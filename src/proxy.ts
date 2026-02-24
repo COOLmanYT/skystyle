@@ -13,9 +13,14 @@ export async function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = await auth();
+  let session;
+  try {
+    session = await auth();
+  } catch (err) {
+    console.error("Proxy auth check failed:", err);
+  }
 
-  if (!session) {
+  if (!session?.user) {
     const loginUrl = req.nextUrl.clone();
     loginUrl.pathname = "/login";
     return NextResponse.redirect(loginUrl);
