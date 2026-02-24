@@ -214,8 +214,47 @@ async function fetchOpenWeather(lat: number, lon: number): Promise<WeatherData> 
 // Custom JSON source (Pro feature)
 // ---------------------------------------------------------------------------
 
+/** Check whether a hostname points to a private/internal address (SSRF prevention) */
+function isPrivateHost(host: string): boolean {
+  // Strip IPv6 brackets
+  const h = host.replace(/^\[|\]$/g, "");
+
+  // Localhost variants
+  if (h === "localhost" || h === "127.0.0.1" || h === "0.0.0.0" || h === "::1") return true;
+
+  // Private IPv4 ranges: 10.0.0.0/8, 192.168.0.0/16, 172.16.0.0/12
+  if (h.startsWith("10.") || h.startsWith("192.168.")) return true;
+  if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true;
+
+  // Link-local IPv4 (169.254.0.0/16) — includes cloud metadata endpoint 169.254.169.254
+  if (h.startsWith("169.254.")) return true;
+
+  // IPv6 private/link-local ranges
+  if (h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80")) return true;
+
+  // Internal-style hostnames
+  if (h.endsWith(".local") || h.endsWith(".internal") || h.endsWith(".localhost")) return true;
+
+  return false;
+}
+
 async function fetchCustomSource(url: string, lon: number): Promise<WeatherData> {
-  const res = await fetch(url, { next: { revalidate: 300 } });
+  // Validate URL to prevent SSRF — only allow HTTPS with public hostnames
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid custom source URL");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("Custom source URL must use HTTPS");
+  }
+  const host = parsed.hostname.toLowerCase();
+  if (isPrivateHost(host)) {
+    throw new Error("Custom source URL must point to a public host");
+  }
+
+  const res = await fetch(parsed.toString(), { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Custom source fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();

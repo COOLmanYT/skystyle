@@ -2,16 +2,55 @@
 -- Sky Style — Supabase (Postgres) Schema
 -- ============================================================
 -- Run this in your Supabase SQL Editor to create all tables.
--- Auth.js (NextAuth) with @auth/supabase-adapter manages the
--- users / accounts / sessions / verification_tokens tables
--- automatically.  The tables below extend that base schema.
+-- This creates the base Auth.js (NextAuth) tables used by
+-- @auth/supabase-adapter, then extends them for Sky Style.
 -- ============================================================
+
+-- ------------------------------------------------------------
+-- 0. Base Auth.js tables (required by @auth/supabase-adapter)
+-- ------------------------------------------------------------
+
+CREATE TABLE IF NOT EXISTS users (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name          text,
+  email         text UNIQUE,
+  "emailVerified" timestamptz,
+  image         text
+);
+
+CREATE TABLE IF NOT EXISTS accounts (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "userId"            uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  type                text NOT NULL,
+  provider            text NOT NULL,
+  "providerAccountId" text NOT NULL,
+  refresh_token       text,
+  access_token        text,
+  expires_at          bigint,
+  token_type          text,
+  scope               text,
+  id_token            text,
+  session_state       text,
+  UNIQUE (provider, "providerAccountId")
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  "sessionToken" text NOT NULL UNIQUE,
+  "userId"       uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  expires        timestamptz NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS verification_tokens (
+  identifier text NOT NULL,
+  token      text NOT NULL UNIQUE,
+  expires    timestamptz NOT NULL,
+  PRIMARY KEY (identifier, token)
+);
 
 -- ------------------------------------------------------------
 -- 1. Extend the users table with is_pro flag
 -- ------------------------------------------------------------
--- @auth/supabase-adapter creates the `users` table; we just add
--- the extra column.
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS is_pro boolean NOT NULL DEFAULT false;
 

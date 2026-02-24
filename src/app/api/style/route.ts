@@ -33,9 +33,9 @@ export async function POST(req: NextRequest) {
   }
 
   const { lat, lon } = body;
-  if (typeof lat !== "number" || typeof lon !== "number") {
+  if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return NextResponse.json(
-      { error: "lat and lon are required numbers" },
+      { error: "lat must be between -90 and 90, lon between -180 and 180" },
       { status: 400 }
     );
   }

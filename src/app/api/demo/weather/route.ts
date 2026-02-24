@@ -1,21 +1,14 @@
 export const dynamic = "force-dynamic";
 /**
- * GET /api/weather?lat=<lat>&lon=<lon>
+ * GET /api/demo/weather?lat=<lat>&lon=<lon>
  *
- * Returns raw weather data for the given coordinates.
- * Auth-protected.
+ * Public (no auth) weather endpoint for the homepage live demo.
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
 import { getWeather } from "@/lib/weather";
 
 export async function GET(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
   const { searchParams } = new URL(req.url);
   const latStr = searchParams.get("lat");
   const lonStr = searchParams.get("lon");

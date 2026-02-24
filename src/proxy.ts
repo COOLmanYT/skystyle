@@ -3,13 +3,13 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Public paths that never require auth
-const PUBLIC_PATHS = ["/login", "/api/auth", "/preview"];
+const PUBLIC_PATHS = ["/", "/login", "/api/auth", "/preview", "/api/demo"];
 
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Allow public paths through without touching the session
-  if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
+  if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();
   }
 
