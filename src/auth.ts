@@ -13,9 +13,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       ? SupabaseAdapter({ url: supabaseUrl, secret: supabaseServiceKey })
       : undefined,
   callbacks: {
-    async session({ session, user }) {
+    async session({ session, user, token }) {
       if (session.user) {
-        session.user.id = user.id;
+        session.user.id = user?.id ?? token?.sub ?? "";
       }
       return session;
     },

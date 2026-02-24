@@ -126,7 +126,7 @@ function nearestBomStation(lat: number, lon: number) {
 
 async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
   const { station, distanceKm } = nearestBomStation(lat, lon);
-  const url = `http://www.bom.gov.au/fwo/${station.id}.json`;
+  const url = `http://www.bom.gov.au/fwo/${station.id}/${station.id}.json`;
   const res = await fetch(url, {
     headers: { "User-Agent": "SkyStyle/1.0 (weather-stylist app)" },
     next: { revalidate: 600 }, // cache 10 min
