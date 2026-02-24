@@ -144,7 +144,7 @@ async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
     description: obs.weather ?? "Clear",
     rainChance: 0, // BOM current obs doesn't include forecast rain%
     uvIndex: 0,    // Not in current obs; would need separate BOM forecast call
-    isDay: isDaytime(),
+    isDay: isDaytime(lon),
     alerts: [],
     stationName: station.name,
     stationDistanceKm: Math.round(distanceKm),
@@ -157,7 +157,6 @@ async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
 // OpenWeatherMap
 // ---------------------------------------------------------------------------
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function fetchOpenWeather(lat: number, lon: number): Promise<WeatherData> {
   const key = process.env.OPENWEATHER_API_KEY;
   if (!key) throw new Error("OPENWEATHER_API_KEY is not set");
@@ -202,7 +201,7 @@ async function fetchOpenWeather(lat: number, lon: number): Promise<WeatherData> 
     description: current.weather?.[0]?.description ?? "clear",
     rainChance: Math.round(rainChance),
     uvIndex: 0, // Requires separate One Call API
-    isDay: isDaytime(),
+    isDay: isDaytime(lon),
     alerts,
     stationName: current.name ?? "Unknown",
     stationDistanceKm: Math.round(distanceKm),
@@ -215,7 +214,7 @@ async function fetchOpenWeather(lat: number, lon: number): Promise<WeatherData> 
 // Custom JSON source (Pro feature)
 // ---------------------------------------------------------------------------
 
-async function fetchCustomSource(url: string): Promise<WeatherData> {
+async function fetchCustomSource(url: string, lon: number): Promise<WeatherData> {
   const res = await fetch(url, { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Custom source fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -232,7 +231,7 @@ async function fetchCustomSource(url: string): Promise<WeatherData> {
     description: String(data.description ?? data.condition ?? "Unknown"),
     rainChance: Number(data.rainChance ?? data.rain_chance ?? 0),
     uvIndex: Number(data.uvIndex ?? data.uv_index ?? 0),
-    isDay: Boolean(data.isDay ?? isDaytime()),
+    isDay: Boolean(data.isDay ?? isDaytime(lon)),
     alerts: Array.isArray(data.alerts) ? data.alerts : [],
     stationName: String(data.stationName ?? data.station ?? "Custom"),
     stationDistanceKm: Number(data.stationDistanceKm ?? 0),
@@ -251,7 +250,7 @@ export async function getWeather(
   customSourceUrl?: string
 ): Promise<WeatherData> {
   if (customSourceUrl) {
-    return fetchCustomSource(customSourceUrl);
+    return fetchCustomSource(customSourceUrl, lon);
   }
   if (isAustralia(lat, lon)) {
     return fetchBom(lat, lon);
@@ -263,9 +262,12 @@ export async function getWeather(
 // Helpers
 // ---------------------------------------------------------------------------
 
-function isDaytime(): boolean {
-  const h = new Date().getUTCHours();
-  return h >= 6 && h < 18;
+/** Approximate whether it is daytime at the given longitude using solar time. */
+function isDaytime(lon: number): boolean {
+  // Solar hour ≈ UTC hour + longitude / 15 (each 15° = 1 hour)
+  const utcHour = new Date().getUTCHours() + new Date().getUTCMinutes() / 60;
+  const solarHour = ((utcHour + lon / 15) % 24 + 24) % 24;
+  return solarHour >= 6 && solarHour < 18;
 }
 
 function degreesToCardinal(deg: number): string {

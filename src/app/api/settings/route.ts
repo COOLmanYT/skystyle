@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 /**
  * GET  /api/settings      – get user settings
  * PATCH /api/settings     – update user settings (Pro features gated)

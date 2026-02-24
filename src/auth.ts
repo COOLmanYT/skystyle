@@ -3,12 +3,15 @@ import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
 import { SupabaseAdapter } from "@auth/supabase-adapter";
 
+const supabaseUrl = process.env.SUPABASE_URL ?? "";
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [GitHub, Google],
-  adapter: SupabaseAdapter({
-    url: process.env.SUPABASE_URL!,
-    secret: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  }),
+  adapter:
+    supabaseUrl && supabaseServiceKey
+      ? SupabaseAdapter({ url: supabaseUrl, secret: supabaseServiceKey })
+      : undefined,
   callbacks: {
     async session({ session, user }) {
       if (session.user) {

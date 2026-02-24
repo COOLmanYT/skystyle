@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 /**
  * GET  /api/closet        – fetch closet items
  * POST /api/closet        – add an item

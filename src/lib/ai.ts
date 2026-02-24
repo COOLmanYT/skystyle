@@ -6,7 +6,15 @@
 import OpenAI from "openai";
 import { WeatherData } from "./weather";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+let _openai: OpenAI | null = null;
+function getOpenAI(): OpenAI {
+  if (!_openai) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY is not set");
+    _openai = new OpenAI({ apiKey });
+  }
+  return _openai;
+}
 
 const DEFAULT_SYSTEM_PROMPT = `You are Sky Style — an expert personal stylist and meteorologist.
 Given weather conditions and a user's wardrobe, recommend a specific outfit.
@@ -72,7 +80,7 @@ export async function getStyleRecommendation(
 
 Please recommend an outfit.`;
 
-  const response = await openai.chat.completions.create({
+  const response = await getOpenAI().chat.completions.create({
     model: "gpt-4o",
     messages: [
       { role: "system", content: systemPrompt },
