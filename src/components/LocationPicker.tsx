@@ -80,10 +80,15 @@ export default function LocationPicker({ onLocationResolved }: Props) {
     setCandidates([]);
     try {
       const res = await fetch(`/api/geocode?q=${encodeURIComponent(q)}`);
-      const data = await res.json();
       if (!res.ok) {
-        setSearchError(data.error ?? "Location not found.");
+        let errorMessage = "Location not found.";
+        try {
+          const data = await res.json();
+          errorMessage = data.error ?? errorMessage;
+        } catch {}
+        setSearchError(errorMessage);
       } else {
+        const data = await res.json();
         setCandidates(data.candidates);
       }
     } catch {
