@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS credits (
 
 ALTER TABLE credits ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own credits" ON credits;
 CREATE POLICY "Users can read own credits"
   ON credits FOR SELECT
   USING (auth.uid() = user_id);
@@ -126,10 +127,12 @@ CREATE TABLE IF NOT EXISTS settings (
 
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own settings" ON settings;
 CREATE POLICY "Users can read own settings"
   ON settings FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own settings" ON settings;
 CREATE POLICY "Users can update own settings"
   ON settings FOR UPDATE
   USING (auth.uid() = user_id);
