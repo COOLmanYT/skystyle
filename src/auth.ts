@@ -22,6 +22,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     isValidHttpUrl(supabaseUrl) && supabaseServiceKey
       ? SupabaseAdapter({ url: supabaseUrl, secret: supabaseServiceKey })
       : undefined,
+  session: { strategy: "jwt" },
   callbacks: {
     async session({ session, user, token }) {
       if (session.user) {
