@@ -51,10 +51,15 @@ export default function Home() {
     setLoading(true);
     try {
       const res = await fetch(`/api/demo/weather?lat=${loc.lat}&lon=${loc.lon}`);
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong.");
+        let errorMessage = "Something went wrong.";
+        try {
+          const data = await res.json();
+          errorMessage = data.error ?? errorMessage;
+        } catch { /* non-JSON error response */ }
+        setError(errorMessage);
       } else {
+        const data = await res.json();
         setWeather(data as WeatherData);
       }
     } catch {

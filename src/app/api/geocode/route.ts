@@ -36,14 +36,20 @@ export async function GET(req: NextRequest) {
   url.searchParams.set("limit", "5");
   url.searchParams.set("addressdetails", "0");
 
-  const res = await fetch(url.toString(), {
-    headers: {
-      // Nominatim requires a descriptive User-Agent
-      "User-Agent": "SkyStyle/1.0 (weather-outfit-stylist; github.com/COOLmanYT/what2wear)",
-      "Accept-Language": "en",
-    },
-    next: { revalidate: 3600 }, // cache geocoding results for 1 hour
-  });
+  let res: Response;
+  try {
+    res = await fetch(url.toString(), {
+      headers: {
+        // Nominatim requires a descriptive User-Agent
+        "User-Agent": "SkyStyle/1.0 (weather-outfit-stylist; github.com/COOLmanYT/what2wear)",
+        "Accept-Language": "en",
+      },
+      next: { revalidate: 3600 }, // cache geocoding results for 1 hour
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Geocoding request failed";
+    return NextResponse.json({ error: message }, { status: 502 });
+  }
 
   if (!res.ok) {
     return NextResponse.json(
@@ -52,7 +58,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const results: NominatimResult[] = await res.json();
+  let results: NominatimResult[];
+  try {
+    results = await res.json();
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid response from geocoding service" },
+      { status: 502 }
+    );
+  }
 
   if (results.length === 0) {
     return NextResponse.json(

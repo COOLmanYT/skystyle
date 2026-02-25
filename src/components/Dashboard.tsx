@@ -54,10 +54,15 @@ export default function Dashboard({ userName }: { userName: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ lat: loc.lat, lon: loc.lon }),
       });
-      const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Something went wrong.");
+        let errorMessage = "Something went wrong.";
+        try {
+          const data = await res.json();
+          errorMessage = data.error ?? errorMessage;
+        } catch { /* non-JSON error response */ }
+        setError(errorMessage);
       } else {
+        const data = await res.json();
         setResult(data as StyleResponse);
       }
     } catch {

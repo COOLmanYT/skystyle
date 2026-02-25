@@ -292,7 +292,13 @@ export async function getWeather(
     return fetchCustomSource(customSourceUrl, lon);
   }
   if (isAustralia(lat, lon)) {
-    return fetchBom(lat, lon);
+    try {
+      return await fetchBom(lat, lon);
+    } catch (err) {
+      // BOM may be unreachable from cloud environments; fall back to OpenWeather
+      console.warn("BOM fetch failed, falling back to OpenWeather:", err);
+      return fetchOpenWeather(lat, lon);
+    }
   }
   return fetchOpenWeather(lat, lon);
 }
