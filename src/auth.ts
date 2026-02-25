@@ -52,6 +52,7 @@ const rawAdapter =
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
+  trustHost: true,
   providers: [GitHub, Google],
   adapter: rawAdapter ? safeAdapter(rawAdapter) : undefined,
   session: { strategy: "jwt" },

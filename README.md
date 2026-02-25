@@ -43,6 +43,7 @@ In your Vercel project go to **Settings → Environment Variables** and add ever
 | Variable | Where to find it |
 |---|---|
 | `AUTH_SECRET` | Run `npx auth secret` locally and copy the output |
+| `AUTH_URL` | Your deployment URL, e.g. `https://your-domain.vercel.app` |
 | `AUTH_GITHUB_ID` | GitHub OAuth App → Client ID |
 | `AUTH_GITHUB_SECRET` | GitHub OAuth App → Client Secret |
 | `AUTH_GOOGLE_ID` | Google OAuth App → Client ID |
