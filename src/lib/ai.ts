@@ -1,9 +1,12 @@
 /**
  * AI styling logic.
- * Builds a prompt from weather data + closet items, then calls the OpenAI API.
+ * Builds a prompt from weather data + closet items, then calls the configured AI API.
+ * Supports OpenAI (OPENAI_API_KEY) and Google Gemini (GEMINI_API_KEY).
+ * OpenAI is preferred when both keys are present.
  */
 
 import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { WeatherData } from "./weather";
 
 let _openai: OpenAI | null = null;
@@ -14,6 +17,16 @@ function getOpenAI(): OpenAI {
     _openai = new OpenAI({ apiKey });
   }
   return _openai;
+}
+
+let _gemini: GoogleGenerativeAI | null = null;
+function getGemini(): GoogleGenerativeAI {
+  if (!_gemini) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) throw new Error("GEMINI_API_KEY is not set");
+    _gemini = new GoogleGenerativeAI(apiKey);
+  }
+  return _gemini;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are Sky Style — an expert personal stylist and meteorologist.
@@ -80,18 +93,30 @@ export async function getStyleRecommendation(
 
 Please recommend an outfit.`;
 
-  const response = await getOpenAI().chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userMessage },
-    ],
-    response_format: { type: "json_object" },
-    max_tokens: 300,
-    temperature: 0.7,
-  });
+  let raw: string;
 
-  const raw = response.choices[0]?.message?.content ?? "{}";
+  if (process.env.OPENAI_API_KEY) {
+    const response = await getOpenAI().chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userMessage },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 300,
+      temperature: 0.7,
+    });
+    raw = response.choices[0]?.message?.content ?? "{}";
+  } else if (process.env.GEMINI_API_KEY) {
+    const model = getGemini().getGenerativeModel({
+      model: "gemini-2.0-flash",
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 300 },
+    });
+    const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
+    raw = result.response.text();
+  } else {
+    throw new Error("No AI API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY.");
+  }
 
   try {
     const parsed = JSON.parse(raw) as Partial<StyleRecommendation>;
