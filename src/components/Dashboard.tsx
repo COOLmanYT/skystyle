@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
+import { handleSignOut } from "@/app/actions";
 
 interface StyleResponse {
   weather: {
@@ -37,11 +38,20 @@ const ACCURACY_COLOR: Record<string, string> = {
   Low: "#ff3b30",
 };
 
-export default function Dashboard({ userName }: { userName: string }) {
+interface DashboardProps {
+  userName: string;
+  isPro: boolean;
+  initialCredits: number | null;
+}
+
+export default function Dashboard({ userName, isPro, initialCredits }: DashboardProps) {
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<StyleResponse | null>(null);
+
+  // Credits shown in header: update after a style call
+  const creditsRemaining = result?.meta?.creditsRemaining ?? initialCredits;
 
   async function handleLocationResolved(loc: ResolvedLocation) {
     setLocation(loc);
@@ -90,14 +100,40 @@ export default function Dashboard({ userName }: { userName: string }) {
               Good day, {userName}
             </p>
           </div>
-          {meta?.isPro && meta.creditsRemaining !== null && (
-            <span
-              className="rounded-full px-3 py-1 text-xs font-medium"
-              style={{ background: "var(--accent)", color: "#fff" }}
-            >
-              {meta.creditsRemaining} credits
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isPro && creditsRemaining !== null && (
+              <span
+                className="rounded-full px-3 py-1 text-xs font-medium"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                {creditsRemaining} credits
+              </span>
+            )}
+            {!isPro && (
+              <a
+                href="https://buymeacoffee.com/coolmanyt"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-full px-3 py-1 text-xs font-medium transition-opacity hover:opacity-80"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                ☕ Buy Pro
+              </a>
+            )}
+            <form action={handleSignOut}>
+              <button
+                type="submit"
+                className="rounded-full px-3 py-1 text-xs font-medium transition-opacity hover:opacity-80"
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid var(--card-border)",
+                  color: "var(--foreground)",
+                }}
+              >
+                Sign Out
+              </button>
+            </form>
+          </div>
         </div>
 
         {/* Location Picker */}
