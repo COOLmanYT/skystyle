@@ -2,10 +2,10 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/style
  *
- * Body: { lat: number; lon: number }
+ * Body: { lat: number; lon: number; userApiKey?: string }
  *
  * Returns an AI-generated outfit recommendation based on real-time weather data.
- * Auth-protected. Pro users have credits deducted.
+ * Auth-protected. Pro users have credits deducted. Free users get 5 AI uses/day.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -14,6 +14,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getWeather } from "@/lib/weather";
 import { getStyleRecommendation } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
+import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
 
 export async function POST(req: NextRequest) {
   // 1. Auth check
@@ -25,14 +26,14 @@ export async function POST(req: NextRequest) {
   const userId = session.user.id;
 
   // 2. Parse body
-  let body: { lat?: number; lon?: number };
+  let body: { lat?: number; lon?: number; userApiKey?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { lat, lon } = body;
+  const { lat, lon, userApiKey } = body;
   if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return NextResponse.json(
       { error: "lat must be between -90 and 90, lon between -180 and 180" },
@@ -49,7 +50,17 @@ export async function POST(req: NextRequest) {
 
   const isPro: boolean = profileResult.data?.is_pro ?? false;
   const settings = settingsResult.data ?? {};
-  const closetItems: string[] = closetResult.data?.items ?? [];
+
+  // Closet: free users can use it 1x/day; Pro unlimited
+  let closetItems: string[] = closetResult.data?.items ?? [];
+  if (!isPro && closetItems.length > 0) {
+    const { allowed } = await canUseFeature(userId, "closet_uses", isPro);
+    if (!allowed) {
+      closetItems = []; // Don't send closet data if limit reached
+    } else {
+      await incrementUsage(userId, "closet_uses", isPro);
+    }
+  }
 
   const unitPreference: "metric" | "imperial" =
     isPro && settings.unit_preference === "imperial" ? "imperial" : "metric";
@@ -60,13 +71,22 @@ export async function POST(req: NextRequest) {
     ? settings.custom_source_url ?? undefined
     : undefined;
 
-  // 4. Credits check (Pro users only)
+  // 4. Credits / daily limit check
   if (isPro) {
     const balance = await getCredits(userId);
     if (balance <= 0) {
       return NextResponse.json(
         { error: "Insufficient credits. Your weekly credits reset in a few days." },
         { status: 402 }
+      );
+    }
+  } else {
+    // Free users: 5 AI uses per day
+    const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Daily AI limit reached (${used}/${limit}). Upgrade to Pro for unlimited access.` },
+        { status: 429 }
       );
     }
   }
@@ -80,7 +100,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  // 6. Get AI recommendation
+  // 6. Get AI recommendation (use BYOK if provided and user is Pro)
   let recommendation;
   try {
     recommendation = await getStyleRecommendation({
@@ -88,16 +108,21 @@ export async function POST(req: NextRequest) {
       closetItems,
       unitPreference,
       customSystemPrompt,
+      userApiKey: isPro ? userApiKey : undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  // 7. Deduct credit (Pro only, after successful response)
+  // 7. Deduct credit / increment daily usage
   if (isPro) {
     await deductCredit(userId);
+  } else {
+    await incrementUsage(userId, "ai_uses", isPro);
   }
+
+  const dailyLimits = await getDailyLimitsInfo(userId, isPro);
 
   return NextResponse.json({
     weather,
@@ -106,6 +131,7 @@ export async function POST(req: NextRequest) {
       isPro,
       unitPreference,
       creditsRemaining: isPro ? (await getCredits(userId)) : null,
+      dailyLimits,
     },
   });
 }

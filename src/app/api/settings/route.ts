@@ -7,6 +7,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
 
 export async function GET() {
   const session = await auth();
@@ -42,8 +43,8 @@ export async function PATCH(req: NextRequest) {
 
   const updates = await req.json();
   const allowedKeys = isPro
-    ? ["unit_preference", "custom_system_prompt", "custom_source_url"]
-    : ["unit_preference"];
+    ? ["unit_preference", "custom_system_prompt", "custom_source_url", "custom_weather_api_key"]
+    : ["unit_preference", "custom_source_url"];
 
   const filtered: Record<string, unknown> = {};
   for (const key of allowedKeys) {
@@ -52,6 +53,18 @@ export async function PATCH(req: NextRequest) {
 
   if (Object.keys(filtered).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+  }
+
+  // Free users: source picker limited to 1x/day
+  if (!isPro && ("custom_source_url" in filtered)) {
+    const { allowed } = await canUseFeature(userId, "source_picks", false);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: "Free users can only change weather source once per day. Upgrade to Pro for unlimited." },
+        { status: 429 }
+      );
+    }
+    await incrementUsage(userId, "source_picks", false);
   }
 
   await supabaseAdmin

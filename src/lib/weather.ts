@@ -9,6 +9,27 @@
  * classify as High (<10 km), Medium (10-50 km), or Low (>50 km).
  */
 
+export interface HourlyForecast {
+  time: string;          // ISO string
+  temp: number;          // Celsius
+  description: string;
+  rainChance: number;    // 0-100
+  windSpeed: number;     // km/h
+}
+
+export interface SourceWeatherData {
+  temp: number;
+  feelsLike: number;
+  humidity: number;
+  windSpeed: number;
+  windDir: string;
+  description: string;
+  rainChance: number;
+  uvIndex: number;
+  source: string;
+  hourly?: HourlyForecast[];
+}
+
 export interface WeatherData {
   temp: number;          // Celsius
   feelsLike: number;     // Celsius
@@ -23,7 +44,10 @@ export interface WeatherData {
   stationName: string;
   stationDistanceKm: number;
   accuracyScore: "High" | "Medium" | "Low";
-  source: "BOM" | "OpenWeather" | "Custom";
+  source: "BOM" | "OpenWeather" | "Custom" | "Multi";
+  hourly?: HourlyForecast[];
+  /** Individual source data (sent to AI for better context) */
+  sources?: SourceWeatherData[];
 }
 
 /** Australia's approximate bounding box */
@@ -280,6 +304,91 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
 }
 
 // ---------------------------------------------------------------------------
+// Open-Meteo (free, no API key needed)
+// ---------------------------------------------------------------------------
+
+async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,weather_code,precipitation_probability,wind_speed_10m&forecast_days=1&timezone=auto`;
+  const res = await fetch(url, { next: { revalidate: 600 } });
+  if (!res.ok) throw new Error(`Open-Meteo fetch failed: ${res.status}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await res.json();
+
+  const current = data.current ?? {};
+  const hourlyData = data.hourly ?? {};
+
+  const hourly: HourlyForecast[] = [];
+  const times: string[] = hourlyData.time ?? [];
+  const temps: number[] = hourlyData.temperature_2m ?? [];
+  const codes: number[] = hourlyData.weather_code ?? [];
+  const rainProbs: number[] = hourlyData.precipitation_probability ?? [];
+  const winds: number[] = hourlyData.wind_speed_10m ?? [];
+
+  for (let i = 0; i < times.length; i++) {
+    hourly.push({
+      time: times[i],
+      temp: Math.round(temps[i] ?? 0),
+      description: wmoCodeToDescription(codes[i] ?? 0),
+      rainChance: Math.round(rainProbs[i] ?? 0),
+      windSpeed: Math.round(winds[i] ?? 0),
+    });
+  }
+
+  return {
+    temp: Math.round(current.temperature_2m ?? 0),
+    feelsLike: Math.round(current.apparent_temperature ?? current.temperature_2m ?? 0),
+    humidity: Math.round(current.relative_humidity_2m ?? 0),
+    windSpeed: Math.round(current.wind_speed_10m ?? 0),
+    windDir: degreesToCardinal(current.wind_direction_10m ?? 0),
+    description: wmoCodeToDescription(current.weather_code ?? 0),
+    rainChance: Math.round(rainProbs[0] ?? 0),
+    uvIndex: 0,
+    source: "Open-Meteo",
+    hourly,
+  };
+}
+
+/** Convert WMO weather code to human-readable description */
+function wmoCodeToDescription(code: number): string {
+  if (code === 0) return "Clear sky";
+  if (code <= 3) return "Partly cloudy";
+  if (code <= 49) return "Fog";
+  if (code <= 59) return "Drizzle";
+  if (code <= 69) return "Rain";
+  if (code <= 79) return "Snow";
+  if (code <= 84) return "Rain showers";
+  if (code <= 89) return "Snow showers";
+  if (code <= 99) return "Thunderstorm";
+  return "Unknown";
+}
+
+/** Average multiple weather sources for display, keep all source data for AI */
+function averageSources(sources: SourceWeatherData[], primary: WeatherData): WeatherData {
+  if (sources.length === 0) return primary;
+
+  const avg = (field: keyof SourceWeatherData) => {
+    const nums = sources.map((s) => Number(s[field])).filter((n) => !isNaN(n));
+    return nums.length > 0 ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : 0;
+  };
+
+  // Merge hourly from first source that has it
+  const hourly = sources.find((s) => s.hourly && s.hourly.length > 0)?.hourly;
+
+  return {
+    ...primary,
+    temp: avg("temp"),
+    feelsLike: avg("feelsLike"),
+    humidity: avg("humidity"),
+    windSpeed: avg("windSpeed"),
+    rainChance: avg("rainChance"),
+    uvIndex: avg("uvIndex"),
+    source: sources.length > 1 ? "Multi" : primary.source,
+    hourly,
+    sources,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
@@ -291,16 +400,80 @@ export async function getWeather(
   if (customSourceUrl) {
     return fetchCustomSource(customSourceUrl, lon);
   }
-  if (isAustralia(lat, lon)) {
-    try {
-      return await fetchBom(lat, lon);
-    } catch (err) {
-      // BOM may be unreachable from cloud environments; fall back to OpenWeather
-      console.warn("BOM fetch failed, falling back to OpenWeather:", err);
-      return fetchOpenWeather(lat, lon);
-    }
+
+  // Fetch from multiple sources in parallel for better accuracy
+  const sourcePromises: Promise<SourceWeatherData | null>[] = [];
+
+  // Always try OpenWeather (primary)
+  if (process.env.OPENWEATHER_API_KEY) {
+    sourcePromises.push(
+      fetchOpenWeather(lat, lon)
+        .then((w) => ({
+          temp: w.temp,
+          feelsLike: w.feelsLike,
+          humidity: w.humidity,
+          windSpeed: w.windSpeed,
+          windDir: w.windDir,
+          description: w.description,
+          rainChance: w.rainChance,
+          uvIndex: w.uvIndex,
+          source: "OpenWeather",
+        }))
+        .catch(() => null)
+    );
   }
-  return fetchOpenWeather(lat, lon);
+
+  // Always try Open-Meteo (free, no key needed)
+  sourcePromises.push(
+    fetchOpenMeteo(lat, lon).catch(() => null)
+  );
+
+  // Try BOM for Australia
+  if (isAustralia(lat, lon)) {
+    sourcePromises.push(
+      fetchBom(lat, lon)
+        .then((w) => ({
+          temp: w.temp,
+          feelsLike: w.feelsLike,
+          humidity: w.humidity,
+          windSpeed: w.windSpeed,
+          windDir: w.windDir,
+          description: w.description,
+          rainChance: w.rainChance,
+          uvIndex: w.uvIndex,
+          source: "BOM",
+        }))
+        .catch(() => null)
+    );
+  }
+
+  const results = await Promise.all(sourcePromises);
+  const validSources = results.filter((r): r is SourceWeatherData => r !== null);
+
+  // We need at least one source
+  if (validSources.length === 0) {
+    throw new Error("All weather sources failed. Please try again later.");
+  }
+
+  // Use the primary (first successful) source for metadata
+  let primary: WeatherData;
+  try {
+    primary = await fetchOpenWeather(lat, lon);
+  } catch {
+    // Fall back to a simple primary from first valid source
+    const s = validSources[0];
+    primary = {
+      ...s,
+      isDay: isDaytime(lon),
+      alerts: [],
+      stationName: s.source,
+      stationDistanceKm: 0,
+      accuracyScore: "Medium",
+      source: s.source as WeatherData["source"],
+    };
+  }
+
+  return averageSources(validSources, primary);
 }
 
 // ---------------------------------------------------------------------------

@@ -121,7 +121,8 @@ CREATE TABLE IF NOT EXISTS settings (
   unit_preference      text NOT NULL DEFAULT 'metric'
                          CHECK (unit_preference IN ('metric', 'imperial')),
   custom_system_prompt text,          -- Pro only
-  custom_source_url    text,          -- Pro only
+  custom_source_url    text,          -- Pro only (saved weather source API key/URL)
+  custom_weather_api_key text,        -- Pro only (saved weather source API key)
   UNIQUE (user_id)
 );
 
@@ -135,4 +136,25 @@ CREATE POLICY "Users can read own settings"
 DROP POLICY IF EXISTS "Users can update own settings" ON settings;
 CREATE POLICY "Users can update own settings"
   ON settings FOR UPDATE
+  USING (auth.uid() = user_id);
+
+-- ------------------------------------------------------------
+-- 5. Daily usage tracking  (follow-ups, AI uses, closet, source picks)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS daily_usage (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  usage_date          date NOT NULL DEFAULT current_date,
+  ai_uses             integer NOT NULL DEFAULT 0,
+  follow_ups          integer NOT NULL DEFAULT 0,
+  closet_uses         integer NOT NULL DEFAULT 0,
+  source_picks        integer NOT NULL DEFAULT 0,
+  UNIQUE (user_id, usage_date)
+);
+
+ALTER TABLE daily_usage ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can read own daily_usage" ON daily_usage;
+CREATE POLICY "Users can read own daily_usage"
+  ON daily_usage FOR SELECT
   USING (auth.uid() = user_id);
