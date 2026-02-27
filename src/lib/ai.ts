@@ -190,12 +190,35 @@ async function callAI(
     });
     raw = response.choices[0]?.message?.content ?? "{}";
   } else if (process.env.GEMINI_API_KEY) {
-    const model = getGemini().getGenerativeModel({
-      model: "gemini-2.5-flash-lite",
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: 300 },
-    });
-    const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
-    raw = result.response.text();
+    const GEMINI_MODELS = [
+      "gemini-2.5-flash-lite",
+      "gemini-2.5-flash",
+      "gemma-3-27b-it",
+      "gemma-3-12b-it",
+    ];
+    let geminiRaw: string | undefined;
+    const triedModels: string[] = [];
+    for (const modelName of GEMINI_MODELS) {
+      triedModels.push(modelName);
+      try {
+        const model = getGemini().getGenerativeModel({
+          model: modelName,
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 300 },
+        });
+        const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
+        geminiRaw = result.response.text();
+        break;
+      } catch (err) {
+        console.warn(
+          `[ai] Gemini model "${modelName}" failed:`,
+          err instanceof Error ? err.message : err
+        );
+      }
+    }
+    if (geminiRaw === undefined) {
+      throw new Error(`All Gemini models failed. Tried: ${triedModels.join(", ")}`);
+    }
+    raw = geminiRaw;
   } else {
     throw new Error("No AI API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY.");
   }

@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
+import { syncPublicUser } from "@/lib/sync-user";
 
 export async function GET() {
   const session = await auth();
@@ -31,6 +32,9 @@ export async function PATCH(req: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  // Sync NextAuth user to public.users (required for FK references in app tables)
+  await syncPublicUser(session);
 
   // Check Pro status for gated settings
   const { data: profile } = await supabaseAdmin

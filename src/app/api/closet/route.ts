@@ -8,6 +8,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { syncPublicUser } from "@/lib/sync-user";
 
 export async function GET() {
   const session = await auth();
@@ -41,6 +42,9 @@ export async function POST(req: NextRequest) {
 
   const userId = session.user.id;
 
+  // Sync NextAuth user to public.users (required for FK references in app tables)
+  await syncPublicUser(session);
+
   // Upsert: append item to existing array
   const { data: existing } = await supabaseAdmin
     .from("closet")
@@ -70,6 +74,9 @@ export async function DELETE(req: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  // Sync NextAuth user to public.users (required for FK references in app tables)
+  await syncPublicUser(session);
   const { data: existing } = await supabaseAdmin
     .from("closet")
     .select("items")

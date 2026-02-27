@@ -14,6 +14,7 @@ import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getFollowUpRecommendation } from "@/lib/ai";
 import { canUseFeature, incrementUsage, getDailyLimitsInfo } from "@/lib/daily-usage";
+import { syncPublicUser } from "@/lib/sync-user";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -22,6 +23,9 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  // Sync NextAuth user to public.users (required for FK references in app tables)
+  await syncPublicUser(session);
 
   let body: {
     message?: string;

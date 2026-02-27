@@ -15,6 +15,7 @@ import { getWeather } from "@/lib/weather";
 import { getStyleRecommendation } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
+import { syncPublicUser } from "@/lib/sync-user";
 
 export async function POST(req: NextRequest) {
   // 1. Auth check
@@ -24,6 +25,9 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = session.user.id;
+
+  // Sync NextAuth user to public.users (required for FK references in app tables)
+  await syncPublicUser(session);
 
   // 2. Parse body
   let body: { lat?: number; lon?: number; userApiKey?: string; gender?: string; shareLocation?: boolean };
