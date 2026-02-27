@@ -30,7 +30,17 @@ interface StyleResponse {
     accuracyScore: "High" | "Medium" | "Low";
     source: "BOM" | "OpenWeather" | "Custom" | "Multi";
     hourly?: HourlyForecast[];
-    sources?: { source: string; temp: number; humidity: number; description: string }[];
+    sources?: {
+      source: string;
+      temp: number;
+      feelsLike: number;
+      humidity: number;
+      windSpeed: number;
+      windDir: string;
+      description: string;
+      rainChance: number;
+      uvIndex: number;
+    }[];
   };
   recommendation: {
     outfit: string;
@@ -192,7 +202,7 @@ export default function Dashboard({
       style={{ background: "var(--background)" }}
     >
       <div className="flex-1 px-4 py-10">
-        <div className="mx-auto max-w-2xl space-y-5">
+        <div className="mx-auto max-w-3xl space-y-5">
           {/* ── Heading ── */}
           <div className="flex items-center justify-between">
             <div>
@@ -377,10 +387,10 @@ export default function Dashboard({
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                   {[
-                    { label: "Humidity", value: `${w!.humidity}%` },
-                    { label: "Rain chance", value: `${w!.rainChance}%` },
+                    { label: "Humidity", value: `${w!.humidity}%`, icon: "💧" },
+                    { label: "Rain chance", value: `${w!.rainChance}%`, icon: "🌧" },
                     {
                       label: "Wind",
                       value: `${
@@ -388,8 +398,18 @@ export default function Dashboard({
                           ? `${Math.round(w!.windSpeed * 0.621)}mph`
                           : `${w!.windSpeed}km/h`
                       } ${w!.windDir}`,
+                      icon: "💨",
                     },
-                  ].map(({ label, value }) => (
+                    { label: "UV Index", value: `${w!.uvIndex}`, icon: "☀️" },
+                    {
+                      label: "Feels like",
+                      value: meta?.unitPreference === "imperial"
+                        ? `${Math.round((w!.feelsLike * 9) / 5 + 32)}°F`
+                        : `${w!.feelsLike}°C`,
+                      icon: "🌡️",
+                    },
+                    { label: "Time", value: w!.isDay ? "Daytime" : "Night-time", icon: w!.isDay ? "🌞" : "🌙" },
+                  ].map(({ label, value, icon }) => (
                     <div
                       key={label}
                       className="rounded-xl p-2.5 text-center"
@@ -399,7 +419,7 @@ export default function Dashboard({
                         className="text-xs"
                         style={{ color: "var(--foreground)", opacity: 0.45 }}
                       >
-                        {label}
+                        {icon} {label}
                       </p>
                       <p
                         className="text-sm font-medium mt-0.5"
@@ -410,6 +430,93 @@ export default function Dashboard({
                     </div>
                   ))}
                 </div>
+
+                {/* Alerts — shown prominently */}
+                {w!.alerts.length > 0 && (
+                  <div
+                    className="rounded-xl p-3 text-xs space-y-1"
+                    style={{
+                      background: "#ff950022",
+                      border: "1px solid #ff950040",
+                    }}
+                  >
+                    <p className="font-semibold uppercase tracking-widest" style={{ color: "#ff9500" }}>
+                      ⚠️ Weather Alerts
+                    </p>
+                    {w!.alerts.map((a, i) => (
+                      <p key={i} style={{ color: "#ff9500" }}>
+                        {a}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Per-source breakdown */}
+                {w!.sources && w!.sources.length > 1 && (
+                  <div className="pt-2">
+                    <p
+                      className="text-xs font-semibold uppercase tracking-widest mb-2"
+                      style={{ color: "var(--foreground)", opacity: 0.4 }}
+                    >
+                      Per-Source Breakdown
+                    </p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs" style={{ color: "var(--foreground)" }}>
+                        <thead>
+                          <tr style={{ opacity: 0.5 }}>
+                            <th className="text-left py-1 pr-2">Source</th>
+                            <th className="text-right py-1 px-1">Temp</th>
+                            <th className="text-right py-1 px-1">Feels</th>
+                            <th className="text-right py-1 px-1">Hum.</th>
+                            <th className="text-right py-1 px-1">Wind</th>
+                            <th className="text-right py-1 px-1">Rain</th>
+                            <th className="text-right py-1 px-1">UV</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {w!.sources.map((s) => (
+                            <tr key={s.source}>
+                              <td className="py-1 pr-2">
+                                {SOURCE_LINKS[s.source] ? (
+                                  <a
+                                    href={SOURCE_LINKS[s.source]}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline hover:opacity-70"
+                                    style={{ color: "var(--accent)" }}
+                                  >
+                                    {s.source}
+                                  </a>
+                                ) : (
+                                  s.source
+                                )}
+                              </td>
+                              <td className="text-right py-1 px-1">
+                                {meta?.unitPreference === "imperial"
+                                  ? `${Math.round((s.temp * 9) / 5 + 32)}°F`
+                                  : `${s.temp}°C`}
+                              </td>
+                              <td className="text-right py-1 px-1">
+                                {meta?.unitPreference === "imperial"
+                                  ? `${Math.round((s.feelsLike * 9) / 5 + 32)}°F`
+                                  : `${s.feelsLike}°C`}
+                              </td>
+                              <td className="text-right py-1 px-1">{s.humidity}%</td>
+                              <td className="text-right py-1 px-1">
+                                {meta?.unitPreference === "imperial"
+                                  ? `${Math.round(s.windSpeed * 0.621)}mph`
+                                  : `${s.windSpeed}km/h`}{" "}
+                                {s.windDir}
+                              </td>
+                              <td className="text-right py-1 px-1">{s.rainChance}%</td>
+                              <td className="text-right py-1 px-1">{s.uvIndex}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
 
                 {/* Data sources badge */}
                 <div className="flex items-center gap-2 pt-1">
@@ -426,18 +533,27 @@ export default function Dashboard({
                     {w!.accuracyScore} accuracy · {w!.stationName} (
                     {w!.stationDistanceKm} km) · {w!.source}
                     {w!.sources && w!.sources.length > 1 && (
-                      <> — averaged from {w!.sources.map((s) => s.source).join(", ")}</>
+                      <> — averaged from {w!.sources.length} sources</>
                     )}
                   </span>
                 </div>
 
                 {/* Weather source attribution */}
-                <div className="pt-1">
+                <div
+                  className="rounded-xl p-3"
+                  style={{ background: "var(--background)" }}
+                >
                   <p
-                    className="text-xs"
-                    style={{ color: "var(--foreground)", opacity: 0.35 }}
+                    className="text-xs font-semibold uppercase tracking-widest mb-1.5"
+                    style={{ color: "var(--foreground)", opacity: 0.4 }}
                   >
-                    Data from{" "}
+                    Data Sources &amp; Credits
+                  </p>
+                  <p
+                    className="text-xs leading-relaxed"
+                    style={{ color: "var(--foreground)", opacity: 0.5 }}
+                  >
+                    Weather data from{" "}
                     {[...new Set([
                       ...(w!.sources ?? []).map((s) => s.source),
                       ...(w!.sources ? [] : [w!.source]),
@@ -451,7 +567,7 @@ export default function Dashboard({
                             target="_blank"
                             rel="noopener noreferrer"
                             className="underline hover:opacity-70"
-                            style={{ color: "var(--foreground)" }}
+                            style={{ color: "var(--accent)" }}
                           >
                             {name}
                           </a>
@@ -464,10 +580,17 @@ export default function Dashboard({
                         acc.push(el);
                         return acc;
                       }, [])}
+                    . AI by{" "}
+                    <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--accent)" }}>OpenAI</a>
+                    {" / "}
+                    <a href="https://deepmind.google/technologies/gemini/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--accent)" }}>Google Gemini</a>
+                    . Geocoding by{" "}
+                    <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--accent)" }}>OpenStreetMap Nominatim</a>
+                    .
                   </p>
                 </div>
 
-                {/* Hourly forecast preview */}
+                {/* Hourly forecast */}
                 {w!.hourly && w!.hourly.length > 0 && (
                   <div className="pt-2">
                     <p
@@ -477,10 +600,10 @@ export default function Dashboard({
                       Hourly Forecast
                     </p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
-                      {w!.hourly.slice(0, 8).map((h, i) => (
+                      {w!.hourly.slice(0, 12).map((h, i) => (
                         <div
                           key={i}
-                          className="flex-shrink-0 rounded-xl p-2 text-center min-w-[60px]"
+                          className="flex-shrink-0 rounded-xl p-2 text-center min-w-[72px]"
                           style={{ background: "var(--background)" }}
                         >
                           <p
@@ -507,28 +630,22 @@ export default function Dashboard({
                               opacity: 0.4,
                             }}
                           >
-                            {h.rainChance}%🌧
+                            🌧{h.rainChance}%
+                          </p>
+                          <p
+                            className="text-xs"
+                            style={{
+                              color: "var(--foreground)",
+                              opacity: 0.35,
+                            }}
+                          >
+                            💨{meta?.unitPreference === "imperial"
+                              ? `${Math.round(h.windSpeed * 0.621)}`
+                              : h.windSpeed}
                           </p>
                         </div>
                       ))}
                     </div>
-                  </div>
-                )}
-
-                {/* Alerts */}
-                {w!.alerts.length > 0 && (
-                  <div
-                    className="rounded-xl p-3 text-xs space-y-1"
-                    style={{
-                      background: "#ff950022",
-                      border: "1px solid #ff950040",
-                    }}
-                  >
-                    {w!.alerts.map((a, i) => (
-                      <p key={i} style={{ color: "#ff9500" }}>
-                        ⚠️ {a}
-                      </p>
-                    ))}
                   </div>
                 )}
               </div>
@@ -777,11 +894,30 @@ export default function Dashboard({
 
       {/* ── Footer ── */}
       <footer
-        className="px-6 py-6 text-center text-xs"
+        className="px-6 py-6 text-center text-xs space-y-2"
         style={{ color: "var(--foreground)", opacity: 0.3 }}
       >
         <p>© {new Date().getFullYear()} Sky Style</p>
-        <p className="mt-1">
+        <p>
+          Weather data:{" "}
+          {Object.entries(SOURCE_LINKS).map(([name, link], i) => (
+            <span key={name}>
+              {i > 0 && " · "}
+              <a href={link} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>{name}</a>
+            </span>
+          ))}
+        </p>
+        <p>
+          AI:{" "}
+          <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OpenAI</a>
+          {" · "}
+          <a href="https://deepmind.google/technologies/gemini/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Google Gemini</a>
+          {" · Geocoding: "}
+          <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OSM Nominatim</a>
+          {" · Hosted on "}
+          <a href="https://vercel.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Vercel</a>
+        </p>
+        <p>
           <Link
             href="https://github.com/COOLmanYT/what2wear"
             target="_blank"

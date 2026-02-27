@@ -4,6 +4,14 @@ import { useState } from "react";
 import DemoLocationPicker, { ResolvedLocation } from "@/components/DemoLocationPicker";
 import Link from "next/link";
 
+interface HourlyForecast {
+  time: string;
+  temp: number;
+  description: string;
+  rainChance: number;
+  windSpeed: number;
+}
+
 interface WeatherData {
   temp: number;
   feelsLike: number;
@@ -19,12 +27,33 @@ interface WeatherData {
   stationDistanceKm: number;
   accuracyScore: "High" | "Medium" | "Low";
   source: "BOM" | "OpenWeather" | "Custom" | "Multi";
+  hourly?: HourlyForecast[];
+  sources?: {
+    source: string;
+    temp: number;
+    feelsLike: number;
+    humidity: number;
+    windSpeed: number;
+    windDir: string;
+    description: string;
+    rainChance: number;
+    uvIndex: number;
+  }[];
 }
 
 const ACCURACY_COLOR: Record<string, string> = {
   High: "#34c759",
   Medium: "#ff9500",
   Low: "#ff3b30",
+};
+
+const SOURCE_LINKS: Record<string, string> = {
+  OpenWeather: "https://openweathermap.org/",
+  "Open-Meteo": "https://open-meteo.com/",
+  BOM: "http://www.bom.gov.au/",
+  WeatherAPI: "https://www.weatherapi.com/",
+  VisualCrossing: "https://www.visualcrossing.com/",
+  PirateWeather: "https://pirateweather.net/",
 };
 
 function weatherEmoji(description: string, isDay: boolean): string {
@@ -187,7 +216,7 @@ export default function Home() {
       </section>
 
       {/* Live Demo */}
-      <section id="demo" className="px-6 py-16 max-w-lg mx-auto">
+      <section id="demo" className="px-6 py-16 max-w-2xl mx-auto">
         <h2
           className="text-2xl font-semibold text-center mb-2"
           style={{ color: "var(--foreground)" }}
@@ -280,15 +309,15 @@ export default function Home() {
                   </span>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                   {[
-                    { label: "Humidity", value: `${weather.humidity}%` },
-                    { label: "Rain chance", value: `${weather.rainChance}%` },
-                    {
-                      label: "Wind",
-                      value: `${weather.windSpeed}km/h ${weather.windDir}`,
-                    },
-                  ].map(({ label, value }) => (
+                    { label: "Humidity", value: `${weather.humidity}%`, icon: "💧" },
+                    { label: "Rain chance", value: `${weather.rainChance}%`, icon: "🌧" },
+                    { label: "Wind", value: `${weather.windSpeed}km/h ${weather.windDir}`, icon: "💨" },
+                    { label: "UV Index", value: `${weather.uvIndex}`, icon: "☀️" },
+                    { label: "Feels like", value: `${weather.feelsLike}°C`, icon: "🌡️" },
+                    { label: "Time", value: weather.isDay ? "Daytime" : "Night-time", icon: weather.isDay ? "🌞" : "🌙" },
+                  ].map(({ label, value, icon }) => (
                     <div
                       key={label}
                       className="rounded-xl p-2.5 text-center"
@@ -298,7 +327,7 @@ export default function Home() {
                         className="text-xs"
                         style={{ color: "var(--foreground)", opacity: 0.45 }}
                       >
-                        {label}
+                        {icon} {label}
                       </p>
                       <p
                         className="text-sm font-medium mt-0.5"
@@ -309,6 +338,112 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
+
+                {/* Alerts */}
+                {weather.alerts.length > 0 && (
+                  <div
+                    className="rounded-xl p-3 text-xs space-y-1"
+                    style={{
+                      background: "#ff950022",
+                      border: "1px solid #ff950040",
+                    }}
+                  >
+                    <p className="font-semibold uppercase tracking-widest" style={{ color: "#ff9500" }}>
+                      ⚠️ Weather Alerts
+                    </p>
+                    {weather.alerts.map((a, i) => (
+                      <p key={i} style={{ color: "#ff9500" }}>
+                        {a}
+                      </p>
+                    ))}
+                  </div>
+                )}
+
+                {/* Per-source breakdown */}
+                {weather.sources && weather.sources.length > 1 && (
+                  <div className="pt-2">
+                    <p
+                      className="text-xs font-semibold uppercase tracking-widest mb-2"
+                      style={{ color: "var(--foreground)", opacity: 0.4 }}
+                    >
+                      Per-Source Breakdown
+                    </p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs" style={{ color: "var(--foreground)" }}>
+                        <thead>
+                          <tr style={{ opacity: 0.5 }}>
+                            <th className="text-left py-1 pr-2">Source</th>
+                            <th className="text-right py-1 px-1">Temp</th>
+                            <th className="text-right py-1 px-1">Hum.</th>
+                            <th className="text-right py-1 px-1">Wind</th>
+                            <th className="text-right py-1 px-1">Rain</th>
+                            <th className="text-right py-1 px-1">UV</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {weather.sources.map((s) => (
+                            <tr key={s.source}>
+                              <td className="py-1 pr-2">
+                                {SOURCE_LINKS[s.source] ? (
+                                  <a
+                                    href={SOURCE_LINKS[s.source]}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline hover:opacity-70"
+                                    style={{ color: "var(--accent)" }}
+                                  >
+                                    {s.source}
+                                  </a>
+                                ) : (
+                                  s.source
+                                )}
+                              </td>
+                              <td className="text-right py-1 px-1">{s.temp}°C</td>
+                              <td className="text-right py-1 px-1">{s.humidity}%</td>
+                              <td className="text-right py-1 px-1">{s.windSpeed}km/h {s.windDir}</td>
+                              <td className="text-right py-1 px-1">{s.rainChance}%</td>
+                              <td className="text-right py-1 px-1">{s.uvIndex}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Hourly forecast */}
+                {weather.hourly && weather.hourly.length > 0 && (
+                  <div className="pt-2">
+                    <p
+                      className="text-xs font-semibold uppercase tracking-widest mb-2"
+                      style={{ color: "var(--foreground)", opacity: 0.4 }}
+                    >
+                      Hourly Forecast
+                    </p>
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {weather.hourly.slice(0, 12).map((h, i) => (
+                        <div
+                          key={i}
+                          className="flex-shrink-0 rounded-xl p-2 text-center min-w-[72px]"
+                          style={{ background: "var(--background)" }}
+                        >
+                          <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>
+                            {new Date(h.time).getHours()}:00
+                          </p>
+                          <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
+                            {h.temp}°
+                          </p>
+                          <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+                            🌧{h.rainChance}%
+                          </p>
+                          <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.35 }}>
+                            💨{h.windSpeed}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-2 pt-1">
                   <span
@@ -323,24 +458,49 @@ export default function Home() {
                   >
                     {weather.accuracyScore} accuracy · {weather.stationName} (
                     {weather.stationDistanceKm} km) · {weather.source}
+                    {weather.sources && weather.sources.length > 1 && (
+                      <> — averaged from {weather.sources.length} sources</>
+                    )}
                   </span>
                 </div>
 
-                {weather.alerts.length > 0 && (
-                  <div
-                    className="rounded-xl p-3 text-xs space-y-1"
-                    style={{
-                      background: "#ff950022",
-                      border: "1px solid #ff950040",
-                    }}
+                {/* Attribution */}
+                <div
+                  className="rounded-xl p-3"
+                  style={{ background: "var(--background)" }}
+                >
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest mb-1"
+                    style={{ color: "var(--foreground)", opacity: 0.4 }}
                   >
-                    {weather.alerts.map((a, i) => (
-                      <p key={i} style={{ color: "#ff9500" }}>
-                        ⚠️ {a}
-                      </p>
-                    ))}
-                  </div>
-                )}
+                    Data Sources &amp; Credits
+                  </p>
+                  <p
+                    className="text-xs leading-relaxed"
+                    style={{ color: "var(--foreground)", opacity: 0.5 }}
+                  >
+                    Weather from{" "}
+                    {[...new Set([
+                      ...(weather.sources ?? []).map((s) => s.source),
+                      ...(weather.sources ? [] : [weather.source]),
+                    ])]
+                      .map((name) => {
+                        const link = SOURCE_LINKS[name];
+                        return link ? (
+                          <a key={name} href={link} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--accent)" }}>{name}</a>
+                        ) : (
+                          <span key={name}>{name}</span>
+                        );
+                      })
+                      .reduce<React.ReactNode[]>((acc, el, i) => {
+                        if (i > 0) acc.push(<span key={`sep-${i}`}>, </span>);
+                        acc.push(el);
+                        return acc;
+                      }, [])}
+                    . Geocoding by{" "}
+                    <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--accent)" }}>OSM Nominatim</a>.
+                  </p>
+                </div>
               </div>
 
               {/* AI recommendation — demo placeholder */}
@@ -529,11 +689,34 @@ export default function Home() {
 
       {/* Footer */}
       <footer
-        className="px-6 py-6 text-center text-xs"
+        className="px-6 py-6 text-center text-xs space-y-2"
         style={{ color: "var(--foreground)", opacity: 0.3 }}
       >
-        <p>© {new Date().getFullYear()} Sky Style. Built with Next.js, Supabase &amp; OpenAI.</p>
-        <p className="mt-1">
+        <p>© {new Date().getFullYear()} Sky Style</p>
+        <p>
+          Weather data:{" "}
+          {Object.entries(SOURCE_LINKS).map(([name, link], i) => (
+            <span key={name}>
+              {i > 0 && " · "}
+              <a href={link} target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>{name}</a>
+            </span>
+          ))}
+        </p>
+        <p>
+          AI:{" "}
+          <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OpenAI</a>
+          {" · "}
+          <a href="https://deepmind.google/technologies/gemini/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Google Gemini</a>
+          {" · Geocoding: "}
+          <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OSM Nominatim</a>
+          {" · Built with "}
+          <a href="https://nextjs.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Next.js</a>
+          {", "}
+          <a href="https://supabase.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Supabase</a>
+          {" · Hosted on "}
+          <a href="https://vercel.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Vercel</a>
+        </p>
+        <p>
           <Link
             href="https://github.com/COOLmanYT/what2wear"
             target="_blank"
