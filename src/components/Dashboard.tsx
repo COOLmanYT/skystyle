@@ -204,34 +204,40 @@ export default function Dashboard({
       <div className="flex-1 px-4 py-10">
         <div className="mx-auto max-w-3xl space-y-5">
           {/* ── Heading ── */}
-          <div className="flex items-center justify-between">
-            <div>
-              <h1
-                className="text-2xl font-semibold"
-                style={{ color: "var(--foreground)" }}
-              >
-                🌤️ Sky Style
-              </h1>
-              <p
-                className="text-sm"
-                style={{ color: "var(--foreground)", opacity: 0.5 }}
-              >
-                Good day, {userName}
-              </p>
-            </div>
-            <form action={handleSignOut}>
+          <div className="sticky-nav rounded-2xl px-4 py-3 -mx-4">
+            <div className="flex items-center justify-between">
               <button
-                type="submit"
-                className="rounded-full px-3 py-1 text-xs font-medium transition-opacity hover:opacity-80"
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid var(--card-border)",
-                  color: "var(--foreground)",
-                }}
+                onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+                className="btn-interact cursor-pointer text-left"
+                aria-label="Scroll to top"
               >
-                Sign Out
+                <h1
+                  className="text-2xl font-semibold"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  🌤️ Sky Style
+                </h1>
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--foreground)", opacity: 0.5 }}
+                >
+                  Good day, {userName}
+                </p>
               </button>
-            </form>
+              <form action={handleSignOut}>
+                <button
+                  type="submit"
+                  className="rounded-full px-3 py-1 text-xs font-medium btn-interact"
+                  style={{
+                    background: "var(--card)",
+                    border: "1px solid var(--card-border)",
+                    color: "var(--foreground)",
+                  }}
+                >
+                  Sign Out
+                </button>
+              </form>
+            </div>
           </div>
 
           {/* ── Location Picker ── */}
@@ -257,7 +263,7 @@ export default function Dashboard({
                   <button
                     key={opt}
                     onClick={() => setGender(opt === "Other" ? "N/A" : opt)}
-                    className="rounded-xl px-3 py-1.5 text-xs font-medium transition-opacity"
+                    className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
                     style={{
                       background: isGenderActive(opt, gender)
                         ? "var(--accent)"
@@ -728,7 +734,7 @@ export default function Dashboard({
                   <button
                     type="submit"
                     disabled={followUpLoading || !followUpText.trim()}
-                    className="rounded-xl px-4 py-2.5 text-sm font-medium transition-opacity disabled:opacity-40"
+                    className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
                     style={{ background: "var(--accent)", color: "#fff" }}
                   >
                     {followUpLoading ? "…" : "Ask"}
@@ -742,7 +748,7 @@ export default function Dashboard({
               {/* Refresh */}
               <button
                 onClick={() => location && handleLocationResolved(location)}
-                className="w-full rounded-2xl py-3 text-sm font-medium transition-opacity hover:opacity-80"
+                className="w-full rounded-2xl py-3 text-sm font-medium btn-interact"
                 style={{
                   background: "var(--card)",
                   border: "1px solid var(--card-border)",
@@ -791,7 +797,7 @@ export default function Dashboard({
                     href="https://buymeacoffee.com/coolmanyt"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="rounded-full px-3 py-1 text-xs font-medium transition-opacity hover:opacity-80"
+                    className="rounded-full px-3 py-1 text-xs font-medium btn-interact"
                     style={{ background: "var(--accent)", color: "#fff" }}
                   >
                     ☕ Upgrade to Pro

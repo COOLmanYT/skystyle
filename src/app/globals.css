@@ -25,3 +25,25 @@ body {
     "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
+
+/* Shared button interaction animations */
+.btn-interact {
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+.btn-interact:hover {
+  transform: scale(1.04);
+  opacity: 0.9;
+}
+.btn-interact:active {
+  transform: scale(0.96);
+}
+
+/* Sticky nav glassmorphism */
+.sticky-nav {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--background) 80%, transparent);
+}

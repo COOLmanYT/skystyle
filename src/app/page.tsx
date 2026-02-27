@@ -101,27 +101,33 @@ export default function Home() {
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       {/* Navigation */}
-      <nav className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">🌤️</span>
-          <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-            Sky Style
-          </span>
-        </div>
-        <div className="flex items-center gap-3">
-          <a href="#demo" className="text-sm px-3 py-1.5 rounded-lg transition-opacity hover:opacity-70" style={{ color: "var(--foreground)" }}>
-            Demo
-          </a>
-          <a href="#pricing" className="text-sm px-3 py-1.5 rounded-lg transition-opacity hover:opacity-70" style={{ color: "var(--foreground)" }}>
-            Pricing
-          </a>
-          <Link
-            href="/login"
-            className="text-sm px-4 py-2 rounded-xl font-medium transition-opacity hover:opacity-80"
-            style={{ background: "var(--accent)", color: "#fff" }}
+      <nav className="sticky-nav">
+        <div className="flex items-center justify-between px-6 py-4 max-w-5xl mx-auto">
+          <button
+            onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+            className="flex items-center gap-2 btn-interact cursor-pointer"
+            aria-label="Scroll to top"
           >
-            Sign In
-          </Link>
+            <span className="text-2xl">🌤️</span>
+            <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+              Sky Style
+            </span>
+          </button>
+          <div className="flex items-center gap-3">
+            <a href="#demo" className="text-sm px-3 py-1.5 rounded-lg btn-interact" style={{ color: "var(--foreground)" }}>
+              Demo
+            </a>
+            <a href="#pricing" className="text-sm px-3 py-1.5 rounded-lg btn-interact" style={{ color: "var(--foreground)" }}>
+              Pricing
+            </a>
+            <Link
+              href="/login"
+              className="text-sm px-4 py-2 rounded-xl font-medium btn-interact"
+              style={{ background: "var(--accent)", color: "#fff" }}
+            >
+              Sign In
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -144,14 +150,14 @@ export default function Home() {
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <Link
             href="/login"
-            className="px-6 py-3 rounded-2xl text-sm font-medium transition-opacity hover:opacity-80"
+            className="px-6 py-3 rounded-2xl text-sm font-medium btn-interact"
             style={{ background: "var(--accent)", color: "#fff" }}
           >
             Get Started — Free
           </Link>
           <a
             href="#demo"
-            className="px-6 py-3 rounded-2xl text-sm font-medium transition-opacity hover:opacity-80"
+            className="px-6 py-3 rounded-2xl text-sm font-medium btn-interact"
             style={{
               background: "var(--card)",
               color: "var(--foreground)",
@@ -532,7 +538,7 @@ export default function Home() {
                 </p>
                 <Link
                   href="/login"
-                  className="inline-block mt-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-opacity hover:opacity-80"
+                  className="inline-block mt-2 px-5 py-2.5 rounded-xl text-sm font-medium btn-interact"
                   style={{ background: "var(--accent)", color: "#fff" }}
                 >
                   Sign in for AI recommendations →
@@ -680,7 +686,7 @@ export default function Home() {
         </h2>
         <Link
           href="/login"
-          className="inline-block px-6 py-3 rounded-2xl text-sm font-medium transition-opacity hover:opacity-80"
+          className="inline-block px-6 py-3 rounded-2xl text-sm font-medium btn-interact"
           style={{ background: "var(--accent)", color: "#fff" }}
         >
           Get Started — It&apos;s Free
