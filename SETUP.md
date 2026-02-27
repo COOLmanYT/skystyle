@@ -18,6 +18,13 @@ Before deploying, create accounts and obtain credentials for:
 
 > **Note:** [Open-Meteo](https://open-meteo.com/) is also used as a weather source and requires no API key.
 
+**Optional extra weather sources** (improve accuracy via multi-source aggregation):
+
+| Service | Purpose | Link |
+|---|---|---|
+| [WeatherAPI.com](https://www.weatherapi.com/) | Additional weather source | Free tier |
+| [Visual Crossing](https://www.visualcrossing.com/) | Additional weather source | Free tier |
+
 ### 2. Create the Supabase database
 
 1. Create a new Supabase project.
@@ -55,6 +62,8 @@ In your Vercel project go to **Settings → Environment Variables** and add ever
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` secret |
 | `OPENAI_API_KEY` | OpenAI → API Keys |
 | `OPENWEATHER_API_KEY` | OpenWeatherMap → My API Keys |
+| `WEATHERAPI_KEY` | *(optional)* WeatherAPI.com → Dashboard → API Key |
+| `VISUALCROSSING_API_KEY` | *(optional)* Visual Crossing → Account → API Key |
 
 ### 6. Redeploy
 

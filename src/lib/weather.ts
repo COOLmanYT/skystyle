@@ -304,6 +304,90 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
 }
 
 // ---------------------------------------------------------------------------
+// WeatherAPI.com (requires WEATHERAPI_KEY)
+// ---------------------------------------------------------------------------
+
+async function fetchWeatherApi(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = process.env.WEATHERAPI_KEY;
+  if (!key) throw new Error("WEATHERAPI_KEY is not set");
+
+  const url = `https://api.weatherapi.com/v1/forecast.json?key=${key}&q=${lat},${lon}&days=1&aqi=no&alerts=no`;
+  const res = await fetch(url, { next: { revalidate: 600 } });
+  if (!res.ok) throw new Error(`WeatherAPI fetch failed: ${res.status}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await res.json();
+
+  const current = data.current ?? {};
+  const forecastDay = data.forecast?.forecastday?.[0] ?? {};
+
+  const hourly: HourlyForecast[] = (forecastDay.hour ?? []).map(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (h: any) => ({
+      time: h.time ?? "",
+      temp: Math.round(h.temp_c ?? 0),
+      description: h.condition?.text ?? "Unknown",
+      rainChance: h.chance_of_rain ?? 0,
+      windSpeed: Math.round(h.wind_kph ?? 0),
+    })
+  );
+
+  return {
+    temp: Math.round(current.temp_c ?? 0),
+    feelsLike: Math.round(current.feelslike_c ?? current.temp_c ?? 0),
+    humidity: current.humidity ?? 0,
+    windSpeed: Math.round(current.wind_kph ?? 0),
+    windDir: current.wind_dir ?? "N",
+    description: current.condition?.text ?? "Unknown",
+    rainChance: forecastDay.day?.daily_chance_of_rain ?? 0,
+    uvIndex: current.uv ?? 0,
+    source: "WeatherAPI",
+    hourly,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Visual Crossing (requires VISUALCROSSING_API_KEY)
+// ---------------------------------------------------------------------------
+
+async function fetchVisualCrossing(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = process.env.VISUALCROSSING_API_KEY;
+  if (!key) throw new Error("VISUALCROSSING_API_KEY is not set");
+
+  const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}/today?unitGroup=metric&key=${key}&include=current,hours&contentType=json`;
+  const res = await fetch(url, { next: { revalidate: 600 } });
+  if (!res.ok) throw new Error(`Visual Crossing fetch failed: ${res.status}`);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const data: any = await res.json();
+
+  const current = data.currentConditions ?? {};
+  const dayData = data.days?.[0] ?? {};
+
+  const hourly: HourlyForecast[] = (dayData.hours ?? []).map(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (h: any) => ({
+      time: h.datetime ?? "",
+      temp: Math.round(h.temp ?? 0),
+      description: h.conditions ?? "Unknown",
+      rainChance: Math.round(h.precipprob ?? 0),
+      windSpeed: Math.round(h.windspeed ?? 0),
+    })
+  );
+
+  return {
+    temp: Math.round(current.temp ?? 0),
+    feelsLike: Math.round(current.feelslike ?? current.temp ?? 0),
+    humidity: Math.round(current.humidity ?? 0),
+    windSpeed: Math.round(current.windspeed ?? 0),
+    windDir: degreesToCardinal(current.winddir ?? 0),
+    description: current.conditions ?? "Unknown",
+    rainChance: Math.round(dayData.precipprob ?? 0),
+    uvIndex: current.uvindex ?? 0,
+    source: "VisualCrossing",
+    hourly,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Open-Meteo (free, no API key needed)
 // ---------------------------------------------------------------------------
 
@@ -427,6 +511,20 @@ export async function getWeather(
   sourcePromises.push(
     fetchOpenMeteo(lat, lon).catch(() => null)
   );
+
+  // Try WeatherAPI.com if key is available
+  if (process.env.WEATHERAPI_KEY) {
+    sourcePromises.push(
+      fetchWeatherApi(lat, lon).catch(() => null)
+    );
+  }
+
+  // Try Visual Crossing if key is available
+  if (process.env.VISUALCROSSING_API_KEY) {
+    sourcePromises.push(
+      fetchVisualCrossing(lat, lon).catch(() => null)
+    );
+  }
 
   // Try BOM for Australia
   if (isAustralia(lat, lon)) {
