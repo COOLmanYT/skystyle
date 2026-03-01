@@ -51,6 +51,8 @@ export interface StyleInput {
   gender?: string;
   /** Whether the user consented to share their location with the AI */
   shareLocation?: boolean;
+  /** When true, AI must ONLY recommend items from the user's closet */
+  forceCloset?: boolean;
 }
 
 export interface FollowUpInput {
@@ -87,12 +89,14 @@ function formatWind(kmh: number, unit: "metric" | "imperial"): string {
 export async function getStyleRecommendation(
   input: StyleInput
 ): Promise<StyleRecommendation> {
-  const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation } = input;
+  const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation, forceCloset } = input;
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
   const closetSection =
     closetItems.length > 0
-      ? `\nUser's available wardrobe:\n${closetItems.map((i) => `- ${i}`).join("\n")}`
+      ? forceCloset
+        ? `\nUser's available wardrobe (ONLY recommend items from this list — do NOT suggest anything outside it):\n${closetItems.map((i) => `- ${i}`).join("\n")}`
+        : `\nUser's available wardrobe (you may also suggest items not listed here):\n${closetItems.map((i) => `- ${i}`).join("\n")}`
       : "\nUser has not added any wardrobe items — suggest general clothing.";
 
   const alertSection =

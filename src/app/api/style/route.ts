@@ -30,14 +30,14 @@ export async function POST(req: NextRequest) {
   await syncPublicUser(session);
 
   // 2. Parse body
-  let body: { lat?: number; lon?: number; userApiKey?: string; gender?: string; shareLocation?: boolean };
+  let body: { lat?: number; lon?: number; userApiKey?: string; gender?: string; shareLocation?: boolean; forceCloset?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { lat, lon, userApiKey, gender, shareLocation } = body;
+  const { lat, lon, userApiKey, gender, shareLocation, forceCloset } = body;
   if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return NextResponse.json(
       { error: "lat must be between -90 and 90, lon between -180 and 180" },
@@ -115,6 +115,7 @@ export async function POST(req: NextRequest) {
       userApiKey: isPro ? userApiKey : undefined,
       gender: typeof gender === "string" ? gender.slice(0, 30) : undefined,
       shareLocation: shareLocation === true,
+      forceCloset: forceCloset === true,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";

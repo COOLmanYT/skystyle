@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
 import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
@@ -109,10 +109,72 @@ export default function Dashboard({
   const [gender, setGender] = useState<string>("N/A");
   const [customGender, setCustomGender] = useState("");
   const [shareLocation, setShareLocation] = useState(false);
+  const [closetItems, setClosetItems] = useState<string[]>([]);
+  const [newClosetItem, setNewClosetItem] = useState("");
+  const [closetLoading, setClosetLoading] = useState(false);
+  const [forceCloset, setForceCloset] = useState(false);
+  const [weatherOnly, setWeatherOnly] = useState(false);
+
+  // Fetch closet items on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/closet");
+        if (res.ok) {
+          const data = await res.json();
+          setClosetItems(data.items ?? []);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
+
+  async function addClosetItem(e: React.FormEvent) {
+    e.preventDefault();
+    const item = newClosetItem.trim();
+    if (!item) return;
+    setClosetLoading(true);
+    try {
+      const res = await fetch("/api/closet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClosetItems(data.items ?? []);
+        setNewClosetItem("");
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setClosetLoading(false);
+    }
+  }
+
+  async function removeClosetItem(item: string) {
+    setClosetLoading(true);
+    try {
+      const res = await fetch("/api/closet", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ item }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setClosetItems(data.items ?? []);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setClosetLoading(false);
+    }
+  }
 
   const creditsRemaining = result?.meta?.creditsRemaining ?? initialCredits;
 
-  async function handleLocationResolved(loc: ResolvedLocation) {
+  const handleLocationResolved = useCallback(async function handleLocationResolved(loc: ResolvedLocation) {
     setLocation(loc);
     setError(null);
     setResult(null);
@@ -120,27 +182,49 @@ export default function Dashboard({
     setFollowUpText("");
     setFollowUpError(null);
     try {
-      const effectiveGender = gender === "Other - Manual" ? customGender.slice(0, MAX_GENDER_LENGTH) : gender;
-      const res = await fetch("/api/style", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat: loc.lat, lon: loc.lon, gender: effectiveGender, shareLocation }),
-      });
-      if (!res.ok) {
-        let errorMessage = "Something went wrong.";
-        try {
-          const data = await res.json();
-          errorMessage = data.error ?? errorMessage;
-        } catch {
-          /* non-JSON error response */
+      if (weatherOnly) {
+        // Weather-only mode: fetch weather without AI recommendation
+        const res = await fetch(`/api/weather?lat=${loc.lat}&lon=${loc.lon}`);
+        if (!res.ok) {
+          let errorMessage = "Something went wrong.";
+          try {
+            const data = await res.json();
+            errorMessage = data.error ?? errorMessage;
+          } catch {
+            /* non-JSON error response */
+          }
+          setError(errorMessage);
+        } else {
+          const weather = await res.json();
+          setResult({
+            weather,
+            recommendation: { outfit: "", reasoning: "" },
+            meta: { isPro, unitPreference: "metric", creditsRemaining: null },
+          });
         }
-        setError(errorMessage);
       } else {
-        const data = await res.json();
-        const styleResult = data as StyleResponse;
-        setResult(styleResult);
-        if (styleResult.meta?.dailyLimits) {
-          setDailyLimits(styleResult.meta.dailyLimits);
+        const effectiveGender = gender === "Other - Manual" ? customGender.slice(0, MAX_GENDER_LENGTH) : gender;
+        const res = await fetch("/api/style", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ lat: loc.lat, lon: loc.lon, gender: effectiveGender, shareLocation, forceCloset }),
+        });
+        if (!res.ok) {
+          let errorMessage = "Something went wrong.";
+          try {
+            const data = await res.json();
+            errorMessage = data.error ?? errorMessage;
+          } catch {
+            /* non-JSON error response */
+          }
+          setError(errorMessage);
+        } else {
+          const data = await res.json();
+          const styleResult = data as StyleResponse;
+          setResult(styleResult);
+          if (styleResult.meta?.dailyLimits) {
+            setDailyLimits(styleResult.meta.dailyLimits);
+          }
         }
       }
     } catch {
@@ -148,7 +232,7 @@ export default function Dashboard({
     } finally {
       setLoading(false);
     }
-  }
+  }, [weatherOnly, gender, customGender, shareLocation, forceCloset, isPro]);
 
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
@@ -308,6 +392,107 @@ export default function Dashboard({
                 Share my location with AI for more relevant recommendations
               </span>
             </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={weatherOnly}
+                onChange={(e) => setWeatherOnly(e.target.checked)}
+                className="rounded"
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.6 }}
+              >
+                Weather only (skip AI outfit recommendation)
+              </span>
+            </label>
+          </div>
+
+          {/* ── Closet Management ── */}
+          <div
+            className="rounded-2xl p-4 space-y-3"
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+            }}
+          >
+            <p
+              className="text-xs font-semibold uppercase tracking-widest"
+              style={{ color: "var(--foreground)", opacity: 0.4 }}
+            >
+              👕 My Closet
+            </p>
+            <form onSubmit={addClosetItem} className="flex gap-2">
+              <input
+                type="text"
+                value={newClosetItem}
+                onChange={(e) => setNewClosetItem(e.target.value)}
+                placeholder="Add an item (e.g. Blue denim jacket)"
+                className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
+                style={{
+                  background: "var(--background)",
+                  color: "var(--foreground)",
+                  border: "1px solid var(--card-border)",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={closetLoading || !newClosetItem.trim()}
+                className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                {closetLoading ? "…" : "Add"}
+              </button>
+            </form>
+            {closetItems.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {closetItems.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs"
+                    style={{
+                      background: "var(--background)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  >
+                    {item}
+                    <button
+                      onClick={() => removeClosetItem(item)}
+                      disabled={closetLoading}
+                      className="hover:opacity-70 disabled:opacity-30"
+                      style={{ color: "#ff3b30" }}
+                      aria-label={`Remove ${item}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {closetItems.length === 0 && (
+              <p
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                No items in your closet yet. Add some to get personalised recommendations!
+              </p>
+            )}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceCloset}
+                onChange={(e) => setForceCloset(e.target.checked)}
+                className="rounded"
+                disabled={closetItems.length === 0}
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: closetItems.length === 0 ? 0.3 : 0.6 }}
+              >
+                Force recommendation to use closet
+              </span>
+            </label>
           </div>
 
           {location && (
@@ -339,7 +524,7 @@ export default function Dashboard({
                 className="text-sm"
                 style={{ color: "var(--foreground)", opacity: 0.6 }}
               >
-                Fetching weather &amp; styling your look…
+                Fetching weather{weatherOnly ? "…" : " & styling your look…"}
               </p>
             </div>
           )}
@@ -657,6 +842,7 @@ export default function Dashboard({
               </div>
 
               {/* ── Outfit Recommendation ── */}
+              {rec!.outfit && (
               <div
                 className="rounded-2xl p-5 space-y-3"
                 style={{
@@ -693,8 +879,10 @@ export default function Dashboard({
                   </>
                 )}
               </div>
+              )}
 
               {/* ── Follow-Up Input ── */}
+              {rec!.outfit && (
               <div
                 className="rounded-2xl p-4"
                 style={{
@@ -744,6 +932,7 @@ export default function Dashboard({
                   <p className="text-xs text-red-500 mt-2">{followUpError}</p>
                 )}
               </div>
+              )}
 
               {/* Refresh */}
               <button
