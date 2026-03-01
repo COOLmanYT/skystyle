@@ -174,7 +174,7 @@ export default function Dashboard({
 
   const creditsRemaining = result?.meta?.creditsRemaining ?? initialCredits;
 
-  const handleLocationResolved = useCallback(async function handleLocationResolved(loc: ResolvedLocation) {
+  const handleLocationResolved = useCallback(async (loc: ResolvedLocation) => {
     setLocation(loc);
     setError(null);
     setResult(null);
@@ -475,7 +475,7 @@ export default function Dashboard({
                 className="text-xs"
                 style={{ color: "var(--foreground)", opacity: 0.4 }}
               >
-                No items in your closet yet. Add some to get personalised recommendations!
+                No items in your closet yet. Add some to get personalized recommendations!
               </p>
             )}
             <label className="flex items-center gap-2 cursor-pointer">
