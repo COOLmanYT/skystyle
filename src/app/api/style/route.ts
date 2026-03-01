@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
   }
 
   const unitPreference: "metric" | "imperial" =
-    isPro && settings.unit_preference === "imperial" ? "imperial" : "metric";
+    settings.unit_preference === "imperial" ? "imperial" : "metric";
   const customSystemPrompt: string | undefined = isPro
     ? settings.custom_system_prompt ?? undefined
     : undefined;

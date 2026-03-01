@@ -114,15 +114,25 @@ export default function Dashboard({
   const [closetLoading, setClosetLoading] = useState(false);
   const [forceCloset, setForceCloset] = useState(false);
   const [weatherOnly, setWeatherOnly] = useState(false);
+  const [userUnitPreference, setUserUnitPreference] = useState<"metric" | "imperial">("metric");
 
-  // Fetch closet items on mount
+  // Fetch closet items and settings on mount
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch("/api/closet");
-        if (res.ok) {
-          const data = await res.json();
+        const [closetRes, settingsRes] = await Promise.all([
+          fetch("/api/closet"),
+          fetch("/api/settings"),
+        ]);
+        if (closetRes.ok) {
+          const data = await closetRes.json();
           setClosetItems(data.items ?? []);
+        }
+        if (settingsRes.ok) {
+          const data = await settingsRes.json();
+          if (data.unit_preference === "imperial") {
+            setUserUnitPreference("imperial");
+          }
         }
       } catch {
         /* ignore */
@@ -199,7 +209,7 @@ export default function Dashboard({
           setResult({
             weather,
             recommendation: { outfit: "", reasoning: "" },
-            meta: { isPro, unitPreference: "metric", creditsRemaining: null },
+            meta: { isPro, unitPreference: userUnitPreference, creditsRemaining: null },
           });
         }
       } else {
@@ -232,7 +242,7 @@ export default function Dashboard({
     } finally {
       setLoading(false);
     }
-  }, [weatherOnly, gender, customGender, shareLocation, forceCloset, isPro]);
+  }, [weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, userUnitPreference]);
 
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
@@ -377,6 +387,41 @@ export default function Dashboard({
                   }}
                 />
               )}
+            </div>
+            <div>
+              <p
+                className="text-xs font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                Units
+              </p>
+              <div className="flex gap-2">
+                {(["metric", "imperial"] as const).map((unit) => (
+                  <button
+                    key={unit}
+                    onClick={async () => {
+                      setUserUnitPreference(unit);
+                      try {
+                        await fetch("/api/settings", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ unit_preference: unit }),
+                        });
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact capitalize"
+                    style={{
+                      background: userUnitPreference === unit ? "var(--accent)" : "var(--background)",
+                      color: userUnitPreference === unit ? "#fff" : "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  >
+                    {unit === "metric" ? "°C / km/h" : "°F / mph"}
+                  </button>
+                ))}
+              </div>
             </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input

@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
     .eq("user_id", userId)
     .single();
 
-  const unitPreference = isPro && settings?.unit_preference === "imperial" ? "imperial" as const : "metric" as const;
+  const unitPreference = settings?.unit_preference === "imperial" ? "imperial" as const : "metric" as const;
   const customSystemPrompt = isPro ? settings?.custom_system_prompt ?? undefined : undefined;
 
   let recommendation;
