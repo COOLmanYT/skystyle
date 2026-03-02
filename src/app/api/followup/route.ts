@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
   // Check Pro/Dev status
   const { data: profile } = await supabaseAdmin
     .from("users")
-    .select("is_pro, is_dev")
+    .select("*")
     .eq("id", userId)
     .single();
 

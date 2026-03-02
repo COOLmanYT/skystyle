@@ -154,6 +154,18 @@ CREATE POLICY "Users can read own daily_usage"
   USING ((select auth.uid()) = user_id);
 
 -- ============================================================
+-- MIGRATIONS — Run once in Supabase SQL Editor if upgrading
+-- ============================================================
+-- If your users table was created before is_dev was added,
+-- run this to add the column:
+--
+--    ALTER TABLE users ADD COLUMN IF NOT EXISTS is_dev boolean NOT NULL DEFAULT false;
+--
+-- Then reload the PostgREST schema cache (Settings > API > Reload):
+--    NOTIFY pgrst, 'reload schema';
+-- ============================================================
+
+-- ============================================================
 -- MANUAL CLEANUP — Run once in Supabase SQL Editor
 -- ============================================================
 -- These statements clean up unused tables that may have been
