@@ -17,15 +17,16 @@ export async function GET() {
   const userId = session.user.id;
   const { data } = await supabaseAdmin
     .from("users")
-    .select("is_pro")
+    .select("is_pro, is_dev")
     .eq("id", userId)
     .single();
 
   const isPro = data?.is_pro ?? false;
-  if (!isPro) {
-    return NextResponse.json({ isPro: false, credits: null });
+  const isDev = data?.is_dev ?? false;
+  if (!isPro && !isDev) {
+    return NextResponse.json({ isPro: false, isDev: false, credits: null });
   }
 
   const credits = await getCredits(userId);
-  return NextResponse.json({ isPro: true, credits });
+  return NextResponse.json({ isPro, isDev, credits });
 }

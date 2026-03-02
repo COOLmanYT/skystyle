@@ -13,6 +13,10 @@
 -- ------------------------------------------------------------
 -- 0. Base Auth.js tables (required by @auth/supabase-adapter)
 --    These MUST live in the "next_auth" schema.
+--
+--    Only `users` and `accounts` are needed:
+--    - sessions is NOT used (NextAuth uses JWT strategy)
+--    - verification_tokens is NOT used (OAuth-only, no email auth)
 -- ------------------------------------------------------------
 
 CREATE SCHEMA IF NOT EXISTS next_auth;
@@ -45,20 +49,6 @@ CREATE TABLE IF NOT EXISTS next_auth.accounts (
   UNIQUE (provider, "providerAccountId")
 );
 
-CREATE TABLE IF NOT EXISTS next_auth.sessions (
-  id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  "sessionToken" text NOT NULL UNIQUE,
-  "userId"       uuid NOT NULL REFERENCES next_auth.users(id) ON DELETE CASCADE,
-  expires        timestamptz NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS next_auth.verification_tokens (
-  identifier text NOT NULL,
-  token      text NOT NULL UNIQUE,
-  expires    timestamptz NOT NULL,
-  PRIMARY KEY (identifier, token)
-);
-
 -- ------------------------------------------------------------
 -- 1. Application "users" table (public schema) with is_pro flag
 --    API routes query public.users for app-specific data.
@@ -75,6 +65,9 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- ------------------------------------------------------------
 -- 2. Credits  (Pro users: 50 per week)
+--    Actively used: /api/style deducts 1 credit per AI call for
+--    Pro users. Balance is shown in the dashboard and weekly
+--    reset is handled by src/lib/credits.ts.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS credits (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -89,7 +82,7 @@ ALTER TABLE credits ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own credits" ON credits;
 CREATE POLICY "Users can read own credits"
   ON credits FOR SELECT
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id);
 
 -- Service role can do everything (used by the API routes).
 
@@ -107,11 +100,11 @@ ALTER TABLE closet ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "Users can read own closet"
   ON closet FOR SELECT
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id);
 
 CREATE POLICY "Users can update own closet"
   ON closet FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id);
 
 -- ------------------------------------------------------------
 -- 4. Settings  (unit preference + Pro-only overrides)
@@ -132,12 +125,12 @@ ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own settings" ON settings;
 CREATE POLICY "Users can read own settings"
   ON settings FOR SELECT
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id);
 
 DROP POLICY IF EXISTS "Users can update own settings" ON settings;
 CREATE POLICY "Users can update own settings"
   ON settings FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id);
 
 -- ------------------------------------------------------------
 -- 5. Daily usage tracking  (follow-ups, AI uses, closet, source picks)
@@ -158,4 +151,56 @@ ALTER TABLE daily_usage ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Users can read own daily_usage" ON daily_usage;
 CREATE POLICY "Users can read own daily_usage"
   ON daily_usage FOR SELECT
-  USING (auth.uid() = user_id);
+  USING ((select auth.uid()) = user_id);
+
+-- ============================================================
+-- MANUAL CLEANUP — Run once in Supabase SQL Editor
+-- ============================================================
+-- These statements clean up unused tables that may have been
+-- created in the database. Safe to run even if the tables
+-- don't exist (IF EXISTS).
+--
+-- 1. Drop unused next_auth tables (JWT strategy = no sessions
+--    table needed; OAuth-only = no verification_tokens needed):
+--
+--    DROP TABLE IF EXISTS next_auth.sessions;
+--    DROP TABLE IF EXISTS next_auth.verification_tokens;
+--
+-- 2. Drop any accidentally-created public-schema duplicates
+--    of the next_auth tables (these are never referenced by
+--    application code):
+--
+--    DROP TABLE IF EXISTS public.sessions;
+--    DROP TABLE IF EXISTS public.verification_tokens;
+--    DROP TABLE IF EXISTS public.accounts;
+--
+-- 3. Update existing RLS policies to use (select auth.uid())
+--    instead of auth.uid() for better performance. Re-run the
+--    DROP POLICY / CREATE POLICY statements above, or run:
+--
+--    -- credits
+--    DROP POLICY IF EXISTS "Users can read own credits" ON credits;
+--    CREATE POLICY "Users can read own credits"
+--      ON credits FOR SELECT USING ((select auth.uid()) = user_id);
+--
+--    -- closet
+--    DROP POLICY IF EXISTS "Users can read own closet" ON closet;
+--    CREATE POLICY "Users can read own closet"
+--      ON closet FOR SELECT USING ((select auth.uid()) = user_id);
+--    DROP POLICY IF EXISTS "Users can update own closet" ON closet;
+--    CREATE POLICY "Users can update own closet"
+--      ON closet FOR UPDATE USING ((select auth.uid()) = user_id);
+--
+--    -- settings
+--    DROP POLICY IF EXISTS "Users can read own settings" ON settings;
+--    CREATE POLICY "Users can read own settings"
+--      ON settings FOR SELECT USING ((select auth.uid()) = user_id);
+--    DROP POLICY IF EXISTS "Users can update own settings" ON settings;
+--    CREATE POLICY "Users can update own settings"
+--      ON settings FOR UPDATE USING ((select auth.uid()) = user_id);
+--
+--    -- daily_usage
+--    DROP POLICY IF EXISTS "Users can read own daily_usage" ON daily_usage;
+--    CREATE POLICY "Users can read own daily_usage"
+--      ON daily_usage FOR SELECT USING ((select auth.uid()) = user_id);
+-- ============================================================

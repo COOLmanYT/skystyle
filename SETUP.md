@@ -66,6 +66,7 @@ In your Vercel project go to **Settings → Environment Variables** and add ever
 | `WEATHERAPI_KEY` | *(optional)* WeatherAPI.com → Dashboard → API Key |
 | `VISUALCROSSING_API_KEY` | *(optional)* Visual Crossing → Account → API Key |
 | `PIRATEWEATHER_API_KEY` | *(optional)* Pirate Weather → [Request API Key](https://pirateweather.net/) |
+| `DEV_EMAILS` | *(optional)* Comma-separated emails granted dev mode (bypasses all limits) |
 
 ### 6. Redeploy
 
