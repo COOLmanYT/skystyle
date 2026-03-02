@@ -162,7 +162,7 @@ export default function Dashboard({
     e.preventDefault();
     if (!newSourceName.trim() || !newSourceValue.trim()) return;
     const newSource: CustomSource = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: crypto.randomUUID(),
       type: newSourceType,
       name: newSourceName.trim().slice(0, 50),
       value: newSourceValue.trim().slice(0, 500),

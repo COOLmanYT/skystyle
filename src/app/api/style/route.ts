@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getWeather, CustomSource, SourceMode } from "@/lib/weather";
+import { getWeather, CustomSource, SourceMode, MAX_CUSTOM_SOURCES } from "@/lib/weather";
 import { getStyleRecommendation, getDevChatResponse } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
@@ -132,7 +132,7 @@ export async function POST(req: NextRequest) {
           typeof s.name === "string" &&
           typeof s.value === "string" &&
           ["rss", "api_key", "url"].includes(s.type)
-      ).slice(0, 10) // Limit to 10 custom sources
+      ).slice(0, MAX_CUSTOM_SOURCES)
     : [];
 
   // 5. Fetch weather

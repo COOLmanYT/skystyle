@@ -181,8 +181,8 @@ async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
 // OpenWeatherMap
 // ---------------------------------------------------------------------------
 
-async function fetchOpenWeather(lat: number, lon: number): Promise<WeatherData> {
-  const key = process.env.OPENWEATHER_API_KEY;
+async function fetchOpenWeather(lat: number, lon: number, apiKey?: string): Promise<WeatherData> {
+  const key = apiKey ?? process.env.OPENWEATHER_API_KEY;
   if (!key) throw new Error("OPENWEATHER_API_KEY is not set");
 
   const [currentRes, forecastRes] = await Promise.all([
@@ -307,8 +307,8 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
 // WeatherAPI.com (requires WEATHERAPI_KEY)
 // ---------------------------------------------------------------------------
 
-async function fetchWeatherApi(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = process.env.WEATHERAPI_KEY;
+async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = apiKey ?? process.env.WEATHERAPI_KEY;
   if (!key) throw new Error("WEATHERAPI_KEY is not set");
 
   const url = `https://api.weatherapi.com/v1/forecast.json?key=${key}&q=${lat},${lon}&days=1&aqi=no&alerts=no`;
@@ -349,8 +349,8 @@ async function fetchWeatherApi(lat: number, lon: number): Promise<SourceWeatherD
 // Visual Crossing (requires VISUALCROSSING_API_KEY)
 // ---------------------------------------------------------------------------
 
-async function fetchVisualCrossing(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = process.env.VISUALCROSSING_API_KEY;
+async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = apiKey ?? process.env.VISUALCROSSING_API_KEY;
   if (!key) throw new Error("VISUALCROSSING_API_KEY is not set");
 
   const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}/today?unitGroup=metric&key=${key}&include=current,hours&contentType=json`;
@@ -392,8 +392,8 @@ async function fetchVisualCrossing(lat: number, lon: number): Promise<SourceWeat
 // Dark Sky-compatible API: https://pirateweather.net
 // ---------------------------------------------------------------------------
 
-async function fetchPirateWeather(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = process.env.PIRATEWEATHER_API_KEY;
+async function fetchPirateWeather(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = apiKey ?? process.env.PIRATEWEATHER_API_KEY;
   if (!key) throw new Error("PIRATEWEATHER_API_KEY is not set");
 
   const url = `https://api.pirateweather.net/forecast/${key}/${lat},${lon}?units=ca`;
@@ -529,6 +529,10 @@ export interface CustomSource {
 
 export type SourceMode = "builtin" | "custom" | "both";
 
+const MAX_RSS_ITEMS = 5;
+const MAX_RSS_ITEM_LENGTH = 300;
+export const MAX_CUSTOM_SOURCES = 10;
+
 /** Fetch and extract text content from an RSS feed URL (for weather context) */
 async function fetchRssFeed(url: string): Promise<string> {
   let parsed: URL;
@@ -555,10 +559,10 @@ async function fetchRssFeed(url: string): Promise<string> {
   const items: string[] = [];
   const itemRegex = /<item[\s\S]*?<\/item>/gi;
   const matches = xml.match(itemRegex) ?? [];
-  for (const item of matches.slice(0, 5)) {
+  for (const item of matches.slice(0, MAX_RSS_ITEMS)) {
     const title = item.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() ?? "";
     const desc = item.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").replace(/<[^>]+>/g, "").trim() ?? "";
-    if (title || desc) items.push(`${title}: ${desc}`.slice(0, 300));
+    if (title || desc) items.push(`${title}: ${desc}`.slice(0, MAX_RSS_ITEM_LENGTH));
   }
   return items.join("\n") || "No weather content found in RSS feed.";
 }
@@ -572,7 +576,7 @@ export async function processCustomSources(
   const extraContext: string[] = [];
   const extraWeatherSources: SourceWeatherData[] = [];
 
-  for (const source of customSources) {
+  for (const source of customSources.slice(0, MAX_CUSTOM_SOURCES)) {
     try {
       switch (source.type) {
         case "rss": {
@@ -586,61 +590,33 @@ export async function processCustomSources(
           break;
         }
         case "api_key": {
-          // Use the API key with the specified weather service
+          // Use the API key with the specified weather service (passed as parameter, no env mutation)
           const svc = source.service ?? "";
           if (svc === "weatherapi") {
-            const origKey = process.env.WEATHERAPI_KEY;
-            process.env.WEATHERAPI_KEY = source.value;
-            try {
-              const data = await fetchWeatherApi(lat, lon);
-              data.source = `WeatherAPI (${source.name})`;
-              extraWeatherSources.push(data);
-            } finally {
-              if (origKey) process.env.WEATHERAPI_KEY = origKey;
-              else delete process.env.WEATHERAPI_KEY;
-            }
+            const data = await fetchWeatherApi(lat, lon, source.value);
+            data.source = `WeatherAPI (${source.name})`;
+            extraWeatherSources.push(data);
           } else if (svc === "visualcrossing") {
-            const origKey = process.env.VISUALCROSSING_API_KEY;
-            process.env.VISUALCROSSING_API_KEY = source.value;
-            try {
-              const data = await fetchVisualCrossing(lat, lon);
-              data.source = `VisualCrossing (${source.name})`;
-              extraWeatherSources.push(data);
-            } finally {
-              if (origKey) process.env.VISUALCROSSING_API_KEY = origKey;
-              else delete process.env.VISUALCROSSING_API_KEY;
-            }
+            const data = await fetchVisualCrossing(lat, lon, source.value);
+            data.source = `VisualCrossing (${source.name})`;
+            extraWeatherSources.push(data);
           } else if (svc === "pirateweather") {
-            const origKey = process.env.PIRATEWEATHER_API_KEY;
-            process.env.PIRATEWEATHER_API_KEY = source.value;
-            try {
-              const data = await fetchPirateWeather(lat, lon);
-              data.source = `PirateWeather (${source.name})`;
-              extraWeatherSources.push(data);
-            } finally {
-              if (origKey) process.env.PIRATEWEATHER_API_KEY = origKey;
-              else delete process.env.PIRATEWEATHER_API_KEY;
-            }
+            const data = await fetchPirateWeather(lat, lon, source.value);
+            data.source = `PirateWeather (${source.name})`;
+            extraWeatherSources.push(data);
           } else if (svc === "openweather") {
-            const origKey = process.env.OPENWEATHER_API_KEY;
-            process.env.OPENWEATHER_API_KEY = source.value;
-            try {
-              const data = await fetchOpenWeather(lat, lon);
-              extraWeatherSources.push({
-                temp: data.temp,
-                feelsLike: data.feelsLike,
-                humidity: data.humidity,
-                windSpeed: data.windSpeed,
-                windDir: data.windDir,
-                description: data.description,
-                rainChance: data.rainChance,
-                uvIndex: data.uvIndex,
-                source: `OpenWeather (${source.name})`,
-              });
-            } finally {
-              if (origKey) process.env.OPENWEATHER_API_KEY = origKey;
-              else delete process.env.OPENWEATHER_API_KEY;
-            }
+            const data = await fetchOpenWeather(lat, lon, source.value);
+            extraWeatherSources.push({
+              temp: data.temp,
+              feelsLike: data.feelsLike,
+              humidity: data.humidity,
+              windSpeed: data.windSpeed,
+              windDir: data.windDir,
+              description: data.description,
+              rainChance: data.rainChance,
+              uvIndex: data.uvIndex,
+              source: `OpenWeather (${source.name})`,
+            });
           }
           break;
         }
@@ -675,13 +651,14 @@ export async function getWeather(
       ? await processCustomSources(customSources, lat, lon)
       : { extraContext: [] as string[], extraWeatherSources: [] as SourceWeatherData[] };
 
-  // If "custom" mode and user has no fetchable weather sources, still try built-in
-  if (sourceMode === "custom" && extraWeatherSources.length === 0 && extraContext.length === 0) {
-    sourceMode = "builtin";
-  }
+  // Resolve effective source mode — fall back to built-in if custom has no data
+  const effectiveMode: SourceMode =
+    sourceMode === "custom" && extraWeatherSources.length === 0 && extraContext.length === 0
+      ? "builtin"
+      : sourceMode;
 
   // "custom" mode: only use user-provided weather sources
-  if (sourceMode === "custom" && extraWeatherSources.length > 0) {
+  if (effectiveMode === "custom" && extraWeatherSources.length > 0) {
     const primary: WeatherData = {
       ...extraWeatherSources[0],
       isDay: isDaytime(lon),
@@ -767,7 +744,7 @@ export async function getWeather(
   const validSources = results.filter((r): r is SourceWeatherData => r !== null);
 
   // In "both" mode, merge user's weather sources with built-in
-  if (sourceMode === "both" && extraWeatherSources.length > 0) {
+  if (effectiveMode === "both" && extraWeatherSources.length > 0) {
     validSources.push(...extraWeatherSources);
   }
 
