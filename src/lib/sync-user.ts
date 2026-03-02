@@ -25,6 +25,9 @@ function getDevEmails(): Set<string> {
  * Upsert a row in public.users from the NextAuth session.
  * Sets profile fields (id, name, email, image) and is_dev based on DEV_EMAILS.
  * Never touches is_pro (managed via Supabase dashboard).
+ *
+ * Note: is_dev is re-evaluated on every sync. Removing an email from
+ * DEV_EMAILS will revoke dev privileges on the user's next request.
  */
 export async function syncPublicUser(session: Session): Promise<void> {
   const { id, name, email, image } = session.user ?? {};
