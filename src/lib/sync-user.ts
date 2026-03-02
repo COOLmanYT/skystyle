@@ -28,21 +28,38 @@ function getDevEmails(): Set<string> {
  *
  * Note: is_dev is re-evaluated on every sync. Removing an email from
  * DEV_EMAILS will revoke dev privileges on the user's next request.
+ *
+ * If the is_dev column doesn't exist yet (PGRST204), the upsert is retried
+ * without it so the app remains functional. Run the ALTER TABLE migration
+ * in schema.sql to add the column.
  */
 export async function syncPublicUser(session: Session): Promise<void> {
   const { id, name, email, image } = session.user ?? {};
   if (!id) return;
 
   const isDev = email ? getDevEmails().has(email.toLowerCase()) : false;
+  const basePayload = { id, name: name ?? null, email: email ?? null, image: image ?? null };
 
   const { error } = await supabaseAdmin
     .from("users")
     .upsert(
-      { id, name: name ?? null, email: email ?? null, image: image ?? null, is_dev: isDev },
+      { ...basePayload, is_dev: isDev },
       { onConflict: "id", ignoreDuplicates: false }
     );
 
   if (error) {
+    // If the is_dev column doesn't exist yet, retry without it
+    if (error.code === "PGRST204" && error.message?.includes("is_dev")) {
+      console.warn("[syncPublicUser] is_dev column not found – syncing without it. Run the ALTER TABLE migration in schema.sql.");
+      const { error: retryError } = await supabaseAdmin
+        .from("users")
+        .upsert(basePayload, { onConflict: "id", ignoreDuplicates: false });
+      if (retryError) {
+        console.error("[syncPublicUser] Failed to sync user to public.users:", retryError);
+        throw new Error(`Failed to sync user to public.users: ${retryError.message}`);
+      }
+      return;
+    }
     console.error("[syncPublicUser] Failed to sync user to public.users:", error);
     throw new Error(`Failed to sync user to public.users: ${error.message}`);
   }

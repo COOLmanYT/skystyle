@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
 
   // 3. Load user profile + settings
   const [profileResult, settingsResult, closetResult] = await Promise.all([
-    supabaseAdmin.from("users").select("is_pro, is_dev").eq("id", userId).single(),
+    supabaseAdmin.from("users").select("*").eq("id", userId).single(),
     supabaseAdmin.from("settings").select("*").eq("user_id", userId).single(),
     supabaseAdmin.from("closet").select("items").eq("user_id", userId).single(),
   ]);
