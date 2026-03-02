@@ -38,7 +38,7 @@ Your response MUST be a JSON object with exactly two keys:
   "outfit": a concise outfit recommendation (max 120 words)
   "reasoning": a brief explanation linking weather facts to clothing choices (max 160 words)
 
-Be specific (name garment types, colours, materials). Be friendly and concise.`;
+Be specific (name garment types, colours, materials). Be friendly and concise. DO NOT output anything excluding the JSON object, such as "Here is the JSON you requested".`;
 
 export interface StyleInput {
   weather: WeatherData;
