@@ -442,432 +442,6 @@ export default function Dashboard({
           {/* ── Location Picker ── */}
           <LocationPicker onLocationResolved={handleLocationResolved} />
 
-          {/* ── Gender & Location Consent ── */}
-          <div
-            className="rounded-2xl p-4 space-y-3"
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--card-border)",
-            }}
-          >
-            <div>
-              <p
-                className="text-xs font-semibold uppercase tracking-widest mb-2"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                Gender (for outfit recommendations)
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {["Male", "Female", "Other", "Other - Manual"].map((opt) => (
-                  <button
-                    key={opt}
-                    onClick={() => setGender(opt === "Other" ? "N/A" : opt)}
-                    className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
-                    style={{
-                      background: isGenderActive(opt, gender)
-                        ? "var(--accent)"
-                        : "var(--background)",
-                      color: isGenderActive(opt, gender)
-                        ? "#fff"
-                        : "var(--foreground)",
-                      border: "1px solid var(--card-border)",
-                    }}
-                  >
-                    {opt}
-                  </button>
-                ))}
-              </div>
-              {gender === "Other - Manual" && (
-                <input
-                  type="text"
-                  value={customGender}
-                  onChange={(e) => setCustomGender(e.target.value.slice(0, MAX_GENDER_LENGTH))}
-                  placeholder={`Type your gender (max ${MAX_GENDER_LENGTH} chars)`}
-                  maxLength={MAX_GENDER_LENGTH}
-                  className="mt-2 w-full rounded-xl px-3 py-2 text-xs outline-none"
-                  style={{
-                    background: "var(--background)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--card-border)",
-                  }}
-                />
-              )}
-            </div>
-            <div>
-              <p
-                className="text-xs font-semibold uppercase tracking-widest mb-2"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                Units
-              </p>
-              <div className="flex gap-2">
-                {(["metric", "imperial"] as const).map((unit) => (
-                  <button
-                    key={unit}
-                    onClick={async () => {
-                      setUserUnitPreference(unit);
-                      try {
-                        await fetch("/api/settings", {
-                          method: "PATCH",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ unit_preference: unit }),
-                        });
-                      } catch {
-                        /* ignore */
-                      }
-                    }}
-                    className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact capitalize"
-                    style={{
-                      background: userUnitPreference === unit ? "var(--accent)" : "var(--background)",
-                      color: userUnitPreference === unit ? "#fff" : "var(--foreground)",
-                      border: "1px solid var(--card-border)",
-                    }}
-                  >
-                    {unit === "metric" ? "°C / km/h" : "°F / mph"}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={shareLocation}
-                onChange={(e) => setShareLocation(e.target.checked)}
-                className="rounded"
-              />
-              <span
-                className="text-xs"
-                style={{ color: "var(--foreground)", opacity: 0.6 }}
-              >
-                Share my location with AI for more relevant recommendations
-              </span>
-            </label>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={weatherOnly}
-                onChange={(e) => setWeatherOnly(e.target.checked)}
-                className="rounded"
-              />
-              <span
-                className="text-xs"
-                style={{ color: "var(--foreground)", opacity: 0.6 }}
-              >
-                Weather only (skip AI outfit recommendation)
-              </span>
-            </label>
-          </div>
-
-          {/* ── Closet Management ── */}
-          <div
-            className="rounded-2xl p-4 space-y-3"
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--card-border)",
-            }}
-          >
-            <p
-              className="text-xs font-semibold uppercase tracking-widest"
-              style={{ color: "var(--foreground)", opacity: 0.4 }}
-            >
-              👕 My Closet
-            </p>
-            <form onSubmit={addClosetItem} className="flex gap-2">
-              <input
-                type="text"
-                value={newClosetItem}
-                onChange={(e) => setNewClosetItem(e.target.value)}
-                placeholder="Add an item (e.g. Blue denim jacket)"
-                className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
-                style={{
-                  background: "var(--background)",
-                  color: "var(--foreground)",
-                  border: "1px solid var(--card-border)",
-                }}
-              />
-              <button
-                type="submit"
-                disabled={closetLoading || !newClosetItem.trim()}
-                className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
-                style={{ background: "var(--accent)", color: "#fff" }}
-              >
-                {closetLoading ? "…" : "Add"}
-              </button>
-            </form>
-            {closetItems.length > 0 && (
-              <div className="flex flex-wrap gap-2">
-                {closetItems.map((item) => (
-                  <span
-                    key={item}
-                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs"
-                    style={{
-                      background: "var(--background)",
-                      color: "var(--foreground)",
-                      border: "1px solid var(--card-border)",
-                    }}
-                  >
-                    {item}
-                    <button
-                      onClick={() => removeClosetItem(item)}
-                      disabled={closetLoading}
-                      className="hover:opacity-70 disabled:opacity-30"
-                      style={{ color: "#ff3b30" }}
-                      aria-label={`Remove ${item}`}
-                    >
-                      ✕
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-            {closetItems.length === 0 && (
-              <p
-                className="text-xs"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                No items in your closet yet. Add some to get personalized recommendations!
-              </p>
-            )}
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={forceCloset}
-                onChange={(e) => setForceCloset(e.target.checked)}
-                className="rounded"
-                disabled={closetItems.length === 0}
-              />
-              <span
-                className="text-xs"
-                style={{ color: "var(--foreground)", opacity: closetItems.length === 0 ? 0.3 : 0.6 }}
-              >
-                Force recommendation to use closet
-              </span>
-            </label>
-          </div>
-
-          {/* ── Weather Sources ── */}
-          <div
-            className="rounded-2xl p-4 space-y-3"
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--card-border)",
-            }}
-          >
-            <button
-              onClick={() => setSourcesExpanded(!sourcesExpanded)}
-              className="w-full flex items-center justify-between btn-interact"
-            >
-              <p
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                🌐 Weather Sources
-              </p>
-              <span
-                className="text-xs"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                {sourcesExpanded ? "▲" : "▼"}
-              </span>
-            </button>
-
-            {sourcesExpanded && (
-              <div className="space-y-3">
-                {/* Source mode selector */}
-                <div>
-                  <p
-                    className="text-xs mb-2"
-                    style={{ color: "var(--foreground)", opacity: 0.5 }}
-                  >
-                    Source mode
-                  </p>
-                  <div className="flex flex-wrap gap-2">
-                    {([
-                      { key: "builtin" as SourceMode, label: "Built-in only" },
-                      { key: "both" as SourceMode, label: "Custom + Built-in" },
-                      { key: "custom" as SourceMode, label: "Custom only" },
-                    ]).map(({ key, label }) => (
-                      <button
-                        key={key}
-                        onClick={() => updateSourceMode(key)}
-                        className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
-                        style={{
-                          background: sourceMode === key ? "var(--accent)" : "var(--background)",
-                          color: sourceMode === key ? "#fff" : "var(--foreground)",
-                          border: "1px solid var(--card-border)",
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Existing custom sources */}
-                {customSources.length > 0 && (
-                  <div className="space-y-2">
-                    <p
-                      className="text-xs"
-                      style={{ color: "var(--foreground)", opacity: 0.5 }}
-                    >
-                      Your sources ({customSources.length})
-                    </p>
-                    {customSources.map((source) => (
-                      <div
-                        key={source.id}
-                        className="flex items-center gap-2 rounded-xl px-3 py-2"
-                        style={{
-                          background: "var(--background)",
-                          border: "1px solid var(--card-border)",
-                        }}
-                      >
-                        <span className="text-xs">
-                          {source.type === "rss" ? "📡" : source.type === "api_key" ? "🔑" : "🔗"}
-                        </span>
-                        <div className="flex-1 min-w-0">
-                          <p
-                            className="text-xs font-medium truncate"
-                            style={{ color: "var(--foreground)" }}
-                          >
-                            {source.name}
-                          </p>
-                          <p
-                            className="text-xs truncate"
-                            style={{ color: "var(--foreground)", opacity: 0.4 }}
-                          >
-                            {source.type === "api_key"
-                              ? `${source.service} · ••••${source.value.slice(-4)}`
-                              : source.value}
-                          </p>
-                        </div>
-                        <span
-                          className="rounded-full px-2 py-0.5 text-xs"
-                          style={{
-                            background: "var(--card)",
-                            color: "var(--foreground)",
-                            opacity: 0.5,
-                          }}
-                        >
-                          {source.type === "rss" ? "RSS" : source.type === "api_key" ? "API Key" : "URL"}
-                        </span>
-                        <button
-                          onClick={() => removeCustomSource(source.id)}
-                          className="hover:opacity-70"
-                          style={{ color: "#ff3b30" }}
-                          aria-label={`Remove ${source.name}`}
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Add new source form */}
-                <form onSubmit={addCustomSource} className="space-y-2">
-                  <p
-                    className="text-xs"
-                    style={{ color: "var(--foreground)", opacity: 0.5 }}
-                  >
-                    Add a source
-                  </p>
-                  <div className="flex gap-2">
-                    {([
-                      { key: "url" as const, label: "🔗 URL" },
-                      { key: "rss" as const, label: "📡 RSS" },
-                      { key: "api_key" as const, label: "🔑 API Key" },
-                    ]).map(({ key, label }) => (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => setNewSourceType(key)}
-                        className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
-                        style={{
-                          background: newSourceType === key ? "var(--accent)" : "var(--background)",
-                          color: newSourceType === key ? "#fff" : "var(--foreground)",
-                          border: "1px solid var(--card-border)",
-                        }}
-                      >
-                        {label}
-                      </button>
-                    ))}
-                  </div>
-                  <input
-                    type="text"
-                    value={newSourceName}
-                    onChange={(e) => setNewSourceName(e.target.value.slice(0, 50))}
-                    placeholder="Source name (e.g. My Weather Feed)"
-                    maxLength={50}
-                    className="w-full rounded-xl px-3 py-2 text-xs outline-none"
-                    style={{
-                      background: "var(--background)",
-                      color: "var(--foreground)",
-                      border: "1px solid var(--card-border)",
-                    }}
-                  />
-                  <input
-                    type="text"
-                    value={newSourceValue}
-                    onChange={(e) => setNewSourceValue(e.target.value.slice(0, 500))}
-                    placeholder={
-                      newSourceType === "rss"
-                        ? "RSS feed URL (https://...)"
-                        : newSourceType === "api_key"
-                        ? "API key"
-                        : "URL (will be sent as context to AI, not fetched)"
-                    }
-                    maxLength={500}
-                    className="w-full rounded-xl px-3 py-2 text-xs outline-none"
-                    style={{
-                      background: "var(--background)",
-                      color: "var(--foreground)",
-                      border: "1px solid var(--card-border)",
-                    }}
-                  />
-                  {newSourceType === "api_key" && (
-                    <select
-                      value={newSourceService}
-                      onChange={(e) => setNewSourceService(e.target.value)}
-                      className="w-full rounded-xl px-3 py-2 text-xs outline-none"
-                      style={{
-                        background: "var(--background)",
-                        color: "var(--foreground)",
-                        border: "1px solid var(--card-border)",
-                      }}
-                    >
-                      <option value="weatherapi">WeatherAPI.com</option>
-                      <option value="visualcrossing">Visual Crossing</option>
-                      <option value="pirateweather">Pirate Weather</option>
-                      <option value="openweather">OpenWeather</option>
-                    </select>
-                  )}
-                  <div className="flex gap-2">
-                    <button
-                      type="submit"
-                      disabled={!newSourceName.trim() || !newSourceValue.trim()}
-                      className="rounded-xl px-4 py-2 text-xs font-medium btn-interact disabled:opacity-40"
-                      style={{ background: "var(--accent)", color: "#fff" }}
-                    >
-                      Add Source
-                    </button>
-                  </div>
-                </form>
-
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.3 }}
-                >
-                  {newSourceType === "url"
-                    ? "URLs are not fetched — they are sent as context to the AI."
-                    : newSourceType === "rss"
-                    ? "RSS feeds are fetched server-side for weather content."
-                    : "API keys are used with the selected weather service."}
-                  {" "}Sources are stored locally in your browser.
-                </p>
-              </div>
-            )}
-          </div>
-
           {location && (
             <div
               className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs"
@@ -1342,6 +916,432 @@ export default function Dashboard({
               </button>
             </>
           )}
+
+          {/* ── Gender & Location Consent ── */}
+          <div
+            className="rounded-2xl p-4 space-y-3"
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+            }}
+          >
+            <div>
+              <p
+                className="text-xs font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                Gender (for outfit recommendations)
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {["Male", "Female", "Other", "Other - Manual"].map((opt) => (
+                  <button
+                    key={opt}
+                    onClick={() => setGender(opt === "Other" ? "N/A" : opt)}
+                    className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                    style={{
+                      background: isGenderActive(opt, gender)
+                        ? "var(--accent)"
+                        : "var(--background)",
+                      color: isGenderActive(opt, gender)
+                        ? "#fff"
+                        : "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+              {gender === "Other - Manual" && (
+                <input
+                  type="text"
+                  value={customGender}
+                  onChange={(e) => setCustomGender(e.target.value.slice(0, MAX_GENDER_LENGTH))}
+                  placeholder={`Type your gender (max ${MAX_GENDER_LENGTH} chars)`}
+                  maxLength={MAX_GENDER_LENGTH}
+                  className="mt-2 w-full rounded-xl px-3 py-2 text-xs outline-none"
+                  style={{
+                    background: "var(--background)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--card-border)",
+                  }}
+                />
+              )}
+            </div>
+            <div>
+              <p
+                className="text-xs font-semibold uppercase tracking-widest mb-2"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                Units
+              </p>
+              <div className="flex gap-2">
+                {(["metric", "imperial"] as const).map((unit) => (
+                  <button
+                    key={unit}
+                    onClick={async () => {
+                      setUserUnitPreference(unit);
+                      try {
+                        await fetch("/api/settings", {
+                          method: "PATCH",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ unit_preference: unit }),
+                        });
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                    className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact capitalize"
+                    style={{
+                      background: userUnitPreference === unit ? "var(--accent)" : "var(--background)",
+                      color: userUnitPreference === unit ? "#fff" : "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  >
+                    {unit === "metric" ? "°C / km/h" : "°F / mph"}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={shareLocation}
+                onChange={(e) => setShareLocation(e.target.checked)}
+                className="rounded"
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.6 }}
+              >
+                Share my location with AI for more relevant recommendations
+              </span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={weatherOnly}
+                onChange={(e) => setWeatherOnly(e.target.checked)}
+                className="rounded"
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.6 }}
+              >
+                Weather only (skip AI outfit recommendation)
+              </span>
+            </label>
+          </div>
+
+          {/* ── Closet Management ── */}
+          <div
+            className="rounded-2xl p-4 space-y-3"
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+            }}
+          >
+            <p
+              className="text-xs font-semibold uppercase tracking-widest"
+              style={{ color: "var(--foreground)", opacity: 0.4 }}
+            >
+              👕 My Closet
+            </p>
+            <form onSubmit={addClosetItem} className="flex gap-2">
+              <input
+                type="text"
+                value={newClosetItem}
+                onChange={(e) => setNewClosetItem(e.target.value)}
+                placeholder="Add an item (e.g. Blue denim jacket)"
+                className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
+                style={{
+                  background: "var(--background)",
+                  color: "var(--foreground)",
+                  border: "1px solid var(--card-border)",
+                }}
+              />
+              <button
+                type="submit"
+                disabled={closetLoading || !newClosetItem.trim()}
+                className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                {closetLoading ? "…" : "Add"}
+              </button>
+            </form>
+            {closetItems.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {closetItems.map((item) => (
+                  <span
+                    key={item}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs"
+                    style={{
+                      background: "var(--background)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  >
+                    {item}
+                    <button
+                      onClick={() => removeClosetItem(item)}
+                      disabled={closetLoading}
+                      className="hover:opacity-70 disabled:opacity-30"
+                      style={{ color: "#ff3b30" }}
+                      aria-label={`Remove ${item}`}
+                    >
+                      ✕
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
+            {closetItems.length === 0 && (
+              <p
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                No items in your closet yet. Add some to get personalized recommendations!
+              </p>
+            )}
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={forceCloset}
+                onChange={(e) => setForceCloset(e.target.checked)}
+                className="rounded"
+                disabled={closetItems.length === 0}
+              />
+              <span
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: closetItems.length === 0 ? 0.3 : 0.6 }}
+              >
+                Force recommendation to use closet
+              </span>
+            </label>
+          </div>
+
+          {/* ── Weather Sources ── */}
+          <div
+            className="rounded-2xl p-4 space-y-3"
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+            }}
+          >
+            <button
+              onClick={() => setSourcesExpanded(!sourcesExpanded)}
+              className="w-full flex items-center justify-between btn-interact"
+            >
+              <p
+                className="text-xs font-semibold uppercase tracking-widest"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                🌐 Weather Sources
+              </p>
+              <span
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                {sourcesExpanded ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {sourcesExpanded && (
+              <div className="space-y-3">
+                {/* Source mode selector */}
+                <div>
+                  <p
+                    className="text-xs mb-2"
+                    style={{ color: "var(--foreground)", opacity: 0.5 }}
+                  >
+                    Source mode
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { key: "builtin" as SourceMode, label: "Built-in only" },
+                      { key: "both" as SourceMode, label: "Custom + Built-in" },
+                      { key: "custom" as SourceMode, label: "Custom only" },
+                    ]).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => updateSourceMode(key)}
+                        className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                        style={{
+                          background: sourceMode === key ? "var(--accent)" : "var(--background)",
+                          color: sourceMode === key ? "#fff" : "var(--foreground)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Existing custom sources */}
+                {customSources.length > 0 && (
+                  <div className="space-y-2">
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--foreground)", opacity: 0.5 }}
+                    >
+                      Your sources ({customSources.length})
+                    </p>
+                    {customSources.map((source) => (
+                      <div
+                        key={source.id}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2"
+                        style={{
+                          background: "var(--background)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        <span className="text-xs">
+                          {source.type === "rss" ? "📡" : source.type === "api_key" ? "🔑" : "🔗"}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-xs font-medium truncate"
+                            style={{ color: "var(--foreground)" }}
+                          >
+                            {source.name}
+                          </p>
+                          <p
+                            className="text-xs truncate"
+                            style={{ color: "var(--foreground)", opacity: 0.4 }}
+                          >
+                            {source.type === "api_key"
+                              ? `${source.service} · ••••${source.value.slice(-4)}`
+                              : source.value}
+                          </p>
+                        </div>
+                        <span
+                          className="rounded-full px-2 py-0.5 text-xs"
+                          style={{
+                            background: "var(--card)",
+                            color: "var(--foreground)",
+                            opacity: 0.5,
+                          }}
+                        >
+                          {source.type === "rss" ? "RSS" : source.type === "api_key" ? "API Key" : "URL"}
+                        </span>
+                        <button
+                          onClick={() => removeCustomSource(source.id)}
+                          className="hover:opacity-70"
+                          style={{ color: "#ff3b30" }}
+                          aria-label={`Remove ${source.name}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new source form */}
+                <form onSubmit={addCustomSource} className="space-y-2">
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--foreground)", opacity: 0.5 }}
+                  >
+                    Add a source
+                  </p>
+                  <div className="flex gap-2">
+                    {([
+                      { key: "url" as const, label: "🔗 URL" },
+                      { key: "rss" as const, label: "📡 RSS" },
+                      { key: "api_key" as const, label: "🔑 API Key" },
+                    ]).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setNewSourceType(key)}
+                        className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                        style={{
+                          background: newSourceType === key ? "var(--accent)" : "var(--background)",
+                          color: newSourceType === key ? "#fff" : "var(--foreground)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    value={newSourceName}
+                    onChange={(e) => setNewSourceName(e.target.value.slice(0, 50))}
+                    placeholder="Source name (e.g. My Weather Feed)"
+                    maxLength={50}
+                    className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                    style={{
+                      background: "var(--background)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={newSourceValue}
+                    onChange={(e) => setNewSourceValue(e.target.value.slice(0, 500))}
+                    placeholder={
+                      newSourceType === "rss"
+                        ? "RSS feed URL (https://...)"
+                        : newSourceType === "api_key"
+                        ? "API key"
+                        : "URL (will be sent as context to AI, not fetched)"
+                    }
+                    maxLength={500}
+                    className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                    style={{
+                      background: "var(--background)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  />
+                  {newSourceType === "api_key" && (
+                    <select
+                      value={newSourceService}
+                      onChange={(e) => setNewSourceService(e.target.value)}
+                      className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                      style={{
+                        background: "var(--background)",
+                        color: "var(--foreground)",
+                        border: "1px solid var(--card-border)",
+                      }}
+                    >
+                      <option value="weatherapi">WeatherAPI.com</option>
+                      <option value="visualcrossing">Visual Crossing</option>
+                      <option value="pirateweather">Pirate Weather</option>
+                      <option value="openweather">OpenWeather</option>
+                    </select>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={!newSourceName.trim() || !newSourceValue.trim()}
+                      className="rounded-xl px-4 py-2 text-xs font-medium btn-interact disabled:opacity-40"
+                      style={{ background: "var(--accent)", color: "#fff" }}
+                    >
+                      Add Source
+                    </button>
+                  </div>
+                </form>
+
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--foreground)", opacity: 0.3 }}
+                >
+                  {newSourceType === "url"
+                    ? "URLs are not fetched — they are sent as context to the AI."
+                    : newSourceType === "rss"
+                    ? "RSS feeds are fetched server-side for weather content."
+                    : "API keys are used with the selected weather service."}
+                  {" "}Sources are stored locally in your browser.
+                </p>
+              </div>
+            )}
+          </div>
 
           {/* ── Plan & Credits Card ── */}
           <div
