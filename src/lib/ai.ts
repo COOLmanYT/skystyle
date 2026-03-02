@@ -247,7 +247,7 @@ async function callAI(
 
   // Strip markdown code fences if present (e.g. ```json ... ```)
   let cleaned = raw.trim();
-  const fenceMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+  const fenceMatch = cleaned.match(/^```(?:\w+)?\s*\n?([\s\S]*?)\n?\s*```$/);
   if (fenceMatch) {
     cleaned = fenceMatch[1].trim();
   }

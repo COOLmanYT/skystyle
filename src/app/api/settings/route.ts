@@ -62,14 +62,14 @@ export async function PATCH(req: NextRequest) {
 
   // Free users: source picker limited to 1x/day (devs bypass)
   if (!isPro && !isDev && ("custom_source_url" in filtered)) {
-    const { allowed } = await canUseFeature(userId, "source_picks", false);
+    const { allowed } = await canUseFeature(userId, "source_picks", isPro, isDev);
     if (!allowed) {
       return NextResponse.json(
         { error: "Free users can only change weather source once per day. Upgrade to Pro for unlimited." },
         { status: 429 }
       );
     }
-    await incrementUsage(userId, "source_picks", false);
+    await incrementUsage(userId, "source_picks", isPro, isDev);
   }
 
   await supabaseAdmin

@@ -67,7 +67,7 @@ export async function canUseFeature(
   isDev: boolean = false
 ): Promise<{ allowed: boolean; used: number; limit: number }> {
   const usage = await getDailyUsage(userId);
-  const tier = isDev ? "dev" : isPro ? "pro" : "free";
+  const tier = isDev ? "dev" : (isPro ? "pro" : "free");
   const limit = LIMITS[tier][field];
   const used = usage[field];
   return { allowed: used < limit, used, limit };
@@ -98,7 +98,7 @@ export async function incrementUsage(
 /** Get all daily limits info for a user (used in dashboard). */
 export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: boolean = false) {
   const usage = await getDailyUsage(userId);
-  const tier = isDev ? "dev" : isPro ? "pro" : "free";
+  const tier = isDev ? "dev" : (isPro ? "pro" : "free");
   return {
     ai: { used: usage.ai_uses, limit: LIMITS[tier].ai_uses },
     followUps: { used: usage.follow_ups, limit: LIMITS[tier].follow_ups },
