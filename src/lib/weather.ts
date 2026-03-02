@@ -561,7 +561,14 @@ async function fetchRssFeed(url: string): Promise<string> {
   const matches = xml.match(itemRegex) ?? [];
   for (const item of matches.slice(0, MAX_RSS_ITEMS)) {
     const title = item.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() ?? "";
-    const desc = item.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").replace(/<[^>]+>/g, "").trim() ?? "";
+    let desc = item.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() ?? "";
+    // Strip HTML tags iteratively to handle nested/split tags
+    let prev = "";
+    while (prev !== desc) {
+      prev = desc;
+      desc = desc.replace(/<[^>]*>/g, "");
+    }
+    desc = desc.trim();
     if (title || desc) items.push(`${title}: ${desc}`.slice(0, MAX_RSS_ITEM_LENGTH));
   }
   return items.join("\n") || "No weather content found in RSS feed.";
