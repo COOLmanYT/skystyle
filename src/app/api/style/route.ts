@@ -12,7 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getWeather } from "@/lib/weather";
-import { getStyleRecommendation } from "@/lib/ai";
+import { getStyleRecommendation, getDevChatResponse } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
@@ -30,14 +30,14 @@ export async function POST(req: NextRequest) {
   await syncPublicUser(session);
 
   // 2. Parse body
-  let body: { lat?: number; lon?: number; userApiKey?: string; gender?: string; shareLocation?: boolean; forceCloset?: boolean };
+  let body: { lat?: number; lon?: number; userApiKey?: string; gender?: string; shareLocation?: boolean; forceCloset?: boolean; unitPreference?: string; devMessage?: string };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { lat, lon, userApiKey, gender, shareLocation, forceCloset } = body;
+  const { lat, lon, userApiKey, gender, shareLocation, forceCloset, devMessage } = body;
   if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return NextResponse.json(
       { error: "lat must be between -90 and 90, lon between -180 and 180" },
@@ -47,52 +47,74 @@ export async function POST(req: NextRequest) {
 
   // 3. Load user profile + settings
   const [profileResult, settingsResult, closetResult] = await Promise.all([
-    supabaseAdmin.from("users").select("is_pro").eq("id", userId).single(),
+    supabaseAdmin.from("users").select("is_pro, is_dev").eq("id", userId).single(),
     supabaseAdmin.from("settings").select("*").eq("user_id", userId).single(),
     supabaseAdmin.from("closet").select("items").eq("user_id", userId).single(),
   ]);
 
   const isPro: boolean = profileResult.data?.is_pro ?? false;
+  const isDev: boolean = profileResult.data?.is_dev ?? false;
   const settings = settingsResult.data ?? {};
 
-  // Closet: free users can use it 1x/day; Pro unlimited
+  // Closet: free users can use it 1x/day; Pro/Dev unlimited
   let closetItems: string[] = closetResult.data?.items ?? [];
-  if (!isPro && closetItems.length > 0) {
-    const { allowed } = await canUseFeature(userId, "closet_uses", isPro);
+  if (!isPro && !isDev && closetItems.length > 0) {
+    const { allowed } = await canUseFeature(userId, "closet_uses", isPro, isDev);
     if (!allowed) {
       closetItems = []; // Don't send closet data if limit reached
     } else {
-      await incrementUsage(userId, "closet_uses", isPro);
+      await incrementUsage(userId, "closet_uses", isPro, isDev);
     }
   }
 
+  // Use unitPreference from request body (client state) if provided, else fall back to DB
   const unitPreference: "metric" | "imperial" =
-    settings.unit_preference === "imperial" ? "imperial" : "metric";
-  const customSystemPrompt: string | undefined = isPro
+    body.unitPreference === "imperial" || body.unitPreference === "metric"
+      ? body.unitPreference
+      : settings.unit_preference === "imperial" ? "imperial" : "metric";
+  const customSystemPrompt: string | undefined = (isPro || isDev)
     ? settings.custom_system_prompt ?? undefined
     : undefined;
-  const customSourceUrl: string | undefined = isPro
+  const customSourceUrl: string | undefined = (isPro || isDev)
     ? settings.custom_source_url ?? undefined
     : undefined;
 
-  // 4. Credits / daily limit check
-  if (isPro) {
-    const balance = await getCredits(userId);
-    if (balance <= 0) {
-      return NextResponse.json(
-        { error: "Insufficient credits. Your weekly credits reset in a few days." },
-        { status: 402 }
-      );
+  // 4. Credits / daily limit check (devs bypass all limits)
+  if (!isDev) {
+    if (isPro) {
+      const balance = await getCredits(userId);
+      if (balance <= 0) {
+        return NextResponse.json(
+          { error: "Insufficient credits. Your weekly credits reset in a few days." },
+          { status: 402 }
+        );
+      }
+    } else {
+      // Free users: 5 AI uses per day
+      const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro, isDev);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: `Daily AI limit reached (${used}/${limit}). Upgrade to Pro for unlimited access.` },
+          { status: 429 }
+        );
+      }
     }
-  } else {
-    // Free users: 5 AI uses per day
-    const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro);
-    if (!allowed) {
-      return NextResponse.json(
-        { error: `Daily AI limit reached (${used}/${limit}). Upgrade to Pro for unlimited access.` },
-        { status: 429 }
-      );
+  }
+
+  // Dev mode: direct AI chat without weather data
+  if (isDev && devMessage) {
+    let recommendation;
+    try {
+      recommendation = await getDevChatResponse(devMessage, userApiKey);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "AI request failed";
+      return NextResponse.json({ error: message }, { status: 502 });
     }
+    const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
+    return NextResponse.json({
+      recommendation,
+      meta: { isPro, isDev, unitPreference, creditsRemaining: null, dailyLimits },
+    });
   }
 
   // 5. Fetch weather
@@ -104,7 +126,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  // 6. Get AI recommendation (use BYOK if provided and user is Pro)
+  // 6. Get AI recommendation (use BYOK if provided and user is Pro/Dev)
   let recommendation;
   try {
     recommendation = await getStyleRecommendation({
@@ -112,30 +134,34 @@ export async function POST(req: NextRequest) {
       closetItems,
       unitPreference,
       customSystemPrompt,
-      userApiKey: isPro ? userApiKey : undefined,
+      userApiKey: (isPro || isDev) ? userApiKey : undefined,
       gender: typeof gender === "string" ? gender.slice(0, 30) : undefined,
       shareLocation: shareLocation === true,
       forceCloset: forceCloset === true,
+      isDev,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  // 7. Deduct credit / increment daily usage
-  if (isPro) {
-    await deductCredit(userId);
-  } else {
-    await incrementUsage(userId, "ai_uses", isPro);
+  // 7. Deduct credit / increment daily usage (devs bypass)
+  if (!isDev) {
+    if (isPro) {
+      await deductCredit(userId);
+    } else {
+      await incrementUsage(userId, "ai_uses", isPro, isDev);
+    }
   }
 
-  const dailyLimits = await getDailyLimitsInfo(userId, isPro);
+  const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
 
   return NextResponse.json({
     weather,
     recommendation,
     meta: {
       isPro,
+      isDev,
       unitPreference,
       creditsRemaining: isPro ? (await getCredits(userId)) : null,
       dailyLimits,

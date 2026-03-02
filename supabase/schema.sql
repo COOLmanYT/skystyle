@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS users (
   email         text UNIQUE,
   "emailVerified" timestamptz,
   image         text,
-  is_pro        boolean NOT NULL DEFAULT false
+  is_pro        boolean NOT NULL DEFAULT false,
+  is_dev        boolean NOT NULL DEFAULT false
 );
 
 -- ------------------------------------------------------------

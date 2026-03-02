@@ -53,6 +53,8 @@ export interface StyleInput {
   shareLocation?: boolean;
   /** When true, AI must ONLY recommend items from the user's closet */
   forceCloset?: boolean;
+  /** Dev mode: include raw AI output in response */
+  isDev?: boolean;
 }
 
 export interface FollowUpInput {
@@ -63,11 +65,15 @@ export interface FollowUpInput {
   unitPreference: "metric" | "imperial";
   customSystemPrompt?: string;
   userApiKey?: string;
+  /** Dev mode: include raw AI output in response */
+  isDev?: boolean;
 }
 
 export interface StyleRecommendation {
   outfit: string;
   reasoning: string;
+  /** Raw AI output — only included for dev mode users */
+  rawOutput?: string;
 }
 
 function formatTemp(celsius: number, unit: "metric" | "imperial"): string {
@@ -149,7 +155,15 @@ export async function getStyleRecommendation(
 
 Please recommend an outfit.`;
 
-  return callAI(systemPrompt, userMessage, userApiKey);
+  return callAI(systemPrompt, userMessage, userApiKey, input.isDev);
+}
+
+/** Dev mode: send a freeform message to the AI without weather context */
+export async function getDevChatResponse(
+  message: string,
+  userApiKey?: string
+): Promise<StyleRecommendation> {
+  return callAI(DEFAULT_SYSTEM_PROMPT, message, userApiKey, true);
 }
 
 /** Follow-up: modify an existing recommendation based on user input */
@@ -171,13 +185,14 @@ User follow-up question: "${followUpMessage}"
 
 Please update the outfit recommendation based on the follow-up question. Respond with the same JSON format.`;
 
-  return callAI(systemPrompt, userMessage, userApiKey);
+  return callAI(systemPrompt, userMessage, userApiKey, input.isDev);
 }
 
 async function callAI(
   systemPrompt: string,
   userMessage: string,
-  userApiKey?: string
+  userApiKey?: string,
+  isDev: boolean = false
 ): Promise<StyleRecommendation> {
   let raw: string;
 
@@ -189,7 +204,7 @@ async function callAI(
         { role: "user", content: userMessage },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 300,
+      max_tokens: 500,
       temperature: 0.7,
     });
     raw = response.choices[0]?.message?.content ?? "{}";
@@ -207,7 +222,7 @@ async function callAI(
       try {
         const model = getGemini().getGenerativeModel({
           model: modelName,
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 300 },
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 500 },
         });
         const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
         geminiRaw = result.response.text();
@@ -227,16 +242,28 @@ async function callAI(
     throw new Error("No AI API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY.");
   }
 
+  // Log full AI output for server-side debugging
+  console.log("[ai] Full AI response:", raw);
+
+  // Strip markdown code fences if present (e.g. ```json ... ```)
+  let cleaned = raw.trim();
+  const fenceMatch = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/);
+  if (fenceMatch) {
+    cleaned = fenceMatch[1].trim();
+  }
+
   try {
-    const parsed = JSON.parse(raw) as Partial<StyleRecommendation>;
+    const parsed = JSON.parse(cleaned) as Partial<StyleRecommendation>;
     return {
       outfit: parsed.outfit ?? "Unable to generate outfit recommendation.",
       reasoning: parsed.reasoning ?? "",
+      ...(isDev ? { rawOutput: raw } : {}),
     };
   } catch {
     return {
       outfit: "Unable to generate outfit recommendation.",
-      reasoning: raw,
+      reasoning: cleaned,
+      ...(isDev ? { rawOutput: raw } : {}),
     };
   }
 }

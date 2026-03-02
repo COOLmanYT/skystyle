@@ -49,22 +49,25 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "previousOutfit and weather are required" }, { status: 400 });
   }
 
-  // Check Pro status
+  // Check Pro/Dev status
   const { data: profile } = await supabaseAdmin
     .from("users")
-    .select("is_pro")
+    .select("is_pro, is_dev")
     .eq("id", userId)
     .single();
 
   const isPro = profile?.is_pro ?? false;
+  const isDev = profile?.is_dev ?? false;
 
-  // Check daily follow-up limit
-  const { allowed, used, limit } = await canUseFeature(userId, "follow_ups", isPro);
-  if (!allowed) {
-    return NextResponse.json(
-      { error: `Daily follow-up limit reached (${used}/${limit}). ${isPro ? "Try again tomorrow." : "Upgrade to Pro for 100 follow-ups per day."}` },
-      { status: 429 }
-    );
+  // Check daily follow-up limit (devs bypass)
+  if (!isDev) {
+    const { allowed, used, limit } = await canUseFeature(userId, "follow_ups", isPro, isDev);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Daily follow-up limit reached (${used}/${limit}). ${isPro ? "Try again tomorrow." : "Upgrade to Pro for 100 follow-ups per day."}` },
+        { status: 429 }
+      );
+    }
   }
 
   // Load settings
@@ -75,7 +78,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   const unitPreference = settings?.unit_preference === "imperial" ? "imperial" as const : "metric" as const;
-  const customSystemPrompt = isPro ? settings?.custom_system_prompt ?? undefined : undefined;
+  const customSystemPrompt = (isPro || isDev) ? settings?.custom_system_prompt ?? undefined : undefined;
 
   let recommendation;
   try {
@@ -87,20 +90,23 @@ export async function POST(req: NextRequest) {
       followUpMessage: message.trim(),
       unitPreference,
       customSystemPrompt,
-      userApiKey: isPro ? userApiKey : undefined,
+      userApiKey: (isPro || isDev) ? userApiKey : undefined,
+      isDev,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "AI request failed";
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
-  // Increment follow-up usage
-  await incrementUsage(userId, "follow_ups", isPro);
+  // Increment follow-up usage (devs bypass)
+  if (!isDev) {
+    await incrementUsage(userId, "follow_ups", isPro, isDev);
+  }
 
-  const dailyLimits = await getDailyLimitsInfo(userId, isPro);
+  const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
 
   return NextResponse.json({
     recommendation,
-    meta: { isPro, dailyLimits },
+    meta: { isPro, isDev, dailyLimits },
   });
 }

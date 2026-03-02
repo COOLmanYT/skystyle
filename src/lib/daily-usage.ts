@@ -22,6 +22,7 @@ export interface DailyUsageRecord {
 const LIMITS = {
   free: { ai_uses: 5, follow_ups: 10, closet_uses: 1, source_picks: 1 },
   pro: { ai_uses: Infinity, follow_ups: 100, closet_uses: Infinity, source_picks: Infinity },
+  dev: { ai_uses: Infinity, follow_ups: Infinity, closet_uses: Infinity, source_picks: Infinity },
 } as const;
 
 type UsageField = "ai_uses" | "follow_ups" | "closet_uses" | "source_picks";
@@ -51,7 +52,7 @@ export async function getDailyUsage(userId: string): Promise<DailyUsageRecord> {
       closet_uses: 0,
       source_picks: 0,
     };
-    await supabaseAdmin.from("daily_usage").upsert(record);
+    await supabaseAdmin.from("daily_usage").upsert(record, { onConflict: "user_id,usage_date" });
     return record;
   }
 
@@ -62,10 +63,11 @@ export async function getDailyUsage(userId: string): Promise<DailyUsageRecord> {
 export async function canUseFeature(
   userId: string,
   field: UsageField,
-  isPro: boolean
+  isPro: boolean,
+  isDev: boolean = false
 ): Promise<{ allowed: boolean; used: number; limit: number }> {
   const usage = await getDailyUsage(userId);
-  const tier = isPro ? "pro" : "free";
+  const tier = isDev ? "dev" : isPro ? "pro" : "free";
   const limit = LIMITS[tier][field];
   const used = usage[field];
   return { allowed: used < limit, used, limit };
@@ -75,9 +77,10 @@ export async function canUseFeature(
 export async function incrementUsage(
   userId: string,
   field: UsageField,
-  isPro: boolean
+  isPro: boolean,
+  isDev: boolean = false
 ): Promise<boolean> {
-  const { allowed, used } = await canUseFeature(userId, field, isPro);
+  const { allowed, used } = await canUseFeature(userId, field, isPro, isDev);
   if (!allowed) return false;
 
   const date = today();
@@ -87,15 +90,15 @@ export async function incrementUsage(
       user_id: userId,
       usage_date: date,
       [field]: used + 1,
-    });
+    }, { onConflict: "user_id,usage_date" });
 
   return true;
 }
 
 /** Get all daily limits info for a user (used in dashboard). */
-export async function getDailyLimitsInfo(userId: string, isPro: boolean) {
+export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: boolean = false) {
   const usage = await getDailyUsage(userId);
-  const tier = isPro ? "pro" : "free";
+  const tier = isDev ? "dev" : isPro ? "pro" : "free";
   return {
     ai: { used: usage.ai_uses, limit: LIMITS[tier].ai_uses },
     followUps: { used: usage.follow_ups, limit: LIMITS[tier].follow_ups },

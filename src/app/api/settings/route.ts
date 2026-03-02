@@ -39,14 +39,15 @@ export async function PATCH(req: NextRequest) {
   // Check Pro status for gated settings
   const { data: profile } = await supabaseAdmin
     .from("users")
-    .select("is_pro")
+    .select("is_pro, is_dev")
     .eq("id", userId)
     .single();
 
   const isPro = profile?.is_pro ?? false;
+  const isDev = profile?.is_dev ?? false;
 
   const updates = await req.json();
-  const allowedKeys = isPro
+  const allowedKeys = (isPro || isDev)
     ? ["unit_preference", "custom_system_prompt", "custom_source_url", "custom_weather_api_key"]
     : ["unit_preference", "custom_source_url"];
 
@@ -59,8 +60,8 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  // Free users: source picker limited to 1x/day
-  if (!isPro && ("custom_source_url" in filtered)) {
+  // Free users: source picker limited to 1x/day (devs bypass)
+  if (!isPro && !isDev && ("custom_source_url" in filtered)) {
     const { allowed } = await canUseFeature(userId, "source_picks", false);
     if (!allowed) {
       return NextResponse.json(

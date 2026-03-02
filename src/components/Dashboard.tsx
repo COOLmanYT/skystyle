@@ -87,6 +87,7 @@ interface DashboardProps {
   userName: string;
   userEmail: string;
   isPro: boolean;
+  isDev: boolean;
   initialCredits: number | null;
   initialDailyLimits: DailyLimits | null;
 }
@@ -95,6 +96,7 @@ export default function Dashboard({
   userName,
   userEmail,
   isPro,
+  isDev,
   initialCredits,
   initialDailyLimits,
 }: DashboardProps) {
@@ -115,6 +117,10 @@ export default function Dashboard({
   const [forceCloset, setForceCloset] = useState(false);
   const [weatherOnly, setWeatherOnly] = useState(false);
   const [userUnitPreference, setUserUnitPreference] = useState<"metric" | "imperial">("metric");
+  const [devChatMessage, setDevChatMessage] = useState("");
+  const [devChatLoading, setDevChatLoading] = useState(false);
+  const [devChatError, setDevChatError] = useState<string | null>(null);
+  const [devChatResult, setDevChatResult] = useState<{ outfit: string; reasoning: string; rawOutput?: string } | null>(null);
 
   // Fetch closet items and settings on mount
   useEffect(() => {
@@ -217,7 +223,7 @@ export default function Dashboard({
         const res = await fetch("/api/style", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat: loc.lat, lon: loc.lon, gender: effectiveGender, shareLocation, forceCloset }),
+          body: JSON.stringify({ lat: loc.lat, lon: loc.lon, gender: effectiveGender, shareLocation, forceCloset, unitPreference: userUnitPreference }),
         });
         if (!res.ok) {
           let errorMessage = "Something went wrong.";
@@ -286,9 +292,41 @@ export default function Dashboard({
     }
   }
 
+  async function handleDevChat(e: React.FormEvent) {
+    e.preventDefault();
+    if (!devChatMessage.trim()) return;
+    setDevChatLoading(true);
+    setDevChatError(null);
+    setDevChatResult(null);
+    try {
+      const res = await fetch("/api/style", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lat: 0, lon: 0, devMessage: devChatMessage.trim() }),
+      });
+      if (!res.ok) {
+        let errorMessage = "Dev chat failed.";
+        try {
+          const data = await res.json();
+          errorMessage = data.error ?? errorMessage;
+        } catch {
+          /* non-JSON */
+        }
+        setDevChatError(errorMessage);
+      } else {
+        const data = await res.json();
+        setDevChatResult(data.recommendation);
+        setDevChatMessage("");
+      }
+    } catch {
+      setDevChatError("Network error — please try again.");
+    } finally {
+      setDevChatLoading(false);
+    }
+  }
+
   const w = result?.weather;
   const rec = result?.recommendation;
-  const meta = result?.meta;
 
   return (
     <div
@@ -604,7 +642,7 @@ export default function Dashboard({
                       className="text-4xl font-thin"
                       style={{ color: "var(--foreground)" }}
                     >
-                      {meta?.unitPreference === "imperial"
+                      {userUnitPreference === "imperial"
                         ? `${Math.round((w!.temp * 9) / 5 + 32)}°F`
                         : `${w!.temp}°C`}
                     </p>
@@ -613,7 +651,7 @@ export default function Dashboard({
                       style={{ color: "var(--foreground)", opacity: 0.55 }}
                     >
                       {w!.description} · feels like{" "}
-                      {meta?.unitPreference === "imperial"
+                      {userUnitPreference === "imperial"
                         ? `${Math.round((w!.feelsLike * 9) / 5 + 32)}°F`
                         : `${w!.feelsLike}°C`}
                     </p>
@@ -630,7 +668,7 @@ export default function Dashboard({
                     {
                       label: "Wind",
                       value: `${
-                        meta?.unitPreference === "imperial"
+                        userUnitPreference === "imperial"
                           ? `${Math.round(w!.windSpeed * 0.621)}mph`
                           : `${w!.windSpeed}km/h`
                       } ${w!.windDir}`,
@@ -639,7 +677,7 @@ export default function Dashboard({
                     { label: "UV Index", value: `${w!.uvIndex}`, icon: "☀️" },
                     {
                       label: "Feels like",
-                      value: meta?.unitPreference === "imperial"
+                      value: userUnitPreference === "imperial"
                         ? `${Math.round((w!.feelsLike * 9) / 5 + 32)}°F`
                         : `${w!.feelsLike}°C`,
                       icon: "🌡️",
@@ -728,18 +766,18 @@ export default function Dashboard({
                                 )}
                               </td>
                               <td className="text-right py-1 px-1">
-                                {meta?.unitPreference === "imperial"
+                                {userUnitPreference === "imperial"
                                   ? `${Math.round((s.temp * 9) / 5 + 32)}°F`
                                   : `${s.temp}°C`}
                               </td>
                               <td className="text-right py-1 px-1">
-                                {meta?.unitPreference === "imperial"
+                                {userUnitPreference === "imperial"
                                   ? `${Math.round((s.feelsLike * 9) / 5 + 32)}°F`
                                   : `${s.feelsLike}°C`}
                               </td>
                               <td className="text-right py-1 px-1">{s.humidity}%</td>
                               <td className="text-right py-1 px-1">
-                                {meta?.unitPreference === "imperial"
+                                {userUnitPreference === "imperial"
                                   ? `${Math.round(s.windSpeed * 0.621)}mph`
                                   : `${s.windSpeed}km/h`}{" "}
                                 {s.windDir}
@@ -855,7 +893,7 @@ export default function Dashboard({
                             className="text-sm font-medium"
                             style={{ color: "var(--foreground)" }}
                           >
-                            {meta?.unitPreference === "imperial"
+                            {userUnitPreference === "imperial"
                               ? `${Math.round((h.temp * 9) / 5 + 32)}°`
                               : `${h.temp}°`}
                           </p>
@@ -875,7 +913,7 @@ export default function Dashboard({
                               opacity: 0.35,
                             }}
                           >
-                            💨{meta?.unitPreference === "imperial"
+                            💨{userUnitPreference === "imperial"
                               ? `${Math.round(h.windSpeed * 0.621)}`
                               : h.windSpeed}
                           </p>
@@ -921,6 +959,27 @@ export default function Dashboard({
                     >
                       {rec!.reasoning}
                     </p>
+                  </>
+                )}
+                {isDev && (rec as { rawOutput?: string })?.rawOutput && (
+                  <>
+                    <h3
+                      className="text-xs font-semibold uppercase tracking-widest pt-1"
+                      style={{ color: "#ff9500", opacity: 0.7 }}
+                    >
+                      🛠️ Raw AI Output (Dev)
+                    </h3>
+                    <pre
+                      className="text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap rounded-xl p-3"
+                      style={{
+                        background: "var(--background)",
+                        color: "var(--foreground)",
+                        opacity: 0.6,
+                        border: "1px solid var(--card-border)",
+                      }}
+                    >
+                      {(rec as { rawOutput?: string }).rawOutput}
+                    </pre>
                   </>
                 )}
               </div>
@@ -1129,10 +1188,90 @@ export default function Dashboard({
               </p>
             </div>
           </div>
+
+          {/* ── Dev Chat (dev users only — hidden from all other UI) ── */}
+          {isDev && (
+            <div
+              className="rounded-2xl p-5 space-y-3"
+              style={{
+                background: "var(--card)",
+                border: "1px solid #ff9500",
+              }}
+            >
+              <h2
+                className="text-xs font-semibold uppercase tracking-widest"
+                style={{ color: "#ff9500" }}
+              >
+                🛠️ Dev Chat (no weather context)
+              </h2>
+              <form onSubmit={handleDevChat} className="flex gap-2">
+                <input
+                  type="text"
+                  value={devChatMessage}
+                  onChange={(e) => setDevChatMessage(e.target.value)}
+                  placeholder="Send a message directly to the AI…"
+                  className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
+                  style={{
+                    background: "var(--background)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--card-border)",
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={devChatLoading || !devChatMessage.trim()}
+                  className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
+                  style={{ background: "#ff9500", color: "#fff" }}
+                >
+                  {devChatLoading ? "…" : "Send"}
+                </button>
+              </form>
+              {devChatError && (
+                <p className="text-xs text-red-500">{devChatError}</p>
+              )}
+              {devChatResult && (
+                <div className="space-y-2">
+                  <p
+                    className="text-sm leading-relaxed"
+                    style={{ color: "var(--foreground)" }}
+                  >
+                    {devChatResult.outfit}
+                  </p>
+                  {devChatResult.reasoning && (
+                    <p
+                      className="text-sm leading-relaxed"
+                      style={{ color: "var(--foreground)", opacity: 0.7 }}
+                    >
+                      {devChatResult.reasoning}
+                    </p>
+                  )}
+                  {devChatResult.rawOutput && (
+                    <>
+                      <h3
+                        className="text-xs font-semibold uppercase tracking-widest pt-1"
+                        style={{ color: "#ff9500", opacity: 0.7 }}
+                      >
+                        Raw AI Output
+                      </h3>
+                      <pre
+                        className="text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap rounded-xl p-3"
+                        style={{
+                          background: "var(--background)",
+                          color: "var(--foreground)",
+                          opacity: 0.6,
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {devChatResult.rawOutput}
+                      </pre>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* ── Footer ── */}
       <footer
         className="px-6 py-6 text-center text-xs space-y-2"
         style={{ color: "var(--foreground)", opacity: 0.3 }}

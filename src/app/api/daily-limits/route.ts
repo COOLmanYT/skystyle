@@ -19,12 +19,13 @@ export async function GET() {
 
   const { data: profile } = await supabaseAdmin
     .from("users")
-    .select("is_pro")
+    .select("is_pro, is_dev")
     .eq("id", userId)
     .single();
 
   const isPro = profile?.is_pro ?? false;
-  const limits = await getDailyLimitsInfo(userId, isPro);
+  const isDev = profile?.is_dev ?? false;
+  const limits = await getDailyLimitsInfo(userId, isPro, isDev);
 
-  return NextResponse.json({ isPro, limits });
+  return NextResponse.json({ isPro, isDev, limits });
 }

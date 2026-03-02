@@ -14,6 +14,7 @@ export default async function DashboardPage() {
   const userId = session.user.id;
 
   let isPro = false;
+  let isDev = false;
   let initialCredits: number | null = null;
   let initialDailyLimits: {
     ai: { used: number; limit: number };
@@ -26,14 +27,15 @@ export default async function DashboardPage() {
     try {
       const { data } = await supabaseAdmin
         .from("users")
-        .select("is_pro")
+        .select("is_pro, is_dev")
         .eq("id", userId)
         .single();
       isPro = data?.is_pro ?? false;
+      isDev = data?.is_dev ?? false;
       if (isPro) {
         initialCredits = await getCredits(userId);
       }
-      initialDailyLimits = await getDailyLimitsInfo(userId, isPro);
+      initialDailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
     } catch {
       // Non-fatal: dashboard still works without credits info
     }
@@ -44,6 +46,7 @@ export default async function DashboardPage() {
       userName={name}
       userEmail={email}
       isPro={isPro}
+      isDev={isDev}
       initialCredits={initialCredits}
       initialDailyLimits={initialDailyLimits}
     />
