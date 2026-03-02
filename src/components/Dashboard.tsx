@@ -122,6 +122,70 @@ export default function Dashboard({
   const [devChatError, setDevChatError] = useState<string | null>(null);
   const [devChatResult, setDevChatResult] = useState<{ outfit: string; reasoning: string; rawOutput?: string } | null>(null);
 
+  // Custom weather sources (stored in localStorage)
+  type SourceMode = "builtin" | "custom" | "both";
+  interface CustomSource {
+    id: string;
+    type: "rss" | "api_key" | "url";
+    name: string;
+    value: string;
+    service?: string;
+  }
+  const [sourceMode, setSourceMode] = useState<SourceMode>("builtin");
+  const [customSources, setCustomSources] = useState<CustomSource[]>([]);
+  const [newSourceType, setNewSourceType] = useState<"rss" | "api_key" | "url">("url");
+  const [newSourceName, setNewSourceName] = useState("");
+  const [newSourceValue, setNewSourceValue] = useState("");
+  const [newSourceService, setNewSourceService] = useState("weatherapi");
+  const [sourcesExpanded, setSourcesExpanded] = useState(false);
+
+  // Load custom sources from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("skystyle_custom_sources");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed.customSources)) setCustomSources(parsed.customSources);
+        if (parsed.sourceMode) setSourceMode(parsed.sourceMode);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Save custom sources to localStorage when changed
+  const saveSourcesLocal = useCallback((mode: SourceMode, sources: CustomSource[]) => {
+    try {
+      localStorage.setItem("skystyle_custom_sources", JSON.stringify({ sourceMode: mode, customSources: sources }));
+    } catch { /* ignore */ }
+  }, []);
+
+  function addCustomSource(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newSourceName.trim() || !newSourceValue.trim()) return;
+    const newSource: CustomSource = {
+      id: crypto.randomUUID(),
+      type: newSourceType,
+      name: newSourceName.trim().slice(0, 50),
+      value: newSourceValue.trim().slice(0, 500),
+      ...(newSourceType === "api_key" ? { service: newSourceService } : {}),
+    };
+    const updated = [...customSources, newSource];
+    setCustomSources(updated);
+    saveSourcesLocal(sourceMode, updated);
+    setNewSourceName("");
+    setNewSourceValue("");
+  }
+
+  function removeCustomSource(id: string) {
+    const updated = customSources.filter((s) => s.id !== id);
+    setCustomSources(updated);
+    saveSourcesLocal(sourceMode, updated);
+  }
+
+  function updateSourceMode(mode: SourceMode) {
+    setSourceMode(mode);
+    saveSourcesLocal(mode, customSources);
+  }
+
   // Fetch closet items and settings on mount
   useEffect(() => {
     (async () => {
@@ -223,7 +287,10 @@ export default function Dashboard({
         const res = await fetch("/api/style", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ lat: loc.lat, lon: loc.lon, gender: effectiveGender, shareLocation, forceCloset, unitPreference: userUnitPreference }),
+          body: JSON.stringify({
+            lat: loc.lat, lon: loc.lon, gender: effectiveGender, shareLocation, forceCloset,
+            unitPreference: userUnitPreference, sourceMode, customSources,
+          }),
         });
         if (!res.ok) {
           let errorMessage = "Something went wrong.";
@@ -248,7 +315,7 @@ export default function Dashboard({
     } finally {
       setLoading(false);
     }
-  }, [weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, userUnitPreference]);
+  }, [weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, userUnitPreference, sourceMode, customSources]);
 
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
@@ -576,6 +643,229 @@ export default function Dashboard({
                 Force recommendation to use closet
               </span>
             </label>
+          </div>
+
+          {/* ── Weather Sources ── */}
+          <div
+            className="rounded-2xl p-4 space-y-3"
+            style={{
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+            }}
+          >
+            <button
+              onClick={() => setSourcesExpanded(!sourcesExpanded)}
+              className="w-full flex items-center justify-between btn-interact"
+            >
+              <p
+                className="text-xs font-semibold uppercase tracking-widest"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                🌐 Weather Sources
+              </p>
+              <span
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.4 }}
+              >
+                {sourcesExpanded ? "▲" : "▼"}
+              </span>
+            </button>
+
+            {sourcesExpanded && (
+              <div className="space-y-3">
+                {/* Source mode selector */}
+                <div>
+                  <p
+                    className="text-xs mb-2"
+                    style={{ color: "var(--foreground)", opacity: 0.5 }}
+                  >
+                    Source mode
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { key: "builtin" as SourceMode, label: "Built-in only" },
+                      { key: "both" as SourceMode, label: "Custom + Built-in" },
+                      { key: "custom" as SourceMode, label: "Custom only" },
+                    ]).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => updateSourceMode(key)}
+                        className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                        style={{
+                          background: sourceMode === key ? "var(--accent)" : "var(--background)",
+                          color: sourceMode === key ? "#fff" : "var(--foreground)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Existing custom sources */}
+                {customSources.length > 0 && (
+                  <div className="space-y-2">
+                    <p
+                      className="text-xs"
+                      style={{ color: "var(--foreground)", opacity: 0.5 }}
+                    >
+                      Your sources ({customSources.length})
+                    </p>
+                    {customSources.map((source) => (
+                      <div
+                        key={source.id}
+                        className="flex items-center gap-2 rounded-xl px-3 py-2"
+                        style={{
+                          background: "var(--background)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        <span className="text-xs">
+                          {source.type === "rss" ? "📡" : source.type === "api_key" ? "🔑" : "🔗"}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p
+                            className="text-xs font-medium truncate"
+                            style={{ color: "var(--foreground)" }}
+                          >
+                            {source.name}
+                          </p>
+                          <p
+                            className="text-xs truncate"
+                            style={{ color: "var(--foreground)", opacity: 0.4 }}
+                          >
+                            {source.type === "api_key"
+                              ? `${source.service} · ••••${source.value.slice(-4)}`
+                              : source.value}
+                          </p>
+                        </div>
+                        <span
+                          className="rounded-full px-2 py-0.5 text-xs"
+                          style={{
+                            background: "var(--card)",
+                            color: "var(--foreground)",
+                            opacity: 0.5,
+                          }}
+                        >
+                          {source.type === "rss" ? "RSS" : source.type === "api_key" ? "API Key" : "URL"}
+                        </span>
+                        <button
+                          onClick={() => removeCustomSource(source.id)}
+                          className="hover:opacity-70"
+                          style={{ color: "#ff3b30" }}
+                          aria-label={`Remove ${source.name}`}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add new source form */}
+                <form onSubmit={addCustomSource} className="space-y-2">
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--foreground)", opacity: 0.5 }}
+                  >
+                    Add a source
+                  </p>
+                  <div className="flex gap-2">
+                    {([
+                      { key: "url" as const, label: "🔗 URL" },
+                      { key: "rss" as const, label: "📡 RSS" },
+                      { key: "api_key" as const, label: "🔑 API Key" },
+                    ]).map(({ key, label }) => (
+                      <button
+                        key={key}
+                        type="button"
+                        onClick={() => setNewSourceType(key)}
+                        className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                        style={{
+                          background: newSourceType === key ? "var(--accent)" : "var(--background)",
+                          color: newSourceType === key ? "#fff" : "var(--foreground)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    type="text"
+                    value={newSourceName}
+                    onChange={(e) => setNewSourceName(e.target.value.slice(0, 50))}
+                    placeholder="Source name (e.g. My Weather Feed)"
+                    maxLength={50}
+                    className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                    style={{
+                      background: "var(--background)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  />
+                  <input
+                    type="text"
+                    value={newSourceValue}
+                    onChange={(e) => setNewSourceValue(e.target.value.slice(0, 500))}
+                    placeholder={
+                      newSourceType === "rss"
+                        ? "RSS feed URL (https://...)"
+                        : newSourceType === "api_key"
+                        ? "API key"
+                        : "URL (will be sent as context to AI, not fetched)"
+                    }
+                    maxLength={500}
+                    className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                    style={{
+                      background: "var(--background)",
+                      color: "var(--foreground)",
+                      border: "1px solid var(--card-border)",
+                    }}
+                  />
+                  {newSourceType === "api_key" && (
+                    <select
+                      value={newSourceService}
+                      onChange={(e) => setNewSourceService(e.target.value)}
+                      className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                      style={{
+                        background: "var(--background)",
+                        color: "var(--foreground)",
+                        border: "1px solid var(--card-border)",
+                      }}
+                    >
+                      <option value="weatherapi">WeatherAPI.com</option>
+                      <option value="visualcrossing">Visual Crossing</option>
+                      <option value="pirateweather">Pirate Weather</option>
+                      <option value="openweather">OpenWeather</option>
+                    </select>
+                  )}
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      disabled={!newSourceName.trim() || !newSourceValue.trim()}
+                      className="rounded-xl px-4 py-2 text-xs font-medium btn-interact disabled:opacity-40"
+                      style={{ background: "var(--accent)", color: "#fff" }}
+                    >
+                      Add Source
+                    </button>
+                  </div>
+                </form>
+
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--foreground)", opacity: 0.3 }}
+                >
+                  {newSourceType === "url"
+                    ? "URLs are not fetched — they are sent as context to the AI."
+                    : newSourceType === "rss"
+                    ? "RSS feeds are fetched server-side for weather content."
+                    : "API keys are used with the selected weather service."}
+                  {" "}Sources are stored locally in your browser.
+                </p>
+              </div>
+            )}
           </div>
 
           {location && (

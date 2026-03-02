@@ -55,6 +55,8 @@ export interface StyleInput {
   forceCloset?: boolean;
   /** Dev mode: include raw AI output in response */
   isDev?: boolean;
+  /** Additional context from user's custom sources (RSS content, URL references) */
+  customContext?: string[];
 }
 
 export interface FollowUpInput {
@@ -95,7 +97,7 @@ function formatWind(kmh: number, unit: "metric" | "imperial"): string {
 export async function getStyleRecommendation(
   input: StyleInput
 ): Promise<StyleRecommendation> {
-  const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation, forceCloset } = input;
+  const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation, forceCloset, customContext } = input;
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
   const closetSection =
@@ -133,6 +135,12 @@ export async function getStyleRecommendation(
       .join("\n")}`;
   }
 
+  // Custom source context (RSS content, URL references)
+  const customContextSection =
+    customContext && customContext.length > 0
+      ? `\n\nAdditional weather context from user sources:\n${customContext.join("\n\n")}`
+      : "";
+
   // Gender context — sanitize to prevent prompt injection
   const safeGender = gender ? gender.replace(/[\n\r]/g, " ").slice(0, 30) : undefined;
   const genderSection = safeGender && safeGender !== "N/A"
@@ -151,7 +159,7 @@ export async function getStyleRecommendation(
 - Conditions: ${weather.description}
 - Rain chance: ${weather.rainChance}%
 - UV Index: ${weather.uvIndex}
-- Time of day: ${weather.isDay ? "Daytime" : "Night-time"}${genderSection}${locationSection}${alertSection}${sourcesSection}${hourlySection}${closetSection}
+- Time of day: ${weather.isDay ? "Daytime" : "Night-time"}${genderSection}${locationSection}${alertSection}${sourcesSection}${hourlySection}${customContextSection}${closetSection}
 
 Please recommend an outfit.`;
 

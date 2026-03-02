@@ -181,8 +181,8 @@ async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
 // OpenWeatherMap
 // ---------------------------------------------------------------------------
 
-async function fetchOpenWeather(lat: number, lon: number): Promise<WeatherData> {
-  const key = process.env.OPENWEATHER_API_KEY;
+async function fetchOpenWeather(lat: number, lon: number, apiKey?: string): Promise<WeatherData> {
+  const key = apiKey ?? process.env.OPENWEATHER_API_KEY;
   if (!key) throw new Error("OPENWEATHER_API_KEY is not set");
 
   const [currentRes, forecastRes] = await Promise.all([
@@ -307,8 +307,8 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
 // WeatherAPI.com (requires WEATHERAPI_KEY)
 // ---------------------------------------------------------------------------
 
-async function fetchWeatherApi(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = process.env.WEATHERAPI_KEY;
+async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = apiKey ?? process.env.WEATHERAPI_KEY;
   if (!key) throw new Error("WEATHERAPI_KEY is not set");
 
   const url = `https://api.weatherapi.com/v1/forecast.json?key=${key}&q=${lat},${lon}&days=1&aqi=no&alerts=no`;
@@ -349,8 +349,8 @@ async function fetchWeatherApi(lat: number, lon: number): Promise<SourceWeatherD
 // Visual Crossing (requires VISUALCROSSING_API_KEY)
 // ---------------------------------------------------------------------------
 
-async function fetchVisualCrossing(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = process.env.VISUALCROSSING_API_KEY;
+async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = apiKey ?? process.env.VISUALCROSSING_API_KEY;
   if (!key) throw new Error("VISUALCROSSING_API_KEY is not set");
 
   const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}/today?unitGroup=metric&key=${key}&include=current,hours&contentType=json`;
@@ -392,8 +392,8 @@ async function fetchVisualCrossing(lat: number, lon: number): Promise<SourceWeat
 // Dark Sky-compatible API: https://pirateweather.net
 // ---------------------------------------------------------------------------
 
-async function fetchPirateWeather(lat: number, lon: number): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = process.env.PIRATEWEATHER_API_KEY;
+async function fetchPirateWeather(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
+  const key = apiKey ?? process.env.PIRATEWEATHER_API_KEY;
   if (!key) throw new Error("PIRATEWEATHER_API_KEY is not set");
 
   const url = `https://api.pirateweather.net/forecast/${key}/${lat},${lon}?units=ca`;
@@ -516,16 +516,168 @@ function averageSources(sources: SourceWeatherData[], primary: WeatherData): Wea
 }
 
 // ---------------------------------------------------------------------------
+// RSS feed fetching (custom user source)
+// ---------------------------------------------------------------------------
+
+export interface CustomSource {
+  id: string;
+  type: "rss" | "api_key" | "url";
+  name: string;
+  value: string;
+  service?: string; // For api_key type: weatherapi, visualcrossing, pirateweather, openweather
+}
+
+export type SourceMode = "builtin" | "custom" | "both";
+
+const MAX_RSS_ITEMS = 5;
+const MAX_RSS_ITEM_LENGTH = 300;
+export const MAX_CUSTOM_SOURCES = 10;
+
+/** Fetch and extract text content from an RSS feed URL (for weather context) */
+async function fetchRssFeed(url: string): Promise<string> {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error("Invalid RSS feed URL");
+  }
+  if (parsed.protocol !== "https:") {
+    throw new Error("RSS feed URL must use HTTPS");
+  }
+  if (isPrivateHost(parsed.hostname.toLowerCase())) {
+    throw new Error("RSS feed URL must point to a public host");
+  }
+
+  const res = await fetch(parsed.toString(), {
+    headers: { "User-Agent": "SkyStyle/1.0 (weather-stylist app)" },
+    next: { revalidate: 600 },
+  });
+  if (!res.ok) throw new Error(`RSS fetch failed: ${res.status}`);
+  const xml = await res.text();
+
+  // Simple XML text extraction — pull <title> and <description> content
+  const items: string[] = [];
+  const itemRegex = /<item[\s\S]*?<\/item>/gi;
+  const matches = xml.match(itemRegex) ?? [];
+  for (const item of matches.slice(0, MAX_RSS_ITEMS)) {
+    const title = item.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() ?? "";
+    let desc = item.match(/<description[^>]*>([\s\S]*?)<\/description>/i)?.[1]?.replace(/<!\[CDATA\[|\]\]>/g, "").trim() ?? "";
+    // Strip HTML tags iteratively to handle nested/split tags
+    let prev = "";
+    while (prev !== desc) {
+      prev = desc;
+      desc = desc.replace(/<[^>]*>/g, "");
+    }
+    desc = desc.trim();
+    if (title || desc) items.push(`${title}: ${desc}`.slice(0, MAX_RSS_ITEM_LENGTH));
+  }
+  return items.join("\n") || "No weather content found in RSS feed.";
+}
+
+/** Process custom sources and return context strings for AI and any weather source data */
+export async function processCustomSources(
+  customSources: CustomSource[],
+  lat: number,
+  lon: number
+): Promise<{ extraContext: string[]; extraWeatherSources: SourceWeatherData[] }> {
+  const extraContext: string[] = [];
+  const extraWeatherSources: SourceWeatherData[] = [];
+
+  for (const source of customSources.slice(0, MAX_CUSTOM_SOURCES)) {
+    try {
+      switch (source.type) {
+        case "rss": {
+          const content = await fetchRssFeed(source.value);
+          extraContext.push(`[RSS: ${source.name}]\n${content}`);
+          break;
+        }
+        case "url": {
+          // URLs are NOT fetched — just sent as context reference to the AI
+          extraContext.push(`[URL Reference: ${source.name}] ${source.value}`);
+          break;
+        }
+        case "api_key": {
+          // Use the API key with the specified weather service (passed as parameter, no env mutation)
+          const svc = source.service ?? "";
+          if (svc === "weatherapi") {
+            const data = await fetchWeatherApi(lat, lon, source.value);
+            data.source = `WeatherAPI (${source.name})`;
+            extraWeatherSources.push(data);
+          } else if (svc === "visualcrossing") {
+            const data = await fetchVisualCrossing(lat, lon, source.value);
+            data.source = `VisualCrossing (${source.name})`;
+            extraWeatherSources.push(data);
+          } else if (svc === "pirateweather") {
+            const data = await fetchPirateWeather(lat, lon, source.value);
+            data.source = `PirateWeather (${source.name})`;
+            extraWeatherSources.push(data);
+          } else if (svc === "openweather") {
+            const data = await fetchOpenWeather(lat, lon, source.value);
+            extraWeatherSources.push({
+              temp: data.temp,
+              feelsLike: data.feelsLike,
+              humidity: data.humidity,
+              windSpeed: data.windSpeed,
+              windDir: data.windDir,
+              description: data.description,
+              rainChance: data.rainChance,
+              uvIndex: data.uvIndex,
+              source: `OpenWeather (${source.name})`,
+            });
+          }
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn(`[weather] Custom source "${source.name}" failed:`, err instanceof Error ? err.message : err);
+    }
+  }
+
+  return { extraContext, extraWeatherSources };
+}
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
 export async function getWeather(
   lat: number,
   lon: number,
-  customSourceUrl?: string
-): Promise<WeatherData> {
-  if (customSourceUrl) {
+  customSourceUrl?: string,
+  sourceMode: SourceMode = "builtin",
+  customSources: CustomSource[] = []
+): Promise<WeatherData & { customContext?: string[] }> {
+  // Legacy: single custom source URL (Pro feature)
+  if (customSourceUrl && sourceMode === "builtin") {
     return fetchCustomSource(customSourceUrl, lon);
+  }
+
+  // Process user's custom sources
+  const { extraContext, extraWeatherSources } =
+    customSources.length > 0
+      ? await processCustomSources(customSources, lat, lon)
+      : { extraContext: [] as string[], extraWeatherSources: [] as SourceWeatherData[] };
+
+  // Resolve effective source mode — fall back to built-in if custom has no data
+  const effectiveMode: SourceMode =
+    sourceMode === "custom" && extraWeatherSources.length === 0 && extraContext.length === 0
+      ? "builtin"
+      : sourceMode;
+
+  // "custom" mode: only use user-provided weather sources
+  if (effectiveMode === "custom" && extraWeatherSources.length > 0) {
+    const primary: WeatherData = {
+      ...extraWeatherSources[0],
+      isDay: isDaytime(lon),
+      alerts: [],
+      stationName: extraWeatherSources[0].source,
+      stationDistanceKm: 0,
+      accuracyScore: "Medium",
+      source: "Custom",
+      hourly: extraWeatherSources[0].hourly,
+    };
+    const result = averageSources(extraWeatherSources, primary);
+    return { ...result, customContext: extraContext.length > 0 ? extraContext : undefined };
   }
 
   // Fetch from multiple sources in parallel for better accuracy
@@ -598,6 +750,11 @@ export async function getWeather(
   const results = await Promise.all(sourcePromises);
   const validSources = results.filter((r): r is SourceWeatherData => r !== null);
 
+  // In "both" mode, merge user's weather sources with built-in
+  if (effectiveMode === "both" && extraWeatherSources.length > 0) {
+    validSources.push(...extraWeatherSources);
+  }
+
   // We need at least one source
   if (validSources.length === 0) {
     throw new Error("All weather sources failed. Please try again later.");
@@ -621,7 +778,8 @@ export async function getWeather(
     };
   }
 
-  return averageSources(validSources, primary);
+  const averaged = averageSources(validSources, primary);
+  return { ...averaged, customContext: extraContext.length > 0 ? extraContext : undefined };
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getWeather } from "@/lib/weather";
+import { getWeather, CustomSource, SourceMode, MAX_CUSTOM_SOURCES } from "@/lib/weather";
 import { getStyleRecommendation, getDevChatResponse } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
@@ -30,7 +30,11 @@ export async function POST(req: NextRequest) {
   await syncPublicUser(session);
 
   // 2. Parse body
-  let body: { lat?: number; lon?: number; userApiKey?: string; gender?: string; shareLocation?: boolean; forceCloset?: boolean; unitPreference?: string; devMessage?: string };
+  let body: {
+    lat?: number; lon?: number; userApiKey?: string; gender?: string;
+    shareLocation?: boolean; forceCloset?: boolean; unitPreference?: string;
+    devMessage?: string; sourceMode?: string; customSources?: CustomSource[];
+  };
   try {
     body = await req.json();
   } catch {
@@ -117,10 +121,24 @@ export async function POST(req: NextRequest) {
     });
   }
 
+  // Parse custom source settings from client (stored in localStorage)
+  const sourceMode: SourceMode =
+    body.sourceMode === "custom" || body.sourceMode === "both" ? body.sourceMode : "builtin";
+  const customSources: CustomSource[] = Array.isArray(body.customSources)
+    ? body.customSources.filter(
+        (s): s is CustomSource =>
+          typeof s === "object" && s !== null &&
+          typeof s.id === "string" &&
+          typeof s.name === "string" &&
+          typeof s.value === "string" &&
+          ["rss", "api_key", "url"].includes(s.type)
+      ).slice(0, MAX_CUSTOM_SOURCES)
+    : [];
+
   // 5. Fetch weather
   let weather;
   try {
-    weather = await getWeather(lat, lon, customSourceUrl);
+    weather = await getWeather(lat, lon, customSourceUrl, sourceMode, customSources);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Weather fetch failed";
     return NextResponse.json({ error: message }, { status: 502 });
@@ -139,6 +157,7 @@ export async function POST(req: NextRequest) {
       shareLocation: shareLocation === true,
       forceCloset: forceCloset === true,
       isDev,
+      customContext: weather.customContext,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";
