@@ -89,7 +89,6 @@ function isGenderActive(option: string, gender: string): boolean {
 
 interface DashboardProps {
   userName: string;
-  userEmail: string;
   isPro: boolean;
   isDev: boolean;
   initialCredits: number | null;
@@ -98,7 +97,6 @@ interface DashboardProps {
 
 export default function Dashboard({
   userName,
-  userEmail,
   isPro,
   isDev,
   initialCredits,
@@ -1656,46 +1654,6 @@ export default function Dashboard({
                   ))}
                 </div>
               )}
-            </div>
-
-            {/* ── Account Settings ── */}
-            <div
-              id="section-account"
-              className="rounded-2xl p-5 space-y-3"
-              style={{
-                background: "var(--card)",
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <h2
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                Account
-              </h2>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span
-                    className="text-sm"
-                    style={{ color: "var(--foreground)" }}
-                  >
-                    {userName}
-                  </span>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--foreground)", opacity: 0.5 }}
-                  >
-                    {userEmail}
-                  </span>
-                </div>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
-                >
-                  You can add a GitHub or Google account to your profile by
-                  signing in with that provider.
-                </p>
-              </div>
             </div>
 
             {/* ── Dev Chat (dev users only — hidden from all other UI) ── */}

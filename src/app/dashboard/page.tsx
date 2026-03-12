@@ -10,7 +10,6 @@ export default async function DashboardPage() {
   if (!session?.user) redirect("/login");
 
   const name = session.user.name?.split(" ")[0] ?? session.user.email ?? "there";
-  const email = session.user.email ?? "";
   const userId = session.user.id;
 
   let isPro = false;
@@ -44,7 +43,6 @@ export default async function DashboardPage() {
   return (
     <Dashboard
       userName={name}
-      userEmail={email}
       isPro={isPro}
       isDev={isDev}
       initialCredits={initialCredits}
