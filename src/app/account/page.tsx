@@ -183,7 +183,7 @@ export default async function AccountPage() {
         )}
 
         {/* Pricing */}
-        <div className="space-y-4">
+        <div className="space-y-4 px-4 sm:px-6">
           <div className="text-center">
             <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
               Plans &amp; Pricing
