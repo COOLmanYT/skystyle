@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
-import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
+import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
 import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -848,7 +848,7 @@ export default function Dashboard({
                         Hourly Forecast
                       </p>
                       <div className="flex gap-2 overflow-x-auto pb-1">
-                        {w!.hourly.slice(0, HOURLY_FORECAST_LIMIT).map((h, i) => (
+                        {w!.hourly.filter(h => isHourlyCurrentOrFuture(h.time)).slice(0, HOURLY_FORECAST_LIMIT).map((h, i) => (
                           <div
                             key={i}
                             className="flex-shrink-0 rounded-xl p-2 text-center min-w-[72px]"

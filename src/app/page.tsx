@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import DemoLocationPicker, { ResolvedLocation } from "@/components/DemoLocationPicker";
-import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, HOURLY_FORECAST_LIMIT } from "@/components/WeatherEffectCard";
+import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "@/components/WeatherEffectCard";
 import Link from "next/link";
 
 interface HourlyForecast {
@@ -450,7 +450,7 @@ export default function Home() {
                       Hourly Forecast
                     </p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
-                      {weather.hourly.slice(0, HOURLY_FORECAST_LIMIT).map((h, i) => (
+                      {weather.hourly.filter(h => isHourlyCurrentOrFuture(h.time)).slice(0, HOURLY_FORECAST_LIMIT).map((h, i) => (
                         <div
                           key={i}
                           className="flex-shrink-0 rounded-xl p-2 text-center min-w-[72px]"

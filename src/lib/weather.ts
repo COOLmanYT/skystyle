@@ -444,6 +444,11 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
   const current = data.current ?? {};
   const hourlyData = data.hourly ?? {};
 
+  // utc_offset_seconds: the queried location's UTC offset (e.g. 39600 for AEDT UTC+11).
+  // Open-Meteo returns local times (timezone=auto), so we normalise to UTC ISO so the
+  // client can display them in the user's own timezone regardless of where they are.
+  const utcOffsetSeconds: number = data.utc_offset_seconds ?? 0;
+
   const hourly: HourlyForecast[] = [];
   const times: string[] = hourlyData.time ?? [];
   const temps: number[] = hourlyData.temperature_2m ?? [];
@@ -452,8 +457,15 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
   const winds: number[] = hourlyData.wind_speed_10m ?? [];
 
   for (let i = 0; i < times.length; i++) {
+    // Convert "YYYY-MM-DDTHH:MM" (queried-location local) → UTC ISO with Z suffix
+    const [datePart, timePart] = (times[i] ?? "").split("T");
+    const [year, month, day] = (datePart ?? "").split("-").map(Number);
+    const [hour, min] = (timePart ?? "00:00").split(":").map(Number);
+    const utcMs = Date.UTC(year, month - 1, day, hour, min, 0) - utcOffsetSeconds * 1000;
+    const utcIso = new Date(utcMs).toISOString();
+
     hourly.push({
-      time: times[i],
+      time: utcIso,
       temp: Math.round(temps[i] ?? 0),
       description: wmoCodeToDescription(codes[i] ?? 0),
       rainChance: Math.round(rainProbs[i] ?? 0),

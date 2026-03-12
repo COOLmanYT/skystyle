@@ -5,11 +5,36 @@ export type WeatherCondition = "thunder" | "rain" | "snow" | "sunny" | "fog" | "
 /** Max hourly forecast entries to display. */
 export const HOURLY_FORECAST_LIMIT = 24;
 
-/** Format an hourly time string, extracting HH:MM from ISO or space-separated datetime. */
+/** Format an hourly time string for display in the user's local timezone. */
 export function formatHourlyTime(time: string): string {
+  // UTC or timezone-aware ISO strings (e.g. Pirate Weather .toISOString()): convert to local tz
+  if (time.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(time)) {
+    return new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  }
+  // Local time strings without timezone — already in the queried location's local time
   if (time.includes("T")) return time.split("T")[1].slice(0, 5);
   if (time.includes(" ")) return time.split(" ")[1].slice(0, 5);
-  return `${new Date(time).getHours()}:00`;
+  return time.slice(0, 5);
+}
+
+/**
+ * Returns true if the hourly entry time is current or in the future.
+ * Allows a 30-minute grace window so the current hour is always included.
+ */
+export function isHourlyCurrentOrFuture(time: string): boolean {
+  const threshold = Date.now() - 30 * 60 * 1000;
+  let ts: number;
+  if (time.endsWith("Z") || /[+-]\d{2}:\d{2}$/.test(time)) {
+    ts = new Date(time).getTime();
+  } else if (time.includes("T")) {
+    // No timezone suffix — treat as local time (browser tz), which matches Open-Meteo tz=auto
+    ts = new Date(time).getTime();
+  } else if (time.includes(" ")) {
+    ts = new Date(time.replace(" ", "T")).getTime();
+  } else {
+    return true; // bare time string with no date — can't filter
+  }
+  return !isNaN(ts) && ts >= threshold;
 }
 
 /** Classify a weather description string into a visual condition. */
