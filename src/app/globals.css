@@ -38,6 +38,265 @@ body {
   transform: scale(0.96);
 }
 
+/* ── Weather effect card overlays ── */
+.weather-card {
+  border-radius: 1rem;
+}
+
+/* Tinted background overlays (very subtle) */
+.weather-tint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+}
+.weather-tint-rain {
+  background: linear-gradient(
+    180deg,
+    rgba(100, 150, 220, 0.08) 0%,
+    rgba(60, 110, 190, 0.12) 100%
+  );
+}
+.weather-tint-snow {
+  background: linear-gradient(
+    180deg,
+    rgba(180, 210, 240, 0.08) 0%,
+    rgba(200, 220, 245, 0.1) 100%
+  );
+}
+.weather-tint-sunny {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 200, 50, 0.07) 0%,
+    rgba(255, 160, 40, 0.1) 100%
+  );
+}
+.weather-tint-thunder {
+  background: linear-gradient(180deg, rgba(60, 50, 80, 0.12) 0%, rgba(40, 30, 70, 0.18) 100%);
+}
+.weather-tint-fog {
+  background: linear-gradient(180deg, rgba(180, 180, 190, 0.1) 0%, rgba(160, 165, 175, 0.14) 100%);
+}
+.weather-tint-cloudy {
+  background: linear-gradient(180deg, rgba(140, 150, 170, 0.06) 0%, rgba(120, 130, 155, 0.1) 100%);
+}
+
+@media (prefers-color-scheme: dark) {
+  .weather-tint-rain {
+    background: linear-gradient(
+      180deg,
+      rgba(50, 90, 160, 0.15) 0%,
+      rgba(30, 60, 130, 0.2) 100%
+    );
+  }
+  .weather-tint-snow {
+    background: linear-gradient(
+      180deg,
+      rgba(120, 160, 210, 0.1) 0%,
+      rgba(150, 180, 220, 0.14) 100%
+    );
+  }
+  .weather-tint-sunny {
+    background: linear-gradient(
+      135deg,
+      rgba(255, 180, 30, 0.1) 0%,
+      rgba(255, 140, 20, 0.14) 100%
+    );
+  }
+  .weather-tint-thunder {
+    background: linear-gradient(180deg, rgba(80, 60, 120, 0.2) 0%, rgba(50, 30, 90, 0.28) 100%);
+  }
+  .weather-tint-fog {
+    background: linear-gradient(180deg, rgba(100, 110, 130, 0.12) 0%, rgba(80, 90, 110, 0.16) 100%);
+  }
+  .weather-tint-cloudy {
+    background: linear-gradient(180deg, rgba(80, 90, 110, 0.08) 0%, rgba(60, 70, 95, 0.12) 100%);
+  }
+}
+
+/* Particle container */
+.weather-particles {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Individual particle base */
+.weather-particle {
+  position: absolute;
+  top: -10%;
+  display: block;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/* Rain particles */
+.weather-overlay-rain .weather-particle {
+  width: 1.5px;
+  height: 14px;
+  background: rgba(100, 160, 230, 0.35);
+  border-radius: 1px;
+  animation-name: weather-rain-fall;
+}
+
+@keyframes weather-rain-fall {
+  0% {
+    transform: translateY(-10px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(calc(100cqh + 20px));
+    opacity: 0.3;
+  }
+}
+
+/* Snow particles */
+.weather-overlay-snow .weather-particle {
+  width: 5px;
+  height: 5px;
+  background: rgba(200, 220, 255, 0.5);
+  border-radius: 50%;
+  animation-name: weather-snow-fall;
+}
+
+@keyframes weather-snow-fall {
+  0% {
+    transform: translateY(-8px) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.7;
+  }
+  50% {
+    transform: translateY(50cqh) translateX(8px);
+  }
+  100% {
+    transform: translateY(calc(100cqh + 10px)) translateX(-4px);
+    opacity: 0;
+  }
+}
+
+/* Sunny particles (subtle light rays) */
+.weather-overlay-sunny .weather-particle {
+  width: 2px;
+  height: 22px;
+  background: linear-gradient(
+    180deg,
+    rgba(255, 200, 60, 0.4),
+    rgba(255, 180, 40, 0)
+  );
+  border-radius: 1px;
+  animation-name: weather-sun-shimmer;
+}
+
+@keyframes weather-sun-shimmer {
+  0% {
+    transform: translateY(-20px) scaleY(0.6);
+    opacity: 0;
+  }
+  30% {
+    opacity: 0.5;
+  }
+  70% {
+    opacity: 0.3;
+  }
+  100% {
+    transform: translateY(calc(100cqh + 10px)) scaleY(1.2);
+    opacity: 0;
+  }
+}
+
+/* Use container query length for particle travel distance */
+.weather-particles {
+  container-type: size;
+}
+
+/* Thunder particles (heavier rain drops) */
+.weather-overlay-thunder .weather-particle {
+  width: 2px;
+  height: 18px;
+  background: rgba(140, 170, 240, 0.4);
+  border-radius: 1px;
+  animation-name: weather-rain-fall;
+}
+
+/* Fog particles (horizontal drifting wisps) */
+.weather-overlay-fog .weather-particle {
+  width: 40px;
+  height: 3px;
+  background: rgba(200, 210, 220, 0.25);
+  border-radius: 2px;
+  animation-name: weather-fog-drift;
+}
+
+@keyframes weather-fog-drift {
+  0% { transform: translateX(-20px) translateY(0); opacity: 0; }
+  20% { opacity: 0.4; }
+  80% { opacity: 0.3; }
+  100% { transform: translateX(60px) translateY(8px); opacity: 0; }
+}
+
+/* Wind leaf particles */
+.weather-leaf {
+  position: absolute;
+  left: -20px;
+  display: block;
+  width: 8px;
+  height: 8px;
+  background: rgba(120, 160, 60, 0.45);
+  border-radius: 50% 0 50% 0;
+  animation-name: weather-leaf-blow;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes weather-leaf-blow {
+  0% { transform: translateX(-20px) translateY(0) rotate(0deg); opacity: 0; }
+  10% { opacity: 0.6; }
+  50% { transform: translateX(50cqw) translateY(-15px) rotate(180deg); opacity: 0.5; }
+  100% { transform: translateX(calc(100cqw + 20px)) translateY(10px) rotate(360deg); opacity: 0; }
+}
+
+/* Fallback for browsers without container queries */
+@supports not (container-type: size) {
+  @keyframes weather-rain-fall {
+    0% { transform: translateY(-10px); opacity: 0; }
+    10% { opacity: 1; }
+    100% { transform: translateY(300px); opacity: 0.3; }
+  }
+  @keyframes weather-snow-fall {
+    0% { transform: translateY(-8px) translateX(0); opacity: 0; }
+    10% { opacity: 0.7; }
+    50% { transform: translateY(150px) translateX(8px); }
+    100% { transform: translateY(300px) translateX(-4px); opacity: 0; }
+  }
+  @keyframes weather-sun-shimmer {
+    0% { transform: translateY(-20px) scaleY(0.6); opacity: 0; }
+    30% { opacity: 0.5; }
+    70% { opacity: 0.3; }
+    100% { transform: translateY(300px) scaleY(1.2); opacity: 0; }
+  }
+  @keyframes weather-fog-drift {
+    0% { transform: translateX(-20px) translateY(0); opacity: 0; }
+    20% { opacity: 0.4; }
+    80% { opacity: 0.3; }
+    100% { transform: translateX(60px) translateY(8px); opacity: 0; }
+  }
+  @keyframes weather-leaf-blow {
+    0% { transform: translateX(-20px) translateY(0) rotate(0deg); opacity: 0; }
+    10% { opacity: 0.6; }
+    50% { transform: translateX(300px) translateY(-15px) rotate(180deg); opacity: 0.5; }
+    100% { transform: translateX(600px) translateY(10px) rotate(360deg); opacity: 0; }
+  }
+}
+
 /* Sticky nav glassmorphism */
 .sticky-nav {
   position: sticky;

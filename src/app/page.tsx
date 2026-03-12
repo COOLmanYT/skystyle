@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import DemoLocationPicker, { ResolvedLocation } from "@/components/DemoLocationPicker";
+import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, HOURLY_FORECAST_LIMIT } from "@/components/WeatherEffectCard";
 import Link from "next/link";
 
 interface HourlyForecast {
@@ -240,7 +241,9 @@ export default function Home() {
           <DemoLocationPicker onLocationResolved={handleLocationResolved} />
 
           {location && (
-            <div
+            <WeatherEffectCard
+              condition={weather ? getWeatherCondition(weather.description) : "default"}
+              windSpeed={weather?.windSpeed ?? 0}
               className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs"
               style={{
                 background: "var(--card)",
@@ -251,7 +254,7 @@ export default function Home() {
             >
               <span>{location.source === "gps" ? "📍" : "🔍"}</span>
               <span className="truncate">{location.displayName}</span>
-            </div>
+            </WeatherEffectCard>
           )}
 
           {loading && (
@@ -288,7 +291,9 @@ export default function Home() {
           {weather && !loading && (
             <>
               {/* Weather card */}
-              <div
+              <WeatherEffectCard
+                condition={getWeatherCondition(weather.description)}
+                windSpeed={weather.windSpeed}
                 className="rounded-2xl p-5 space-y-3"
                 style={{
                   background: "var(--card)",
@@ -427,14 +432,14 @@ export default function Home() {
                       Hourly Forecast
                     </p>
                     <div className="flex gap-2 overflow-x-auto pb-1">
-                      {weather.hourly.slice(0, 12).map((h, i) => (
+                      {weather.hourly.slice(0, HOURLY_FORECAST_LIMIT).map((h, i) => (
                         <div
                           key={i}
                           className="flex-shrink-0 rounded-xl p-2 text-center min-w-[72px]"
                           style={{ background: "var(--background)" }}
                         >
                           <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-                            {new Date(h.time).getHours()}:00
+                            {formatHourlyTime(h.time)}
                           </p>
                           <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>
                             {h.temp}°
@@ -507,10 +512,12 @@ export default function Home() {
                     <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--accent)" }}>OSM Nominatim</a>.
                   </p>
                 </div>
-              </div>
+              </WeatherEffectCard>
 
               {/* AI recommendation — demo placeholder */}
-              <div
+              <WeatherEffectCard
+                condition={getWeatherCondition(weather.description)}
+                windSpeed={weather.windSpeed}
                 className="rounded-2xl p-5 space-y-3"
                 style={{
                   background: "var(--card)",
@@ -543,7 +550,7 @@ export default function Home() {
                 >
                   Sign in for AI recommendations →
                 </Link>
-              </div>
+              </WeatherEffectCard>
             </>
           )}
         </div>
