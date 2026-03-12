@@ -457,10 +457,17 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
   const winds: number[] = hourlyData.wind_speed_10m ?? [];
 
   for (let i = 0; i < times.length; i++) {
-    // Convert "YYYY-MM-DDTHH:MM" (queried-location local) → UTC ISO with Z suffix
-    const [datePart, timePart] = (times[i] ?? "").split("T");
-    const [year, month, day] = (datePart ?? "").split("-").map(Number);
-    const [hour, min] = (timePart ?? "00:00").split(":").map(Number);
+    // Convert "YYYY-MM-DDTHH:MM" (queried-location local) → UTC ISO with Z suffix.
+    // Guard against malformed entries that would produce NaN timestamps.
+    const raw = times[i] ?? "";
+    const tIdx = raw.indexOf("T");
+    if (tIdx < 0) continue; // skip entries without T separator
+    const dateParts = raw.slice(0, tIdx).split("-").map(Number);
+    const timeParts = raw.slice(tIdx + 1).split(":").map(Number);
+    const [year, month, day] = dateParts;
+    const hour = timeParts[0] ?? 0;
+    const min = timeParts[1] ?? 0;
+    if (!year || !month || isNaN(year) || isNaN(month) || isNaN(day)) continue;
     const utcMs = Date.UTC(year, month - 1, day, hour, min, 0) - utcOffsetSeconds * 1000;
     const utcIso = new Date(utcMs).toISOString();
 
