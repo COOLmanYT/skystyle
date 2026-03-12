@@ -2,9 +2,14 @@
 
 export type WeatherCondition = "thunder" | "rain" | "snow" | "sunny" | "fog" | "cloudy" | "default";
 
-/** Format an hourly time string, preferring HH:MM from ISO format. */
+/** Max hourly forecast entries to display. */
+export const HOURLY_FORECAST_LIMIT = 24;
+
+/** Format an hourly time string, extracting HH:MM from ISO or space-separated datetime. */
 export function formatHourlyTime(time: string): string {
-  return time.includes("T") ? time.split("T")[1].slice(0, 5) : `${new Date(time).getHours()}:00`;
+  if (time.includes("T")) return time.split("T")[1].slice(0, 5);
+  if (time.includes(" ")) return time.split(" ")[1].slice(0, 5);
+  return `${new Date(time).getHours()}:00`;
 }
 
 /** Classify a weather description string into a visual condition. */
@@ -57,10 +62,10 @@ function buildParticles(condition: WeatherCondition) {
   });
 }
 
-const WIND_LEAF_THRESHOLD = 20;
-const MAX_LEAVES = 12;
-const BASE_LEAF_COUNT = 8;
-const LEAF_INCREMENT_FACTOR = 0.1;
+const WIND_LEAF_THRESHOLD = 20; // km/h — below this no leaves are shown
+const MAX_LEAVES = 12; // maximum number of leaf particles
+const BASE_LEAF_COUNT = 8; // starting leaf count at threshold
+const LEAF_INCREMENT_FACTOR = 0.1; // additional leaves per km/h above threshold
 
 function buildWindLeaves(windSpeed: number) {
   if (windSpeed <= WIND_LEAF_THRESHOLD) return null;
