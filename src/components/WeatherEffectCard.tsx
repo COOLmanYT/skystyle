@@ -63,7 +63,7 @@ function buildParticles(condition: WeatherCondition) {
     : condition === "rain" ? 18
     : condition === "snow" ? 14
     : condition === "fog" ? 10
-    : condition === "cloudy" ? 8
+    : condition === "cloudy" ? 14
     : condition === "default" ? 5
     : 6; // sunny
 
@@ -72,7 +72,7 @@ function buildParticles(condition: WeatherCondition) {
     const r2 = seededRandom(i + 100);
     const r3 = seededRandom(i + 200);
     const left = `${(i / count) * 100 + r1 * (100 / count)}%`;
-    const delay = `${(r2 * 2).toFixed(1)}s`;
+    const delay = condition === "cloudy" ? `${(r2 * 5).toFixed(1)}s` : `${(r2 * 2).toFixed(1)}s`;
     const duration =
       condition === "thunder"
         ? `${0.35 + r3 * 0.3}s`

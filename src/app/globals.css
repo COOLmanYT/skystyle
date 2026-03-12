@@ -79,7 +79,7 @@ body {
   background: linear-gradient(180deg, rgba(180, 180, 190, 0.1) 0%, rgba(160, 165, 175, 0.14) 100%);
 }
 .weather-tint-cloudy {
-  background: linear-gradient(180deg, rgba(140, 150, 170, 0.06) 0%, rgba(120, 130, 155, 0.1) 100%);
+  background: linear-gradient(180deg, rgba(130, 145, 170, 0.18) 0%, rgba(105, 120, 150, 0.24) 100%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -111,7 +111,7 @@ body {
     background: linear-gradient(180deg, rgba(100, 110, 130, 0.12) 0%, rgba(80, 90, 110, 0.16) 100%);
   }
   .weather-tint-cloudy {
-    background: linear-gradient(180deg, rgba(80, 90, 110, 0.08) 0%, rgba(60, 70, 95, 0.12) 100%);
+    background: linear-gradient(180deg, rgba(80, 95, 125, 0.2) 0%, rgba(60, 75, 108, 0.26) 100%);
   }
 }
 
@@ -243,20 +243,25 @@ body {
   100% { transform: translateX(60px) translateY(8px); opacity: 0; }
 }
 
-/* Cloudy particles (slow drifting wisps) */
+/* Cloudy particles — large soft cloud puffs that drift across the card */
 .weather-overlay-cloudy .weather-particle {
-  width: 45px;
-  height: 14px;
-  background: rgba(190, 200, 215, 0.22);
+  width: 80px;
+  height: 26px;
+  background: radial-gradient(ellipse 80% 60% at 50% 50%,
+    rgba(215, 225, 240, 0.72) 0%,
+    rgba(185, 200, 220, 0.45) 55%,
+    transparent 100%
+  );
   border-radius: 50%;
   animation-name: weather-cloud-drift;
 }
 
 @keyframes weather-cloud-drift {
-  0% { transform: translateX(-60px) translateY(0); opacity: 0; }
-  15% { opacity: 0.45; }
-  85% { opacity: 0.3; }
-  100% { transform: translateX(calc(100cqw + 60px)) translateY(-10px); opacity: 0; }
+  0%   { transform: translateX(-90px) translateY(0px); opacity: 0; }
+  10%  { opacity: 0.8; }
+  48%  { transform: translateX(calc(48cqw)) translateY(-7px); opacity: 0.72; }
+  90%  { opacity: 0.6; }
+  100% { transform: translateX(calc(100cqw + 90px)) translateY(-12px); opacity: 0; }
 }
 
 /* Default particles (subtle ambient float) */
@@ -322,10 +327,11 @@ body {
     100% { transform: translateX(60px) translateY(8px); opacity: 0; }
   }
   @keyframes weather-cloud-drift {
-    0% { transform: translateX(-60px) translateY(0); opacity: 0; }
-    15% { opacity: 0.45; }
-    85% { opacity: 0.3; }
-    100% { transform: translateX(600px) translateY(-10px); opacity: 0; }
+    0%   { transform: translateX(-90px) translateY(0px); opacity: 0; }
+    10%  { opacity: 0.8; }
+    48%  { transform: translateX(300px) translateY(-7px); opacity: 0.72; }
+    90%  { opacity: 0.6; }
+    100% { transform: translateX(700px) translateY(-12px); opacity: 0; }
   }
   @keyframes weather-default-float {
     0% { transform: translateY(0) scale(0.8); opacity: 0; }

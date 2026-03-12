@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getCredits } from "@/lib/credits";
 import { getDailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
+import PageSpacingWrapper from "@/components/PageSpacingWrapper";
 
 interface DailyLimits {
   ai: { used: number; limit: number | null };
@@ -64,7 +65,7 @@ export default async function AccountPage() {
       </nav>
 
       {/* Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <PageSpacingWrapper page="account" className="max-w-3xl mx-auto px-4 py-8 space-y-8">
 
         {/* User Info */}
         <div
@@ -331,7 +332,7 @@ export default async function AccountPage() {
           <Link href="/terms" className="underline hover:opacity-70">Terms</Link>
           <Link href="/privacy" className="underline hover:opacity-70">Privacy</Link>
         </div>
-      </div>
+      </PageSpacingWrapper>
     </div>
   );
 }
