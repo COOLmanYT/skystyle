@@ -89,7 +89,6 @@ function isGenderActive(option: string, gender: string): boolean {
 
 interface DashboardProps {
   userName: string;
-  userEmail: string;
   isPro: boolean;
   isDev: boolean;
   initialCredits: number | null;
@@ -98,7 +97,6 @@ interface DashboardProps {
 
 export default function Dashboard({
   userName,
-  userEmail,
   isPro,
   isDev,
   initialCredits,
@@ -155,6 +153,39 @@ export default function Dashboard({
   const [newSourceValue, setNewSourceValue] = useState("");
   const [newSourceService, setNewSourceService] = useState("weatherapi");
   const [sourcesExpanded, setSourcesExpanded] = useState(false);
+
+  const syncStoredPreferences = useCallback(() => {
+    try {
+      const savedGender = localStorage.getItem("skystyle_gender");
+      if (savedGender) setGender(savedGender);
+      const savedCustomGender = localStorage.getItem("skystyle_custom_gender");
+      if (savedCustomGender) setCustomGender(savedCustomGender);
+      const savedLocationConsent = localStorage.getItem("skystyle_location_consent");
+      if (savedLocationConsent !== null) setShareLocation(savedLocationConsent === "true");
+      const savedWeatherOnly = localStorage.getItem("skystyle_weather_only");
+      if (savedWeatherOnly !== null) setWeatherOnly(savedWeatherOnly === "true");
+
+      const savedLayoutMode = localStorage.getItem("skystyle_layout_mode") as LayoutMode | null;
+      if (savedLayoutMode) setLayoutMode(savedLayoutMode);
+
+      const extraEnabled = localStorage.getItem("skystyle_extra_spacing") === "true";
+      const extraPages = (localStorage.getItem("skystyle_extra_spacing_pages") ?? "dashboard")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
+      setExtraSpacingEnabled(extraEnabled && extraPages.includes("dashboard"));
+
+      const customEnabled = localStorage.getItem("skystyle_custom_spacing") === "true";
+      setCustomSpacingEnabled(customEnabled);
+      const savedRatio = parseFloat(localStorage.getItem("skystyle_custom_spacing_ratio") ?? "1.5");
+      if (!isNaN(savedRatio) && savedRatio > 0) {
+        setCustomRatio(savedRatio);
+        customRatioRef.current = savedRatio;
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Load custom sources from localStorage on mount
   useEffect(() => {
@@ -225,35 +256,15 @@ export default function Dashboard({
         /* ignore */
       }
     })();
+    syncStoredPreferences();
+    window.addEventListener("storage", syncStoredPreferences);
+    window.addEventListener("skystyle-preferences-updated", syncStoredPreferences);
 
-    // Load preferences saved from the Settings page (localStorage)
-    try {
-      const savedGender = localStorage.getItem("skystyle_gender");
-      if (savedGender) setGender(savedGender);
-      const savedCustomGender = localStorage.getItem("skystyle_custom_gender");
-      if (savedCustomGender) setCustomGender(savedCustomGender);
-      const savedLocationConsent = localStorage.getItem("skystyle_location_consent");
-      if (savedLocationConsent !== null) setShareLocation(savedLocationConsent === "true");
-      const savedWeatherOnly = localStorage.getItem("skystyle_weather_only");
-      if (savedWeatherOnly !== null) setWeatherOnly(savedWeatherOnly === "true");
-
-      // Layout preferences
-      const savedLayoutMode = localStorage.getItem("skystyle_layout_mode") as LayoutMode | null;
-      if (savedLayoutMode) setLayoutMode(savedLayoutMode);
-
-      const extraEnabled = localStorage.getItem("skystyle_extra_spacing") === "true";
-      const extraPages = (localStorage.getItem("skystyle_extra_spacing_pages") ?? "dashboard").split(",");
-      if (extraEnabled && extraPages.includes("dashboard")) setExtraSpacingEnabled(true);
-
-      const customEnabled = localStorage.getItem("skystyle_custom_spacing") === "true";
-      if (customEnabled) setCustomSpacingEnabled(true);
-      const savedRatio = parseFloat(localStorage.getItem("skystyle_custom_spacing_ratio") ?? "1.5");
-      if (!isNaN(savedRatio) && savedRatio > 0) {
-        setCustomRatio(savedRatio);
-        customRatioRef.current = savedRatio;
-      }
-    } catch { /* ignore */ }
-  }, []);
+    return () => {
+      window.removeEventListener("storage", syncStoredPreferences);
+      window.removeEventListener("skystyle-preferences-updated", syncStoredPreferences);
+    };
+  }, [syncStoredPreferences]);
 
   async function addClosetItem(e: React.FormEvent) {
     e.preventDefault();
@@ -982,6 +993,89 @@ export default function Dashboard({
                   )}
                 </WeatherEffectCard>
 
+                {isDev && (
+                  <WeatherEffectCard
+                    condition={getWeatherCondition(w?.description ?? "")}
+                    windSpeed={w!.windSpeed}
+                    className="rounded-2xl p-5 space-y-3"
+                    style={{
+                      background: "var(--card)",
+                      border: "1px solid #ff9500",
+                    }}
+                  >
+                    <h2
+                      className="text-xs font-semibold uppercase tracking-widest"
+                      style={{ color: "#ff9500" }}
+                    >
+                      🛠️ Dev Chat (no weather context)
+                    </h2>
+                    <form onSubmit={handleDevChat} className="flex gap-2">
+                      <input
+                        type="text"
+                        value={devChatMessage}
+                        onChange={(e) => setDevChatMessage(e.target.value)}
+                        placeholder="Send a message directly to the AI…"
+                        className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
+                        style={{
+                          background: "var(--background)",
+                          color: "var(--foreground)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      />
+                      <button
+                        type="submit"
+                        disabled={devChatLoading || !devChatMessage.trim()}
+                        className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
+                        style={{ background: "#ff9500", color: "#fff" }}
+                      >
+                        {devChatLoading ? "…" : "Send"}
+                      </button>
+                    </form>
+                    {devChatError && (
+                      <p className="text-xs text-red-500">{devChatError}</p>
+                    )}
+                    {devChatResult && (
+                      <div className="space-y-2">
+                        <p
+                          className="text-sm leading-relaxed"
+                          style={{ color: "var(--foreground)" }}
+                        >
+                          {devChatResult.outfit}
+                        </p>
+                        {devChatResult.reasoning && (
+                          <p
+                            className="text-sm leading-relaxed"
+                            style={{ color: "var(--foreground)", opacity: 0.7 }}
+                          >
+                            {devChatResult.reasoning}
+                          </p>
+                        )}
+                        {devChatResult.rawOutput && (
+                          <>
+                            <h3
+                              className="text-xs font-semibold uppercase tracking-widest pt-1"
+                              style={{ color: "#ff9500", opacity: 0.7 }}
+                            >
+                              Raw AI Output
+                            </h3>
+                            <pre
+                              className="text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap rounded-xl p-3"
+                              style={{
+                                background: "var(--background)",
+                                color: "var(--foreground)",
+                                opacity: 0.6,
+                                border: "1px solid var(--card-border)",
+                              }}
+                            >
+                              {devChatResult.rawOutput}
+                            </pre>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </WeatherEffectCard>
+                )}
+
                 {/* ── Outfit Recommendation ── */}
                 {rec?.outfit && (
                 <WeatherEffectCard
@@ -1047,7 +1141,9 @@ export default function Dashboard({
 
                 {/* ── Follow-Up Input ── */}
                 {rec?.outfit && (
-                <div
+                <WeatherEffectCard
+                  condition={getWeatherCondition(w?.description ?? "")}
+                  windSpeed={w!.windSpeed}
                   className="rounded-2xl p-4"
                   style={{
                     background: "var(--card)",
@@ -1095,7 +1191,7 @@ export default function Dashboard({
                   {followUpError && (
                     <p className="text-xs text-red-500 mt-2">{followUpError}</p>
                   )}
-                </div>
+                </WeatherEffectCard>
                 )}
 
                 {/* Refresh */}
@@ -1658,127 +1754,6 @@ export default function Dashboard({
               )}
             </div>
 
-            {/* ── Account Settings ── */}
-            <div
-              id="section-account"
-              className="rounded-2xl p-5 space-y-3"
-              style={{
-                background: "var(--card)",
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <h2
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                Account
-              </h2>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span
-                    className="text-sm"
-                    style={{ color: "var(--foreground)" }}
-                  >
-                    {userName}
-                  </span>
-                  <span
-                    className="text-xs"
-                    style={{ color: "var(--foreground)", opacity: 0.5 }}
-                  >
-                    {userEmail}
-                  </span>
-                </div>
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
-                >
-                  You can add a GitHub or Google account to your profile by
-                  signing in with that provider.
-                </p>
-              </div>
-            </div>
-
-            {/* ── Dev Chat (dev users only — hidden from all other UI) ── */}
-            {isDev && (
-              <div
-                className="rounded-2xl p-5 space-y-3"
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid #ff9500",
-                }}
-              >
-                <h2
-                  className="text-xs font-semibold uppercase tracking-widest"
-                  style={{ color: "#ff9500" }}
-                >
-                  🛠️ Dev Chat (no weather context)
-                </h2>
-                <form onSubmit={handleDevChat} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={devChatMessage}
-                    onChange={(e) => setDevChatMessage(e.target.value)}
-                    placeholder="Send a message directly to the AI…"
-                    className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
-                    style={{
-                      background: "var(--background)",
-                      color: "var(--foreground)",
-                      border: "1px solid var(--card-border)",
-                    }}
-                  />
-                  <button
-                    type="submit"
-                    disabled={devChatLoading || !devChatMessage.trim()}
-                    className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
-                    style={{ background: "#ff9500", color: "#fff" }}
-                  >
-                    {devChatLoading ? "…" : "Send"}
-                  </button>
-                </form>
-                {devChatError && (
-                  <p className="text-xs text-red-500">{devChatError}</p>
-                )}
-                {devChatResult && (
-                  <div className="space-y-2">
-                    <p
-                      className="text-sm leading-relaxed"
-                      style={{ color: "var(--foreground)" }}
-                    >
-                      {devChatResult.outfit}
-                    </p>
-                    {devChatResult.reasoning && (
-                      <p
-                        className="text-sm leading-relaxed"
-                        style={{ color: "var(--foreground)", opacity: 0.7 }}
-                      >
-                        {devChatResult.reasoning}
-                      </p>
-                    )}
-                    {devChatResult.rawOutput && (
-                      <>
-                        <h3
-                          className="text-xs font-semibold uppercase tracking-widest pt-1"
-                          style={{ color: "#ff9500", opacity: 0.7 }}
-                        >
-                          Raw AI Output
-                        </h3>
-                        <pre
-                          className="text-xs leading-relaxed overflow-x-auto whitespace-pre-wrap rounded-xl p-3"
-                          style={{
-                            background: "var(--background)",
-                            color: "var(--foreground)",
-                            opacity: 0.6,
-                            border: "1px solid var(--card-border)",
-                          }}
-                        >
-                          {devChatResult.rawOutput}
-                        </pre>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
           </div>
         </div>
       </div>

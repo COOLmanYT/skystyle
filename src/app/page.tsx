@@ -575,7 +575,7 @@ export default function Home() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="px-6 py-16 max-w-4xl mx-auto">
+      <section id="pricing" className="px-6 py-16 max-w-6xl mx-auto">
         <h2
           className="text-2xl font-semibold text-center mb-2"
           style={{ color: "var(--foreground)" }}
@@ -589,7 +589,7 @@ export default function Home() {
           Start free, upgrade when you need more.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
           {/* Free */}
           <div
             className="rounded-2xl p-8"
@@ -611,7 +611,6 @@ export default function Home() {
               <li>✅ Closet (1 use/day)</li>
               <li>✅ Source picker (1/day)</li>
               <li>✅ GPS &amp; manual location</li>
-              <li>✅ Metric units</li>
             </ul>
           </div>
 
@@ -643,7 +642,6 @@ export default function Home() {
               <li>✅ Custom AI prompts</li>
               <li>✅ Bring your own AI key</li>
               <li>✅ Custom weather sources</li>
-              <li>✅ Imperial units</li>
             </ul>
           </div>
 

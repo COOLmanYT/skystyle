@@ -22,6 +22,7 @@ export default async function AccountPage() {
   const userId = session.user.id;
 
   let isPro = false;
+  let isDev = false;
   let initialCredits: number | null = null;
   let dailyLimits: DailyLimits | null = null;
 
@@ -33,7 +34,7 @@ export default async function AccountPage() {
         .eq("id", userId)
         .single();
       isPro = data?.is_pro ?? false;
-      const isDev = data?.is_dev ?? false;
+      isDev = data?.is_dev ?? false;
       if (isPro) {
         initialCredits = await getCredits(userId);
       }
@@ -48,7 +49,7 @@ export default async function AccountPage() {
         className="sticky-nav px-4 py-3"
         style={{ borderBottom: "1px solid var(--card-border)" }}
       >
-        <div className="flex items-center justify-between max-w-3xl mx-auto">
+        <div className="flex items-center justify-between max-w-6xl mx-auto">
           <div className="flex items-center gap-3">
             <Link
               href="/dashboard"
@@ -65,11 +66,11 @@ export default async function AccountPage() {
       </nav>
 
       {/* Content */}
-      <PageSpacingWrapper page="account" className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <PageSpacingWrapper page="account" className="max-w-6xl mx-auto px-4 py-8 space-y-8">
 
         {/* User Info */}
         <div
-          className="rounded-2xl p-6 space-y-3"
+          className="max-w-3xl mx-auto rounded-2xl p-6 space-y-3"
           style={{
             background: "var(--card)",
             border: "1px solid var(--card-border)",
@@ -94,12 +95,12 @@ export default async function AccountPage() {
               <span
                 className="rounded-full px-3 py-1 text-xs font-medium"
                 style={{
-                  background: isPro ? "var(--accent)" : "var(--background)",
-                  color: isPro ? "#fff" : "var(--foreground)",
-                  border: isPro ? "none" : "1px solid var(--card-border)",
+                  background: isDev ? "#ff9500" : isPro ? "var(--accent)" : "var(--background)",
+                  color: isDev || isPro ? "#fff" : "var(--foreground)",
+                  border: isDev || isPro ? "none" : "1px solid var(--card-border)",
                 }}
               >
-                {isPro ? "⭐ Pro" : "Free"}
+                {isDev ? "🛠️ Dev" : isPro ? "⭐ Pro" : "Free"}
               </span>
               {isPro && initialCredits !== null && (
                 <span
@@ -117,7 +118,7 @@ export default async function AccountPage() {
           >
             You can add a GitHub or Google account to your profile by signing in with that provider.
           </p>
-          {!isPro && (
+          {!isPro && !isDev && (
             <a
               href="https://buymeacoffee.com/coolmanyt"
               target="_blank"
@@ -133,7 +134,7 @@ export default async function AccountPage() {
         {/* AI Usage */}
         {dailyLimits && (
           <div
-            className="rounded-2xl p-6 space-y-4"
+            className="max-w-3xl mx-auto rounded-2xl p-6 space-y-4"
             style={{
               background: "var(--card)",
               border: "1px solid var(--card-border)",
@@ -183,7 +184,7 @@ export default async function AccountPage() {
         )}
 
         {/* Pricing */}
-        <div className="space-y-4">
+        <div className="max-w-6xl mx-auto space-y-4 px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
               Plans &amp; Pricing
@@ -193,16 +194,16 @@ export default async function AccountPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 ${isDev ? "2xl:grid-cols-5" : ""}`}>
             {/* Free */}
             <div
               className={`rounded-2xl p-6`}
               style={{
                 background: "var(--card)",
-                border: !isPro ? "2px solid var(--foreground)" : "1px solid var(--card-border)",
+                border: !isPro && !isDev ? "2px solid var(--foreground)" : "1px solid var(--card-border)",
               }}
             >
-              {!isPro && (
+              {!isPro && !isDev && (
                 <span
                   className="inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2"
                   style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
@@ -219,7 +220,6 @@ export default async function AccountPage() {
                 <li>✅ Closet (1 use/day)</li>
                 <li>✅ Source picker (1/day)</li>
                 <li>✅ GPS &amp; manual location</li>
-                <li>✅ Metric units</li>
               </ul>
             </div>
 
@@ -228,10 +228,10 @@ export default async function AccountPage() {
               className="rounded-2xl p-6 relative"
               style={{
                 background: "var(--card)",
-                border: isPro ? "2px solid var(--accent)" : "1px solid var(--card-border)",
+                border: isPro && !isDev ? "2px solid var(--accent)" : "1px solid var(--card-border)",
               }}
             >
-              {isPro && (
+              {isPro && !isDev && (
                 <span
                   className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1 rounded-full"
                   style={{ background: "var(--accent)", color: "#fff" }}
@@ -251,9 +251,8 @@ export default async function AccountPage() {
                 <li>✅ Custom AI prompts</li>
                 <li>✅ Bring your own AI key</li>
                 <li>✅ Custom weather sources</li>
-                <li>✅ Imperial units</li>
               </ul>
-              {!isPro && (
+              {!isPro && !isDev && (
                 <a
                   href="https://buymeacoffee.com/coolmanyt"
                   target="_blank"
@@ -265,6 +264,34 @@ export default async function AccountPage() {
                 </a>
               )}
             </div>
+
+            {isDev && (
+              <div
+                className="rounded-2xl p-6 relative"
+                style={{
+                  background: "var(--card)",
+                  border: "2px solid #ff9500",
+                }}
+              >
+                <span
+                  className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1 rounded-full"
+                  style={{ background: "#ff9500", color: "#fff" }}
+                >
+                  Current plan
+                </span>
+                <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Dev</h3>
+                <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
+                  Special Access
+                </p>
+                <ul className="text-sm space-y-2 mt-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
+                  <li>✅ Invite-only developer tier</li>
+                  <li>✅ No daily rate limits</li>
+                  <li>✅ Raw AI output visibility</li>
+                  <li>✅ Dev chat access</li>
+                  <li>✅ Experimental feature access</li>
+                </ul>
+              </div>
+            )}
 
             {/* Lifetime */}
             <div
@@ -284,7 +311,7 @@ export default async function AccountPage() {
                 <li>✅ Lifetime updates</li>
                 <li>✅ Priority support</li>
               </ul>
-              {!isPro && (
+              {!isPro && !isDev && (
                 <a
                   href="https://buymeacoffee.com/coolmanyt"
                   target="_blank"
@@ -328,7 +355,7 @@ export default async function AccountPage() {
         </div>
 
         {/* Footer links */}
-        <div className="flex items-center justify-center gap-4 text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+        <div className="max-w-3xl mx-auto flex items-center justify-center gap-4 text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
           <Link href="/terms" className="underline hover:opacity-70">Terms</Link>
           <Link href="/privacy" className="underline hover:opacity-70">Privacy</Link>
         </div>

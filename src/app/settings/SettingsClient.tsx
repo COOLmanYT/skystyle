@@ -69,6 +69,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       localStorage.setItem("skystyle_extra_spacing", String(extraSpacing));
       localStorage.setItem("skystyle_extra_spacing_pages", extraSpacingPages.join(","));
       localStorage.setItem("skystyle_custom_spacing", String(customSpacing));
+      window.dispatchEvent(new Event("skystyle-preferences-updated"));
     } catch { /* ignore */ }
   }
 

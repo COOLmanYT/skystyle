@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface PageSpacingWrapperProps {
   page: "dashboard" | "account" | "settings";
@@ -21,14 +21,33 @@ export default function PageSpacingWrapper({
   style,
   children,
 }: PageSpacingWrapperProps) {
-  const [extraPx] = useState<number>(() => {
+  const readExtraPx = useCallback(() => {
     if (typeof window === "undefined") return 0;
     try {
       const enabled = localStorage.getItem("skystyle_extra_spacing") === "true";
-      const pages = (localStorage.getItem("skystyle_extra_spacing_pages") ?? "dashboard").split(",");
+      const pages = (localStorage.getItem("skystyle_extra_spacing_pages") ?? "dashboard")
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean);
       return enabled && pages.includes(page) ? 32 : 0;
-    } catch { return 0; }
-  });
+    } catch {
+      return 0;
+    }
+  }, [page]);
+
+  const [extraPx, setExtraPx] = useState<number>(() => readExtraPx());
+
+  useEffect(() => {
+    const syncExtraSpacing = () => setExtraPx(readExtraPx());
+
+    syncExtraSpacing();
+    window.addEventListener("storage", syncExtraSpacing);
+    window.addEventListener("skystyle-preferences-updated", syncExtraSpacing);
+    return () => {
+      window.removeEventListener("storage", syncExtraSpacing);
+      window.removeEventListener("skystyle-preferences-updated", syncExtraSpacing);
+    };
+  }, [readExtraPx]);
 
   return (
     <div
