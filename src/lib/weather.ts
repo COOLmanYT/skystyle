@@ -9,6 +9,9 @@
  * classify as High (<10 km), Medium (10-50 km), or Low (>50 km).
  */
 
+import dns from "dns";
+import net from "net";
+
 export interface HourlyForecast {
   time: string;          // ISO string
   temp: number;          // Celsius
@@ -556,7 +559,74 @@ export const MAX_CUSTOM_SOURCES = 10;
  * Validate that a URL is safe to use as an outbound RSS fetch target.
  * Enforces HTTPS, public host, and disallows dangerous URL features.
  */
-function validatePublicHttpsUrlForRss(parsed: URL): void {
+function isPrivateOrReservedIp(ip: string): boolean {
+  // Only handle valid IPs; invalid ones are not considered here
+  if (!net.isIP(ip)) return false;
+
+  // IPv4 checks
+  const parts = ip.split(".").map((p) => parseInt(p, 10));
+  if (parts.length === 4 && parts.every((n) => !Number.isNaN(n))) {
+    const [a, b] = parts;
+    // 10.0.0.0/8
+    if (a === 10) return true;
+    // 172.16.0.0/12
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    // 192.168.0.0/16
+    if (a === 192 && b === 168) return true;
+    // 127.0.0.0/8 loopback
+    if (a === 127) return true;
+    // 169.254.0.0/16 link-local
+    if (a === 169 && b === 254) return true;
+    // 100.64.0.0/10 carrier-grade NAT
+    if (a === 100 && b >= 64 && b <= 127) return true;
+    // 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 TEST-NET ranges
+    if (
+      (a === 192 && b === 0 && parts[2] === 2) ||
+      (a === 198 && b === 51 && parts[2] === 100) ||
+      (a === 203 && b === 0 && parts[2] === 113)
+    ) {
+      return true;
+    }
+    // 224.0.0.0/4 multicast and 240.0.0.0/4 reserved
+    if (a >= 224) return true;
+  }
+
+  // IPv6 checks (basic)
+  const normalized = ip.toLowerCase();
+  // Loopback ::1
+  if (normalized === "::1") return true;
+  // Link-local fe80::/10
+  if (normalized.startsWith("fe8") || normalized.startsWith("fe9") || normalized.startsWith("fea") || normalized.startsWith("feb")) {
+    return true;
+  }
+  // Unique local fc00::/7
+  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
+  // Multicast ff00::/8
+  if (normalized.startsWith("ff")) return true;
+
+  return false;
+}
+
+async function assertHostnameResolvesToPublicIp(hostname: string): Promise<void> {
+  try {
+    const addresses = await dns.promises.lookup(hostname, { all: true });
+    if (!addresses || addresses.length === 0) {
+      throw new Error("RSS feed host could not be resolved");
+    }
+    for (const addr of addresses) {
+      if (isPrivateOrReservedIp(addr.address)) {
+        throw new Error("RSS feed URL must not resolve to a private or internal IP address");
+      }
+    }
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith("RSS feed URL must not resolve")) {
+      throw err;
+    }
+    throw new Error("RSS feed host could not be resolved");
+  }
+}
+
+async function validatePublicHttpsUrlForRss(parsed: URL): Promise<void> {
   // Only allow HTTPS
   if (parsed.protocol !== "https:") {
     throw new Error("RSS feed URL must use HTTPS");
@@ -583,6 +653,9 @@ function validatePublicHttpsUrlForRss(parsed: URL): void {
   if (isPrivateHost(hostname)) {
     throw new Error("RSS feed URL must point to a public host");
   }
+
+  // Additionally, ensure the hostname actually resolves to public IPs only
+  await assertHostnameResolvesToPublicIp(hostname);
 }
 
 /** Fetch and extract text content from an RSS feed URL (for weather context) */
@@ -595,7 +668,7 @@ async function fetchRssFeed(url: string): Promise<string> {
   }
 
   // Enforce strict SSRF-safe validation of the target URL
-  validatePublicHttpsUrlForRss(parsed);
+  await validatePublicHttpsUrlForRss(parsed);
 
   const res = await fetch(parsed.toString(), {
     headers: { "User-Agent": "SkyStyle/1.0 (weather-stylist app)" },
