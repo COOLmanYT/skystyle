@@ -98,12 +98,20 @@ export async function getStyleRecommendation(
   input: StyleInput
 ): Promise<StyleRecommendation> {
   const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation, forceCloset, customContext } = input;
+
+  if (forceCloset && closetItems.length < 2) {
+    return {
+      outfit: "Not enough closet items.",
+      reasoning: "Please add at least 2 items to your closet before using force closet mode.",
+    };
+  }
+
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
   const closetSection =
     closetItems.length > 0
       ? forceCloset
-        ? `\nUser's available wardrobe (ONLY recommend items from this list — do NOT suggest anything outside it):\n${closetItems.map((i) => `- ${i}`).join("\n")}`
+        ? `\nCRITICAL INSTRUCTION: You MUST build the entire outfit EXCLUSIVELY from the items listed below. Do NOT suggest, imply, or reference ANY clothing item not explicitly in this list. If the available items are insufficient for a complete outfit, explicitly tell the user which items are missing rather than inventing new ones. Violating this instruction is not acceptable under any circumstances.\nUser's available wardrobe:\n${closetItems.map((i) => `- ${i}`).join("\n")}`
         : `\nUser's available wardrobe (you may also suggest items not listed here):\n${closetItems.map((i) => `- ${i}`).join("\n")}`
       : "\nUser has not added any wardrobe items — suggest general clothing.";
 

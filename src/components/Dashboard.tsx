@@ -1418,17 +1418,20 @@ export default function Dashboard({
                   No items in your closet yet. Add some to get personalized recommendations!
                 </p>
               )}
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label
+                className="flex items-center gap-2 cursor-pointer"
+                title={closetItems.length < 2 ? "Add at least 2 items to your closet to enable this option" : undefined}
+              >
                 <input
                   type="checkbox"
                   checked={forceCloset}
                   onChange={(e) => setForceCloset(e.target.checked)}
                   className="rounded"
-                  disabled={closetItems.length === 0}
+                  disabled={closetItems.length < 2}
                 />
                 <span
                   className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: closetItems.length === 0 ? 0.3 : 0.6 }}
+                  style={{ color: "var(--foreground)", opacity: closetItems.length < 2 ? 0.3 : 0.6 }}
                 >
                   Force recommendation to use closet
                 </span>
