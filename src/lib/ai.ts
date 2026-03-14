@@ -76,6 +76,10 @@ export interface StyleRecommendation {
   reasoning: string;
   /** Raw AI output — only included for dev mode users */
   rawOutput?: string;
+  /** Warning shown when force-closet mode has very limited items */
+  closetWarning?: string;
+  /** AI model used for this response */
+  modelUsed?: string;
 }
 
 function formatTemp(celsius: number, unit: "metric" | "imperial"): string {
@@ -98,12 +102,13 @@ export async function getStyleRecommendation(
   input: StyleInput
 ): Promise<StyleRecommendation> {
   const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation, forceCloset, customContext } = input;
-
-  if (forceCloset && closetItems.length < 2) {
-    return {
-      outfit: "Not enough closet items.",
-      reasoning: "Please add at least 2 items to your closet before using force closet mode.",
-    };
+  let closetWarning: string | undefined;
+  if (forceCloset) {
+    if (closetItems.length === 0) {
+      closetWarning = "You have no closet items yet — recommendations will be general clothing.";
+    } else if (closetItems.length === 1) {
+      closetWarning = "You have fewer than 2 closet items — recommendations may include items outside your wardrobe.";
+    }
   }
 
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
@@ -171,7 +176,8 @@ export async function getStyleRecommendation(
 
 Please recommend an outfit.`;
 
-  return callAI(systemPrompt, userMessage, userApiKey, input.isDev);
+  const recommendation = await callAI(systemPrompt, userMessage, userApiKey, input.isDev);
+  return closetWarning ? { ...recommendation, closetWarning } : recommendation;
 }
 
 /** Dev mode: send a freeform message to the AI without weather context */
@@ -211,10 +217,12 @@ async function callAI(
   isDev: boolean = false
 ): Promise<StyleRecommendation> {
   let raw: string;
+  let modelUsed: string;
 
   if (userApiKey || process.env.OPENAI_API_KEY) {
+    const modelName = "gpt-4o";
     const response = await getOpenAI(userApiKey).chat.completions.create({
-      model: "gpt-4o",
+      model: modelName,
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userMessage },
@@ -224,6 +232,7 @@ async function callAI(
       temperature: 0.7,
     });
     raw = response.choices[0]?.message?.content ?? "{}";
+    modelUsed = modelName;
   } else if (process.env.GEMINI_API_KEY) {
     const GEMINI_MODELS = [
       "gemini-2.5-flash-lite",
@@ -232,6 +241,7 @@ async function callAI(
       "gemma-3-12b-it",
     ];
     let geminiRaw: string | undefined;
+    let geminiModelUsed: string | undefined;
     const triedModels: string[] = [];
     for (const modelName of GEMINI_MODELS) {
       triedModels.push(modelName);
@@ -242,6 +252,7 @@ async function callAI(
         });
         const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
         geminiRaw = result.response.text();
+        geminiModelUsed = modelName;
         break;
       } catch (err) {
         console.warn(
@@ -253,7 +264,11 @@ async function callAI(
     if (geminiRaw === undefined) {
       throw new Error(`All Gemini models failed. Tried: ${triedModels.join(", ")}`);
     }
+    if (!geminiModelUsed) {
+      throw new Error("Gemini model resolved without model metadata.");
+    }
     raw = geminiRaw;
+    modelUsed = geminiModelUsed;
   } else {
     throw new Error("No AI API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY.");
   }
@@ -273,12 +288,14 @@ async function callAI(
     return {
       outfit: parsed.outfit ?? "Unable to generate outfit recommendation.",
       reasoning: parsed.reasoning ?? "",
+      modelUsed,
       ...(isDev ? { rawOutput: raw } : {}),
     };
   } catch {
     return {
       outfit: "Unable to generate outfit recommendation.",
       reasoning: cleaned,
+      modelUsed,
       ...(isDev ? { rawOutput: raw } : {}),
     };
   }
