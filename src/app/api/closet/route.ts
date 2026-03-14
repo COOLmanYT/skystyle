@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
 
   await supabaseAdmin
     .from("closet")
-    .upsert({ user_id: userId, items });
+    .upsert({ user_id: userId, items }, { onConflict: "user_id" });
 
   return NextResponse.json({ items });
 }
@@ -89,7 +89,7 @@ export async function DELETE(req: NextRequest) {
 
   await supabaseAdmin
     .from("closet")
-    .upsert({ user_id: userId, items });
+    .upsert({ user_id: userId, items }, { onConflict: "user_id" });
 
   return NextResponse.json({ items });
 }
