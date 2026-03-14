@@ -184,8 +184,17 @@ async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
 // OpenWeatherMap
 // ---------------------------------------------------------------------------
 
+/** Sanitise a user-provided API key so it can safely be embedded in a URL.
+ *  Only alphanumeric characters, hyphens, and underscores are allowed. */
+function sanitizeApiKey(key: string): string {
+  if (!/^[\w\-]+$/.test(key)) {
+    throw new Error("API key contains invalid characters");
+  }
+  return key;
+}
+
 async function fetchOpenWeather(lat: number, lon: number, apiKey?: string): Promise<WeatherData> {
-  const key = apiKey ?? process.env.OPENWEATHER_API_KEY;
+  const key = apiKey ? sanitizeApiKey(apiKey) : process.env.OPENWEATHER_API_KEY;
   if (!key) throw new Error("OPENWEATHER_API_KEY is not set");
 
   const [currentRes, forecastRes] = await Promise.all([
@@ -276,10 +285,23 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
   if (parsed.protocol !== "https:") {
     throw new Error("Custom source URL must use HTTPS");
   }
+  // Disallow non-standard ports; only default HTTPS (443) allowed
+  if (parsed.port && parsed.port !== "443") {
+    throw new Error("Custom source URL must use the default HTTPS port");
+  }
+  // Disallow userinfo (username:password@host)
+  if (parsed.username || parsed.password || parsed.href.includes("@")) {
+    throw new Error("Custom source URL must not contain credentials");
+  }
   const host = parsed.hostname.toLowerCase();
+  if (host === "localhost" || host.endsWith(".localhost")) {
+    throw new Error("Custom source URL must point to a public host");
+  }
   if (isPrivateHost(host)) {
     throw new Error("Custom source URL must point to a public host");
   }
+  // Verify DNS resolution targets only public IPs (prevent DNS-rebinding / TOCTOU attacks)
+  await assertHostnameResolvesToPublicIp(host);
 
   const res = await fetch(parsed.toString(), { next: { revalidate: 300 } });
   if (!res.ok) throw new Error(`Custom source fetch failed: ${res.status}`);
@@ -311,7 +333,7 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
 // ---------------------------------------------------------------------------
 
 async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = apiKey ?? process.env.WEATHERAPI_KEY;
+  const key = apiKey ? sanitizeApiKey(apiKey) : process.env.WEATHERAPI_KEY;
   if (!key) throw new Error("WEATHERAPI_KEY is not set");
 
   const url = `https://api.weatherapi.com/v1/forecast.json?key=${key}&q=${lat},${lon}&days=1&aqi=no&alerts=no`;
@@ -353,7 +375,7 @@ async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promi
 // ---------------------------------------------------------------------------
 
 async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = apiKey ?? process.env.VISUALCROSSING_API_KEY;
+  const key = apiKey ? sanitizeApiKey(apiKey) : process.env.VISUALCROSSING_API_KEY;
   if (!key) throw new Error("VISUALCROSSING_API_KEY is not set");
 
   const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${lat},${lon}/today?unitGroup=metric&key=${key}&include=current,hours&contentType=json`;
@@ -396,7 +418,7 @@ async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): P
 // ---------------------------------------------------------------------------
 
 async function fetchPirateWeather(lat: number, lon: number, apiKey?: string): Promise<SourceWeatherData & { hourly: HourlyForecast[] }> {
-  const key = apiKey ?? process.env.PIRATEWEATHER_API_KEY;
+  const key = apiKey ? sanitizeApiKey(apiKey) : process.env.PIRATEWEATHER_API_KEY;
   if (!key) throw new Error("PIRATEWEATHER_API_KEY is not set");
 
   const url = `https://api.pirateweather.net/forecast/${key}/${lat},${lon}?units=ca`;
@@ -751,7 +773,7 @@ export async function processCustomSources(
         }
       }
     } catch (err) {
-      console.warn(`[weather] Custom source "${source.name}" failed:`, err instanceof Error ? err.message : err);
+      console.warn("[weather] Custom source %s failed:", source.name, err instanceof Error ? err.message : err);
     }
   }
 
