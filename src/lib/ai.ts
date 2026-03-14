@@ -103,7 +103,9 @@ export async function getStyleRecommendation(
 ): Promise<StyleRecommendation> {
   const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation, forceCloset, customContext } = input;
   const closetWarning =
-    forceCloset && closetItems.length < 2
+    forceCloset && closetItems.length === 0
+      ? "You have no closet items yet — recommendations will be general clothing."
+      : forceCloset && closetItems.length === 1
       ? "You have fewer than 2 closet items — recommendations may include items outside your wardrobe."
       : undefined;
 
