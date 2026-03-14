@@ -1459,7 +1459,10 @@ export default function Dashboard({
                   No items in your closet yet. Add some to get personalized recommendations!
                 </p>
               )}
-              <label className="flex items-center gap-2 cursor-pointer">
+              <label
+                className="flex items-center gap-2 cursor-pointer"
+                title={closetItems.length === 0 ? "Add items to your closet for more accurate recommendations" : undefined}
+              >
                 <input
                   type="checkbox"
                   checked={forceCloset}

@@ -102,12 +102,14 @@ export async function getStyleRecommendation(
   input: StyleInput
 ): Promise<StyleRecommendation> {
   const { weather, closetItems, unitPreference, customSystemPrompt, userApiKey, gender, shareLocation, forceCloset, customContext } = input;
-  const closetWarning =
-    forceCloset && closetItems.length === 0
-      ? "You have no closet items yet — recommendations will be general clothing."
-      : forceCloset && closetItems.length === 1
-      ? "You have fewer than 2 closet items — recommendations may include items outside your wardrobe."
-      : undefined;
+  let closetWarning: string | undefined;
+  if (forceCloset) {
+    if (closetItems.length === 0) {
+      closetWarning = "You have no closet items yet — recommendations will be general clothing.";
+    } else if (closetItems.length === 1) {
+      closetWarning = "You have fewer than 2 closet items — recommendations may include items outside your wardrobe.";
+    }
+  }
 
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
