@@ -2,6 +2,8 @@
 
 AI-powered outfit recommendations based on hyper-local weather data. Never overdress or underdress again.
 
+[![Buy Me A Coffee](https://img.shields.io/badge/Support_Me!-Buy%20Me%20A%20Coffee-yellow)](https://buymeacoffee.com/coolmanyt)
+
 ## Features
 
 - **Multi-source weather** — aggregates data from OpenWeatherMap, Open-Meteo, and Bureau of Meteorology (Australia) for accuracy, with hourly forecasts
@@ -74,3 +76,10 @@ Both follow the [People First Design](https://github.com/COOLmanYT/people-first-
 ## License
 
 See [LICENSE](LICENSE).
+
+## Support the project
+
+If you like my project and want to support the development:
+
+☕ Buy me a coffee  
+https://buymeacoffee.com/coolmanyt
