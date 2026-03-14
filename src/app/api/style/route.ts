@@ -117,7 +117,14 @@ export async function POST(req: NextRequest) {
     const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
     return NextResponse.json({
       recommendation,
-      meta: { isPro, isDev, unitPreference, creditsRemaining: null, dailyLimits },
+      meta: {
+        isPro,
+        isDev,
+        unitPreference,
+        creditsRemaining: null,
+        dailyLimits,
+        modelUsed: recommendation.modelUsed ?? "unknown",
+      },
     });
   }
 
@@ -184,6 +191,7 @@ export async function POST(req: NextRequest) {
       unitPreference,
       creditsRemaining: isPro ? (await getCredits(userId)) : null,
       dailyLimits,
+      modelUsed: recommendation.modelUsed ?? "unknown",
     },
   });
 }

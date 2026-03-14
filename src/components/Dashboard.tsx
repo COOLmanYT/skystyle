@@ -49,12 +49,15 @@ interface StyleResponse {
   recommendation: {
     outfit: string;
     reasoning: string;
+    closetWarning?: string;
+    modelUsed?: string;
   };
   meta: {
     isPro: boolean;
     unitPreference: "metric" | "imperial";
     creditsRemaining: number | null;
     dailyLimits?: DailyLimits;
+    modelUsed?: string;
   };
 }
 
@@ -995,6 +998,19 @@ export default function Dashboard({
 
                 {/* ── Outfit Recommendation ── */}
                 {rec?.outfit && (
+                <>
+                {rec.closetWarning && (
+                  <div
+                    className="rounded-xl px-3 py-2 text-xs"
+                    style={{
+                      background: "#ff950018",
+                      border: "1px solid #ff950033",
+                      color: "#ff9500",
+                    }}
+                  >
+                    ⚠️ {rec.closetWarning}
+                  </div>
+                )}
                 <WeatherEffectCard
                   condition={getWeatherCondition(w?.description ?? "")}
                   windSpeed={w!.windSpeed}
@@ -1030,6 +1046,30 @@ export default function Dashboard({
                       >
                         {rec!.reasoning}
                       </p>
+                      <div className="flex items-center gap-2 pt-1">
+                        <span
+                          className="text-xs"
+                          style={{ color: "var(--foreground)", opacity: 0.5 }}
+                        >
+                          🤖 {result?.meta?.modelUsed ?? rec!.modelUsed ?? "unknown"}
+                        </span>
+                        {!isPro && !isDev && (
+                          <a
+                            href="https://buymeacoffee.com/coolmanyt"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-full px-2.5 py-1 text-xs btn-interact"
+                            style={{
+                              background: "var(--background)",
+                              color: "var(--foreground)",
+                              border: "1px solid var(--card-border)",
+                              opacity: 0.7,
+                            }}
+                          >
+                            ⭐ Upgrade to Pro for GPT-4o
+                          </a>
+                        )}
+                      </div>
                     </>
                   )}
                   {isDev && (rec as { rawOutput?: string })?.rawOutput && (
@@ -1054,6 +1094,7 @@ export default function Dashboard({
                     </>
                   )}
                 </WeatherEffectCard>
+                </>
                 )}
 
                 {/* ── Follow-Up Input ── */}
@@ -1418,20 +1459,16 @@ export default function Dashboard({
                   No items in your closet yet. Add some to get personalized recommendations!
                 </p>
               )}
-              <label
-                className="flex items-center gap-2 cursor-pointer"
-                title={closetItems.length < 2 ? "Add at least 2 items to your closet to enable this option" : undefined}
-              >
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={forceCloset}
                   onChange={(e) => setForceCloset(e.target.checked)}
                   className="rounded"
-                  disabled={closetItems.length < 2}
                 />
                 <span
                   className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: closetItems.length < 2 ? 0.3 : 0.6 }}
+                  style={{ color: "var(--foreground)", opacity: 0.6 }}
                 >
                   Force recommendation to use closet
                 </span>
