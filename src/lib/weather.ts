@@ -185,9 +185,9 @@ async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
 // ---------------------------------------------------------------------------
 
 /** Sanitise a user-provided API key so it can safely be embedded in a URL.
- *  Only alphanumeric characters, hyphens, underscores, and dots are allowed. */
+ *  Only alphanumeric characters, hyphens, and underscores are allowed. */
 function sanitizeApiKey(key: string): string {
-  if (!/^[\w.\-]+$/.test(key)) {
+  if (!/^[\w\-]+$/.test(key)) {
     throw new Error("API key contains invalid characters");
   }
   return key;
