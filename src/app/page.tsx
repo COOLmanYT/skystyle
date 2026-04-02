@@ -589,7 +589,7 @@ export default function Home() {
           Start free, upgrade when you need more.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
           {/* Free */}
           <div
             className="rounded-2xl p-8"
@@ -642,28 +642,6 @@ export default function Home() {
               <li>✅ Custom AI prompts</li>
               <li>✅ Bring your own AI key</li>
               <li>✅ Custom weather sources</li>
-            </ul>
-          </div>
-
-          {/* Lifetime */}
-          <div
-            className="rounded-2xl p-8"
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--card-border)",
-            }}
-          >
-            <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>
-              Pro Lifetime
-            </h3>
-            <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-              A$30<span className="text-sm font-normal opacity-60"> once</span>
-            </p>
-            <ul className="text-sm space-y-3 mt-6" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-              <li>✅ Everything in Pro</li>
-              <li>✅ One-time payment</li>
-              <li>✅ Lifetime updates</li>
-              <li>✅ Priority support</li>
             </ul>
           </div>
 

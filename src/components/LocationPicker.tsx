@@ -159,8 +159,7 @@ export default function LocationPicker({ onLocationResolved }: Props) {
             <button
               onClick={handleGps}
               disabled={gpsState === "requesting"}
-              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium btn-interact disabled:opacity-50"
-              style={{ background: "var(--accent)", color: "#fff" }}
+              className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-medium btn-interact disabled:opacity-50 fetch-btn-gradient"
             >
               {gpsState === "requesting" ? (
                 <>
@@ -203,8 +202,7 @@ export default function LocationPicker({ onLocationResolved }: Props) {
               <button
                 type="submit"
                 disabled={searching || !query.trim()}
-                className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40"
-                style={{ background: "var(--accent)", color: "#fff" }}
+                className="rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40 fetch-btn-gradient"
               >
                 {searching ? <SpinnerIcon /> : "Search"}
               </button>

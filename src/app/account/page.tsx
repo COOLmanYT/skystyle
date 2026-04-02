@@ -5,6 +5,7 @@ import { getCredits } from "@/lib/credits";
 import { getDailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
+import AccountUpgradeButton from "@/components/AccountUpgradeButton";
 
 interface DailyLimits {
   ai: { used: number; limit: number | null };
@@ -119,15 +120,12 @@ export default async function AccountPage() {
             You can add a GitHub or Google account to your profile by signing in with that provider.
           </p>
           {!isPro && !isDev && (
-            <a
-              href="https://buymeacoffee.com/coolmanyt"
-              target="_blank"
-              rel="noopener noreferrer"
+            <AccountUpgradeButton
               className="inline-block rounded-xl px-4 py-2 text-xs font-medium btn-interact"
               style={{ background: "var(--accent)", color: "#fff" }}
             >
               ☕ Upgrade to Pro
-            </a>
+            </AccountUpgradeButton>
           )}
         </div>
 
@@ -194,7 +192,7 @@ export default async function AccountPage() {
             </p>
           </div>
 
-          <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 ${isDev ? "2xl:grid-cols-5" : ""}`}>
+          <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 ${isDev ? "2xl:grid-cols-4" : ""}`}>
             {/* Free */}
             <div
               className={`rounded-2xl p-6`}
@@ -253,15 +251,12 @@ export default async function AccountPage() {
                 <li>✅ Custom weather sources</li>
               </ul>
               {!isPro && !isDev && (
-                <a
-                  href="https://buymeacoffee.com/coolmanyt"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 block text-center rounded-xl px-4 py-2 text-xs font-medium btn-interact"
+                <AccountUpgradeButton
+                  className="mt-4 block w-full text-center rounded-xl px-4 py-2 text-xs font-medium btn-interact"
                   style={{ background: "var(--accent)", color: "#fff" }}
                 >
                   ☕ Upgrade to Pro
-                </a>
+                </AccountUpgradeButton>
               )}
             </div>
 
@@ -292,37 +287,6 @@ export default async function AccountPage() {
                 </ul>
               </div>
             )}
-
-            {/* Lifetime */}
-            <div
-              className="rounded-2xl p-6"
-              style={{
-                background: "var(--card)",
-                border: "1px solid var(--card-border)",
-              }}
-            >
-              <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Pro Lifetime</h3>
-              <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-                A$30<span className="text-sm font-normal opacity-60"> once</span>
-              </p>
-              <ul className="text-sm space-y-2 mt-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-                <li>✅ Everything in Pro</li>
-                <li>✅ One-time payment</li>
-                <li>✅ Lifetime updates</li>
-                <li>✅ Priority support</li>
-              </ul>
-              {!isPro && !isDev && (
-                <a
-                  href="https://buymeacoffee.com/coolmanyt"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 block text-center rounded-xl px-4 py-2 text-xs font-medium btn-interact"
-                  style={{ background: "var(--accent)", color: "#fff" }}
-                >
-                  ☕ Get Lifetime
-                </a>
-              )}
-            </div>
 
             {/* Pay As You Go */}
             <div
