@@ -27,8 +27,8 @@ interface SettingsClientProps {
 }
 
 export default function SettingsClient({ initialUnitPreference }: SettingsClientProps) {
-  const [gender, setGender] = useState<string>("N/A");
-  const [customGender, setCustomGender] = useState("");
+  const [gender, setGender] = useState<string>(() => getLocalStorage("skystyle_gender", "N/A"));
+  const [customGender, setCustomGender] = useState<string>(() => getLocalStorage("skystyle_custom_gender", ""));
   const [unitPreference, setUnitPreference] = useState<"metric" | "imperial">(initialUnitPreference);
   const [themeMode, setThemeMode] = useState<ThemeMode>(
     () => (getLocalStorage("skystyle_theme_mode", "system") as ThemeMode)
@@ -68,9 +68,9 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
 
   function saveToLocalStorage() {
     // localStorage is used intentionally for client-side UI preferences (theme,
-    // layout, spacing). BYOK API keys are stored separately in the Dashboard
-    // component — all client-side storage is by design so preferences survive
-    // page reloads without requiring server round-trips.
+    // layout, spacing). Gender preference and BYOK API keys are also stored
+    // client-side only — never sent to Sky Style servers except when required
+    // for AI requests.
     try {
       localStorage.setItem("skystyle_theme_mode", themeMode);
       localStorage.setItem("skystyle_location_consent", String(shareLocation));
@@ -80,6 +80,8 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       localStorage.setItem("skystyle_extra_spacing", String(extraSpacing));
       localStorage.setItem("skystyle_extra_spacing_pages", extraSpacingPages.join(","));
       localStorage.setItem("skystyle_custom_spacing", String(customSpacing));
+      localStorage.setItem("skystyle_gender", gender);
+      localStorage.setItem("skystyle_custom_gender", customGender);
       window.dispatchEvent(new Event("skystyle-preferences-updated"));
     } catch { /* ignore */ }
   }

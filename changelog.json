@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-03T01:51:22.000Z",
+    "version": "1.4.0",
+    "title": "BYOK localStorage + gender persistence + legal doc updates",
+    "description": "Fixed gender preference to persist in localStorage. Added BYOK API key UI for Pro/Dev users stored locally only. Updated Privacy Policy and Terms of Service to accurately reflect local-only storage."
+  },
+  {
     "date": "2026-04-03T01:31:30.000Z",
     "version": "1.3.3",
     "title": "Fix broken Markdown table in README",
