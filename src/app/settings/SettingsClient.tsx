@@ -497,6 +497,32 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
           <ChangelogPreview />
         </div>
 
+        {/* ── Feedback ── */}
+        <div
+          className="rounded-2xl p-5 space-y-3"
+          style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+        >
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+              Feedback
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.5 }}>
+              Share a bug report, a suggestion, or just say hello — every message is read personally.
+            </p>
+          </div>
+          <Link
+            href="/feedback"
+            className="inline-block rounded-xl px-4 py-2 text-xs font-semibold btn-interact"
+            style={{
+              background: "var(--background)",
+              color: "var(--accent)",
+              border: "1px solid var(--card-border)",
+            }}
+          >
+            Share Feedback →
+          </Link>
+        </div>
+
         <p className="text-xs text-center" style={{ color: "var(--foreground)", opacity: 0.4 }}>
           These settings apply to your outfit recommendations on the dashboard.
         </p>

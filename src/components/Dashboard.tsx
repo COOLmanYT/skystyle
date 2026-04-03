@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
 import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
 import UpgradePlanModal from "./UpgradePlanModal";
+import FeedbackModal from "./FeedbackModal";
 import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -145,6 +146,10 @@ export default function Dashboard({
   const [weatherData, setWeatherData] = useState<StyleResponse["weather"] | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiRevealed, setAiRevealed] = useState(false);
+  // Feedback modal state
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackCategory, setFeedbackCategory] = useState<string | undefined>(undefined);
+  const [simpleMode, setSimpleMode] = useState(true);
   const router = useRouter();
 
   // Returns the gradient/background CSS class for plan-based primary buttons
@@ -225,6 +230,9 @@ export default function Dashboard({
         setCustomRatio(savedRatio);
         customRatioRef.current = savedRatio;
       }
+
+      const savedSimpleMode = localStorage.getItem("skystyle_simple_mode");
+      if (savedSimpleMode !== null) setSimpleMode(savedSimpleMode === "true");
     } catch {
       /* ignore */
     }
@@ -620,6 +628,15 @@ export default function Dashboard({
     <div className="min-h-screen flex flex-col" style={{ background: "var(--background)" }}>
       {showUpgradeModal && (
         <UpgradePlanModal onClose={() => setShowUpgradeModal(false)} />
+      )}
+      {feedbackOpen && (
+        <FeedbackModal
+          isOpen={feedbackOpen}
+          onClose={() => { setFeedbackOpen(false); setFeedbackCategory(undefined); }}
+          isPro={isPro}
+          isDev={isDev}
+          initialCategory={feedbackCategory}
+        />
       )}
       {/* ── Top Bar ── */}
       <nav className="sticky-nav px-4 py-3" aria-label="Dashboard navigation" style={{ borderBottom: "1px solid var(--card-border)" }}>
@@ -1286,6 +1303,19 @@ export default function Dashboard({
                         </pre>
                       </>
                     )}
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFeedbackCategory("Style");
+                          setFeedbackOpen(true);
+                        }}
+                        className="text-xs btn-interact rounded-xl px-2 py-1"
+                        style={{ color: "var(--foreground)", opacity: 0.45 }}
+                      >
+                        Was this helpful?
+                      </button>
+                    </div>
                   </WeatherEffectCard>
 
                   {/* ── Follow-Up Input ── */}
@@ -2142,6 +2172,15 @@ export default function Dashboard({
           <Link href="/privacy" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>
             Privacy
           </Link>
+          {" · "}
+          <button
+            type="button"
+            onClick={() => setFeedbackOpen(true)}
+            className="underline hover:opacity-70"
+            style={{ color: "var(--foreground)", background: "none", border: "none", cursor: "pointer", font: "inherit", padding: 0 }}
+          >
+            {simpleMode ? "Talk to the Developer" : "Send Feedback"}
+          </button>
         </p>
       </footer>
     </div>
