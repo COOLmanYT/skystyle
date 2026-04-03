@@ -3,9 +3,20 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
 import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
+import UpgradePlanModal from "./UpgradePlanModal";
 import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+
+/** Returns true if version string `a` is strictly greater than `b`. */
+function isVersionGreater(a: string, b: string): boolean {
+  const parse = (v: string) => v.split(".").map(Number);
+  const [aMaj = 0, aMin = 0, aPatch = 0] = parse(a);
+  const [bMaj = 0, bMin = 0, bPatch = 0] = parse(b);
+  if (aMaj !== bMaj) return aMaj > bMaj;
+  if (aMin !== bMin) return aMin > bMin;
+  return aPatch > bPatch;
+}
 
 type LayoutMode = "symmetric" | "large-weather" | "large-settings";
 
@@ -127,7 +138,13 @@ export default function Dashboard({
   const [devChatError, setDevChatError] = useState<string | null>(null);
   const [devChatResult, setDevChatResult] = useState<{ outfit: string; reasoning: string; rawOutput?: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [changelogUnread, setChangelogUnread] = useState(false);
   const router = useRouter();
+
+  // Returns the gradient/background for plan-based primary buttons
+  const planBtnClass = isDev ? "btn-plan-dev" : isPro ? "btn-plan-pro" : "";
+  const planBtnStyle = !isDev && !isPro ? { background: "var(--accent)", color: "#fff" } : {};
 
   // Layout preferences (loaded from localStorage)
   const [layoutMode, setLayoutMode] = useState<LayoutMode>("large-weather");
@@ -200,6 +217,23 @@ export default function Dashboard({
         if (parsed.sourceMode) setSourceMode(parsed.sourceMode);
       }
     } catch { /* ignore */ }
+  }, []);
+
+  // Check for unread changelog entries on mount
+  useEffect(() => {
+    fetch("/api/changelog")
+      .then((r) => r.json())
+      .then((entries: { version: string }[]) => {
+        if (!entries.length) return;
+        const latest = entries[0].version;
+        try {
+          const seen = localStorage.getItem("skystyle_last_seen_changelog");
+          if (!seen || isVersionGreater(latest, seen)) {
+            setChangelogUnread(true);
+          }
+        } catch { /* ignore */ }
+      })
+      .catch(() => { /* ignore */ });
   }, []);
 
   // Save custom sources to localStorage when changed
@@ -501,6 +535,9 @@ export default function Dashboard({
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--background)" }}>
+      {showUpgradeModal && (
+        <UpgradePlanModal onClose={() => setShowUpgradeModal(false)} />
+      )}
       {/* ── Top Bar ── */}
       <nav className="sticky-nav px-4 py-3" style={{ borderBottom: "1px solid var(--card-border)" }}>
         <div className="flex items-center justify-between max-w-7xl mx-auto">
@@ -599,6 +636,31 @@ export default function Dashboard({
             </nav>
             <hr style={{ borderColor: "var(--card-border)" }} />
             <div className="space-y-1">
+              <Link
+                href="/changelog"
+                className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs btn-interact"
+                style={{ color: "var(--foreground)", opacity: 0.6 }}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setChangelogUnread(false);
+                  try { localStorage.setItem("skystyle_last_seen_changelog", "__dismiss__"); } catch { /* ignore */ }
+                }}
+              >
+                📋 Changelog
+                {changelogUnread && (
+                  <span
+                    style={{
+                      display: "inline-block",
+                      width: 7,
+                      height: 7,
+                      borderRadius: "50%",
+                      background: "#ff3b30",
+                      flexShrink: 0,
+                    }}
+                    aria-label="Unread changelog updates"
+                  />
+                )}
+              </Link>
               <Link
                 href="/"
                 className="block rounded-xl px-3 py-2 text-xs btn-interact"
@@ -1054,10 +1116,8 @@ export default function Dashboard({
                           🤖 {result?.meta?.modelUsed ?? rec!.modelUsed ?? "unknown"}
                         </span>
                         {!isPro && !isDev && (
-                          <a
-                            href="https://buymeacoffee.com/coolmanyt"
-                            target="_blank"
-                            rel="noopener noreferrer"
+                          <button
+                            onClick={() => setShowUpgradeModal(true)}
                             className="rounded-full px-2.5 py-1 text-xs btn-interact"
                             style={{
                               background: "var(--background)",
@@ -1067,7 +1127,7 @@ export default function Dashboard({
                             }}
                           >
                             ⭐ Upgrade to Pro for GPT-4o
-                          </a>
+                          </button>
                         )}
                       </div>
                     </>
@@ -1715,34 +1775,32 @@ export default function Dashboard({
                     className="text-sm font-semibold"
                     style={{ color: "var(--foreground)" }}
                   >
-                    {isPro ? "⭐ Pro Plan" : "Free Plan"}
+                    {isDev ? "🛠️ Dev Plan" : isPro ? "⭐ Pro Plan" : "Free Plan"}
                   </h2>
                   <p
                     className="text-xs mt-0.5"
                     style={{ color: "var(--foreground)", opacity: 0.5 }}
                   >
-                    {isPro ? "A$4/month" : "A$0 — free forever"}
+                    {isDev ? "Special Access" : isPro ? "A$4/month" : "A$0 — free forever"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
                   {isPro && creditsRemaining !== null && (
                     <span
-                      className="rounded-full px-3 py-1 text-xs font-medium"
-                      style={{ background: "var(--accent)", color: "#fff" }}
+                      className={`rounded-full px-3 py-1 text-xs font-medium ${planBtnClass}`}
+                      style={planBtnStyle}
                     >
                       {creditsRemaining} credits
                     </span>
                   )}
-                  {!isPro && (
-                    <a
-                      href="https://buymeacoffee.com/coolmanyt"
-                      target="_blank"
-                      rel="noopener noreferrer"
+                  {!isPro && !isDev && (
+                    <button
+                      onClick={() => setShowUpgradeModal(true)}
                       className="rounded-full px-3 py-1 text-xs font-medium btn-interact"
                       style={{ background: "var(--accent)", color: "#fff" }}
                     >
                       ☕ Upgrade to Pro
-                    </a>
+                    </button>
                   )}
                 </div>
               </div>
@@ -1835,6 +1893,33 @@ export default function Dashboard({
             style={{ color: "var(--foreground)" }}
           >
             View on GitHub
+          </Link>
+          {" · "}
+          <Link
+            href="/changelog"
+            className="underline hover:opacity-70 inline-flex items-center gap-1"
+            style={{ color: "var(--foreground)" }}
+            onClick={() => {
+              setChangelogUnread(false);
+              try { localStorage.setItem("skystyle_last_seen_changelog", "__dismiss__"); } catch { /* ignore */ }
+            }}
+          >
+            Changelog
+            {changelogUnread && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#ff3b30",
+                  flexShrink: 0,
+                  verticalAlign: "middle",
+                  marginBottom: 1,
+                }}
+                aria-label="New updates"
+              />
+            )}
           </Link>
           {" · "}
           <Link href="/terms" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>

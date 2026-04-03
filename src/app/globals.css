@@ -367,6 +367,31 @@ body {
   }
 }
 
+/* ── Animated fetch-button gradient ── */
+@keyframes fetch-gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.fetch-btn-gradient {
+  background: linear-gradient(135deg, #0071e3, #34c759, #2997ff, #0071e3);
+  background-size: 300% 300%;
+  animation: fetch-gradient-shift 3s ease infinite;
+  color: #fff !important;
+}
+
+/* ── Plan-based primary button gradients ── */
+.btn-plan-pro {
+  background: linear-gradient(135deg, #0071e3 0%, #9b59b6 100%) !important;
+  color: #fff !important;
+}
+
+.btn-plan-dev {
+  background: linear-gradient(135deg, #0071e3 0%, #ff9500 100%) !important;
+  color: #fff !important;
+}
+
 /* Sticky nav glassmorphism */
 .sticky-nav {
   position: sticky;

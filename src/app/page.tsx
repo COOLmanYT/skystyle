@@ -5,6 +5,37 @@ import DemoLocationPicker, { ResolvedLocation } from "@/components/DemoLocationP
 import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "@/components/WeatherEffectCard";
 import Link from "next/link";
 
+/** Returns true if semver string `a` is strictly greater than `b`. */
+function isVersionGreater(a: string, b: string): boolean {
+  const parse = (v: string) => v.split(".").map(Number);
+  const [aMaj = 0, aMin = 0, aPatch = 0] = parse(a);
+  const [bMaj = 0, bMin = 0, bPatch = 0] = parse(b);
+  if (aMaj !== bMaj) return aMaj > bMaj;
+  if (aMin !== bMin) return aMin > bMin;
+  return aPatch > bPatch;
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffSec = Math.round(diffMs / 1000);
+  const diffMin = Math.round(diffSec / 60);
+  const diffHour = Math.round(diffMin / 60);
+  const diffDay = Math.round(diffHour / 24);
+  const diffWeek = Math.round(diffDay / 7);
+  const diffMonth = Math.round(diffDay / 30);
+  const diffYear = Math.round(diffDay / 365);
+  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
+  if (diffSec < 60) return rtf.format(-diffSec, "second");
+  if (diffMin < 60) return rtf.format(-diffMin, "minute");
+  if (diffHour < 24) return rtf.format(-diffHour, "hour");
+  if (diffDay < 7) return rtf.format(-diffDay, "day");
+  if (diffWeek < 4) return rtf.format(-diffWeek, "week");
+  if (diffMonth < 12) return rtf.format(-diffMonth, "month");
+  return rtf.format(-diffYear, "year");
+}
+
 interface HourlyForecast {
   time: string;
   temp: number;
@@ -74,11 +105,31 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [changelog, setChangelog] = useState<{ date: string; version: string; title: string; description: string }[]>([]);
+  const [changelogUnread, setChangelogUnread] = useState(false);
 
   useEffect(() => {
     fetch("/api/auth/session")
       .then((r) => r.json())
       .then((data) => setIsLoggedIn(!!data?.user))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/changelog")
+      .then((r) => r.json())
+      .then((data: { date: string; version: string; title: string; description: string }[]) => {
+        setChangelog(data);
+        if (data.length > 0) {
+          try {
+            const seen = localStorage.getItem("skystyle_last_seen_changelog");
+            const latest = data[0].version;
+            if (!seen || isVersionGreater(latest, seen)) {
+              setChangelogUnread(true);
+            }
+          } catch { /* ignore */ }
+        }
+      })
       .catch(() => {});
   }, []);
 
@@ -589,7 +640,7 @@ export default function Home() {
           Start free, upgrade when you need more.
         </p>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
           {/* Free */}
           <div
             className="rounded-2xl p-8"
@@ -645,28 +696,6 @@ export default function Home() {
             </ul>
           </div>
 
-          {/* Lifetime */}
-          <div
-            className="rounded-2xl p-8"
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--card-border)",
-            }}
-          >
-            <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>
-              Pro Lifetime
-            </h3>
-            <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-              A$30<span className="text-sm font-normal opacity-60"> once</span>
-            </p>
-            <ul className="text-sm space-y-3 mt-6" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-              <li>✅ Everything in Pro</li>
-              <li>✅ One-time payment</li>
-              <li>✅ Lifetime updates</li>
-              <li>✅ Priority support</li>
-            </ul>
-          </div>
-
           {/* Pay As You Go */}
           <div
             className="rounded-2xl p-8 relative"
@@ -698,6 +727,95 @@ export default function Home() {
           </div>
         </div>
       </section>
+
+      {/* Changelog Section */}
+      {changelog.length > 0 && (
+        <section className="px-6 py-12 max-w-2xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
+              Latest from our changelog
+              {changelogUnread && (
+                <span
+                  className="ml-2 inline-block align-middle"
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: "#ff3b30",
+                    display: "inline-block",
+                    verticalAlign: "middle",
+                  }}
+                  aria-label="New updates"
+                />
+              )}
+            </h2>
+            <Link
+              href="/changelog"
+              className="text-xs btn-interact rounded-xl px-3 py-1.5"
+              style={{ color: "var(--accent)" }}
+              onClick={() => {
+                setChangelogUnread(false);
+                try { localStorage.setItem("skystyle_last_seen_changelog", changelog[0].version); } catch { /* ignore */ }
+              }}
+            >
+              View all →
+            </Link>
+          </div>
+
+          {/* Vertical timeline */}
+          <div className="relative">
+            <div
+              className="absolute left-[7px] top-3"
+              style={{
+                width: 2,
+                bottom: 8,
+                background: "var(--card-border)",
+                willChange: "auto",
+              }}
+              aria-hidden="true"
+            />
+            <div className="space-y-6">
+              {changelog.slice(0, 5).map((entry, i) => (
+                <div key={entry.version} className="relative flex gap-5">
+                  <div
+                    className="relative z-10 mt-1 flex-shrink-0"
+                    style={{
+                      width: 16,
+                      height: 16,
+                      borderRadius: "50%",
+                      background: i === 0 ? "var(--accent)" : "var(--card-border)",
+                      boxShadow: i === 0 ? "0 0 0 3px var(--background), 0 0 0 5px var(--accent)" : "0 0 0 3px var(--background)",
+                    }}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="flex-1 rounded-2xl p-4 space-y-1"
+                    style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="text-xs font-mono px-2 py-0.5 rounded-lg"
+                        style={{ background: "var(--background)", color: "var(--foreground)", opacity: 0.7 }}
+                      >
+                        v{entry.version}
+                      </span>
+                      <span className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
+                        {formatRelativeTime(entry.date)}
+                      </span>
+                    </div>
+                    <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>
+                      {entry.title}
+                    </p>
+                    <p className="text-xs leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.65 }}>
+                      {entry.description}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Footer CTA */}
       <section className="px-6 py-16 text-center">
@@ -754,6 +872,35 @@ export default function Home() {
             style={{ color: "var(--foreground)" }}
           >
             GitHub
+          </Link>
+          {" · "}
+          <Link
+            href="/changelog"
+            className="underline hover:opacity-70 inline-flex items-center gap-1"
+            style={{ color: "var(--foreground)" }}
+            onClick={() => {
+              setChangelogUnread(false);
+              if (changelog.length > 0) {
+                try { localStorage.setItem("skystyle_last_seen_changelog", changelog[0].version); } catch { /* ignore */ }
+              }
+            }}
+          >
+            Changelog
+            {changelogUnread && (
+              <span
+                style={{
+                  display: "inline-block",
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  background: "#ff3b30",
+                  flexShrink: 0,
+                  verticalAlign: "middle",
+                  marginBottom: 1,
+                }}
+                aria-label="New updates"
+              />
+            )}
           </Link>
           {" · "}
           <Link href="/terms" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>

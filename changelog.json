@@ -1,0 +1,44 @@
+[
+  {
+    "date": "2026-04-03T00:58:00.000Z",
+    "version": "1.3.2",
+    "title": "Fix Demo Access functional bypass & environment gating",
+    "description": "Tightened demo login to only allow VERCEL_ENV=preview or NEXT_PUBLIC_IS_PREVIEW=true. Updated demo user identity (id, name, email). Button now hidden by default outside preview."
+  },
+  {
+    "date": "2026-04-03T00:40:00.000Z",
+    "version": "1.3.1",
+    "title": "Fix build error & add AI changelog instructions",
+    "description": "Fixed TypeScript TS2322 error in the style API route by casting Supabase settings fields to string | undefined. Added AGENTS.md and .github/copilot-instructions.md so AI agents know to update changelog.json after every change."
+  },
+  {
+    "date": "2026-04-03T00:00:00.000Z",
+    "version": "1.3.0",
+    "title": "Changelog & DX Integration",
+    "description": "Added a GitHub-style changelog with vertical timeline on the homepage and settings. Implemented demo login for preview environments with 10× free-tier limits. Added Simple Mode persistence via localStorage. Unread changelog indicators appear in the menu and footer until dismissed."
+  },
+  {
+    "date": "2026-03-28T00:00:00.000Z",
+    "version": "1.2.0",
+    "title": "Legal Overhaul & Simple Mode",
+    "description": "Rewrote Terms of Service and Privacy Policy with Plain-English summaries. Added a Simple Mode toggle that lets users switch between legalese and human-readable text. Legal pages now reflect the current payment model and data practices."
+  },
+  {
+    "date": "2026-03-20T00:00:00.000Z",
+    "version": "1.1.0",
+    "title": "Payment & Subscription Pivot",
+    "description": "Migrated billing to a credit-based model for Pro users (50 credits/week, auto-reset). Added Pay As You Go plan (coming soon). Improved account page to show live credit balance and usage stats."
+  },
+  {
+    "date": "2026-03-10T00:00:00.000Z",
+    "version": "1.0.1",
+    "title": "Dashboard Layout Improvements",
+    "description": "Added drag-to-resize column divider, extra side spacing toggle, and persistent layout mode preferences. Dashboard now listens for a skystyle-preferences-updated event so settings reflect instantly."
+  },
+  {
+    "date": "2026-03-01T00:00:00.000Z",
+    "version": "1.0.0",
+    "title": "Sky Style — Public Launch",
+    "description": "Initial public release. AI-powered outfit recommendations based on real-time multi-source weather data. Supports metric/imperial units, closet management, BYOK API keys for Pro users, and custom weather sources."
+  }
+]

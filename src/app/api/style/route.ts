@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
+import { DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getWeather, CustomSource, SourceMode, MAX_CUSTOM_SOURCES } from "@/lib/weather";
 import { getStyleRecommendation, getDevChatResponse } from "@/lib/ai";
@@ -26,8 +27,13 @@ export async function POST(req: NextRequest) {
 
   const userId = session.user.id;
 
+  // Demo users are not persisted to Supabase — skip the sync step
+  const isDemo = userId === DEMO_USER_ID || (session.user as unknown as Record<string, unknown>).plan === "demo";
+
   // Sync NextAuth user to public.users (required for FK references in app tables)
-  await syncPublicUser(session);
+  if (!isDemo) {
+    await syncPublicUser(session);
+  }
 
   // 2. Parse body
   let body: {
@@ -50,24 +56,38 @@ export async function POST(req: NextRequest) {
   }
 
   // 3. Load user profile + settings
-  const [profileResult, settingsResult, closetResult] = await Promise.all([
-    supabaseAdmin.from("users").select("*").eq("id", userId).single(),
-    supabaseAdmin.from("settings").select("*").eq("user_id", userId).single(),
-    supabaseAdmin.from("closet").select("items").eq("user_id", userId).single(),
-  ]);
+  let isPro = false;
+  let isDev = false;
+  let settings: { unit_preference?: string; custom_system_prompt?: string; custom_source_url?: string } = {};
+  let closetItems: string[] = [];
 
-  const isPro: boolean = profileResult.data?.is_pro ?? false;
-  const isDev: boolean = profileResult.data?.is_dev ?? false;
-  const settings = settingsResult.data ?? {};
+  if (isDemo) {
+    // Demo users bypass all Supabase lookups — use empty defaults
+    isPro = false;
+    isDev = false;
+  } else {
+    const [profileResult, settingsResult, closetResult] = await Promise.all([
+      supabaseAdmin.from("users").select("*").eq("id", userId).single(),
+      supabaseAdmin.from("settings").select("*").eq("user_id", userId).single(),
+      supabaseAdmin.from("closet").select("items").eq("user_id", userId).single(),
+    ]);
 
-  // Closet: free users can use it 1x/day; Pro/Dev unlimited
-  let closetItems: string[] = closetResult.data?.items ?? [];
-  if (!isPro && !isDev && closetItems.length > 0) {
-    const { allowed } = await canUseFeature(userId, "closet_uses", isPro, isDev);
-    if (!allowed) {
-      closetItems = []; // Don't send closet data if limit reached
+    isPro = profileResult.data?.is_pro ?? false;
+    isDev = profileResult.data?.is_dev ?? false;
+    settings = (settingsResult.data ?? {}) as { unit_preference?: string; custom_system_prompt?: string; custom_source_url?: string };
+
+    // Closet: free users can use it 1x/day; Pro/Dev/Demo unlimited-ish
+    const rawCloset: string[] = closetResult.data?.items ?? [];
+    if (!isPro && !isDev && rawCloset.length > 0) {
+      const { allowed } = await canUseFeature(userId, "closet_uses", isPro, isDev, isDemo);
+      if (!allowed) {
+        closetItems = [];
+      } else {
+        await incrementUsage(userId, "closet_uses", isPro, isDev, isDemo);
+        closetItems = rawCloset;
+      }
     } else {
-      await incrementUsage(userId, "closet_uses", isPro, isDev);
+      closetItems = rawCloset;
     }
   }
 
@@ -83,8 +103,8 @@ export async function POST(req: NextRequest) {
     ? settings.custom_source_url ?? undefined
     : undefined;
 
-  // 4. Credits / daily limit check (devs bypass all limits)
-  if (!isDev) {
+  // 4. Credits / daily limit check (devs and demos bypass credit deduction)
+  if (!isDev && !isDemo) {
     if (isPro) {
       const balance = await getCredits(userId);
       if (balance <= 0) {
@@ -95,13 +115,22 @@ export async function POST(req: NextRequest) {
       }
     } else {
       // Free users: 5 AI uses per day
-      const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro, isDev);
+      const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro, isDev, isDemo);
       if (!allowed) {
         return NextResponse.json(
           { error: `Daily AI limit reached (${used}/${limit}). Upgrade to Pro for unlimited access.` },
           { status: 429 }
         );
       }
+    }
+  } else if (isDemo) {
+    // Demo users: 50 AI uses per day (10× free). Still enforce the limit.
+    const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro, isDev, isDemo);
+    if (!allowed) {
+      return NextResponse.json(
+        { error: `Demo daily AI limit reached (${used}/${limit}).` },
+        { status: 429 }
+      );
     }
   }
 
@@ -114,7 +143,7 @@ export async function POST(req: NextRequest) {
       const message = err instanceof Error ? err.message : "AI request failed";
       return NextResponse.json({ error: message }, { status: 502 });
     }
-    const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
+    const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev, isDemo);
     return NextResponse.json({
       recommendation,
       meta: {
@@ -172,15 +201,17 @@ export async function POST(req: NextRequest) {
   }
 
   // 7. Deduct credit / increment daily usage (devs bypass)
-  if (!isDev) {
+  if (!isDev && !isDemo) {
     if (isPro) {
       await deductCredit(userId);
     } else {
-      await incrementUsage(userId, "ai_uses", isPro, isDev);
+      await incrementUsage(userId, "ai_uses", isPro, isDev, isDemo);
     }
+  } else if (isDemo) {
+    await incrementUsage(userId, "ai_uses", isPro, isDev, isDemo);
   }
 
-  const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
+  const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev, isDemo);
 
   return NextResponse.json({
     weather,

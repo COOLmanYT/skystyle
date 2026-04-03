@@ -21,6 +21,8 @@ export interface DailyUsageRecord {
 
 const LIMITS = {
   free: { ai_uses: 5, follow_ups: 10, closet_uses: 1, source_picks: 1 },
+  // demo plan: 10× the standard free limits for preview-environment testing
+  demo: { ai_uses: 50, follow_ups: 100, closet_uses: 10, source_picks: 10 },
   pro: { ai_uses: Infinity, follow_ups: 100, closet_uses: Infinity, source_picks: Infinity },
   dev: { ai_uses: Infinity, follow_ups: Infinity, closet_uses: Infinity, source_picks: Infinity },
 } as const;
@@ -64,10 +66,11 @@ export async function canUseFeature(
   userId: string,
   field: UsageField,
   isPro: boolean,
-  isDev: boolean = false
+  isDev: boolean = false,
+  isDemo: boolean = false
 ): Promise<{ allowed: boolean; used: number; limit: number }> {
   const usage = await getDailyUsage(userId);
-  const tier = isDev ? "dev" : (isPro ? "pro" : "free");
+  const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
   const limit = LIMITS[tier][field];
   const used = usage[field];
   return { allowed: used < limit, used, limit };
@@ -78,9 +81,10 @@ export async function incrementUsage(
   userId: string,
   field: UsageField,
   isPro: boolean,
-  isDev: boolean = false
+  isDev: boolean = false,
+  isDemo: boolean = false
 ): Promise<boolean> {
-  const { allowed, used } = await canUseFeature(userId, field, isPro, isDev);
+  const { allowed, used } = await canUseFeature(userId, field, isPro, isDev, isDemo);
   if (!allowed) return false;
 
   const date = today();
@@ -99,9 +103,9 @@ export async function incrementUsage(
  *  Infinite limits are returned as `null` so they survive JSON serialisation
  *  (`JSON.stringify(Infinity)` produces `null` silently).
  */
-export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: boolean = false) {
+export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: boolean = false, isDemo: boolean = false) {
   const usage = await getDailyUsage(userId);
-  const tier = isDev ? "dev" : (isPro ? "pro" : "free");
+  const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
   const fmt = (v: number): number | null => (v === Infinity ? null : v);
   return {
     ai: { used: usage.ai_uses, limit: fmt(LIMITS[tier].ai_uses) },
