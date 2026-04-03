@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-03T10:31:55.000Z",
+    "version": "1.6.1",
+    "title": "Fix missing whitespace between bold and regular text",
+    "description": "Added explicit {\" \"} JSX whitespace around all inline <strong> elements in legal docs and the upgrade modal; removed incorrect CSS letter-spacing workaround; reverted visual spacing overrides."
+  },
+  {
     "date": "2026-04-03T09:47:06.000Z",
     "version": "1.6.0",
     "title": "WCAG 2.2 AA accessibility refactor + text spacing fixes",

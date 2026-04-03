@@ -82,23 +82,23 @@ export default function PrivacyClient() {
         /* ── Simple Mode ── */
         <div className="space-y-5 text-sm leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.85 }}>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>👤 What we collect (and why)</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>👤 What we collect (and why)</p>
             <ul className="space-y-2 list-disc pl-5">
-              <li><strong>Name &amp; email</strong> — from your GitHub or Google login, so you can sign in.</li>
-              <li><strong>Location</strong> — only used to fetch weather. Never stored.</li>
-              <li><strong>Gender preference</strong> — optional. Stored locally on your device and sent to the AI when generating recommendations.</li>
-              <li><strong>Closet items</strong> — optional. Stored so AI can personalise recommendations.</li>
-              <li><strong>Daily usage counts</strong> — for rate limiting only. No request content stored.</li>
+              <li><strong>Name &amp; email</strong>{" "}— from your GitHub or Google login, so you can sign in.</li>
+              <li><strong>Location</strong>{" "}— only used to fetch weather. Never stored.</li>
+              <li><strong>Gender preference</strong>{" "}— optional. Stored locally on your device and sent to the AI when generating recommendations.</li>
+              <li><strong>Closet items</strong>{" "}— optional. Stored so AI can personalise recommendations.</li>
+              <li><strong>Daily usage counts</strong>{" "}— for rate limiting only. No request content stored.</li>
             </ul>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>🔒 Local storage</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🔒 Local storage</p>
             <p>Some preferences are stored locally on your device, including:</p>
             <ul className="space-y-2 list-disc pl-5">
               <li>Gender preference (optional)</li>
@@ -108,10 +108,10 @@ export default function PrivacyClient() {
             <p>This data stays on your device and is not stored on Sky Style servers. Local storage data may be cleared if you clear your browser data.</p>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>🚫 What we never do</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🚫 What we never do</p>
             <ul className="space-y-2 list-disc pl-5">
               <li>We don&apos;t sell or share your data with data brokers.</li>
               <li>We don&apos;t track you across other websites.</li>
@@ -120,10 +120,10 @@ export default function PrivacyClient() {
             </ul>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>🔍 Transparent &amp; open source</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🔍 Transparent &amp; open source</p>
             <p>
               Everything about how we handle data is{" "}
               <a
@@ -139,10 +139,10 @@ export default function PrivacyClient() {
             </p>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>🗑️ Delete your data</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🗑️ Delete your data</p>
             <p>
               Want your data removed? Just{" "}
               <a
@@ -163,9 +163,9 @@ export default function PrivacyClient() {
         </div>
       ) : (
         /* ── Full Legal Text ── */
-        <div className="space-y-8 text-sm leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.8 }}>
+        <div className="space-y-6 text-sm leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.8 }}>
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Our philosophy</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Our philosophy</h2>
             <p>
               Sky Style is built by an individual developer based in Australia — not a
               corporation. We follow{" "}
@@ -180,44 +180,44 @@ export default function PrivacyClient() {
               </a>{" "}
               principles. We collect only the minimum data needed for the app to work. If we
               do not need it, we do not collect it. This policy is written in plain language.
-              Sky Style is a <strong>WIP/POC</strong> project — data practices may evolve as
+              Sky Style is a{" "}<strong>WIP/POC</strong>{" "}project — data practices may evolve as
               the project matures.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>What we collect</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>What we collect</h2>
             <ul className="list-disc pl-5 space-y-1">
               <li>
-                <strong>Account info</strong> — your name, email, and profile image from your
+                <strong>Account info</strong>{" "}— your name, email, and profile image from your
                 GitHub or Google account. This is needed for authentication.
               </li>
               <li>
-                <strong>Location</strong> — the coordinates you provide (GPS or typed) are sent to
+                <strong>Location</strong>{" "}— the coordinates you provide (GPS or typed) are sent to
                 weather APIs to fetch weather data. We do not store your location history.
-                Your location is <strong>not</strong> shared with the AI unless you explicitly
+                Your location is{" "}<strong>not</strong>{" "}shared with the AI unless you explicitly
                 consent via the &quot;Share my location with AI&quot; toggle.
               </li>
               <li>
-                <strong>Gender preference</strong> — optional. Stored locally on your device and sent to the AI only when generating recommendations. This data is not stored on Sky Style servers.
+                <strong>Gender preference</strong>{" "}— optional. Stored locally on your device and sent to the AI only when generating recommendations. This data is not stored on Sky Style servers.
               </li>
               <li>
-                <strong>Closet items</strong> — clothing descriptions you choose to add. Stored so
+                <strong>Closet items</strong>{" "}— clothing descriptions you choose to add. Stored so
                 the AI can make personalised recommendations.
               </li>
               <li>
-                <strong>Settings</strong> — your unit preference, custom prompts, and custom weather
+                <strong>Settings</strong>{" "}— your unit preference, custom prompts, and custom weather
                 source URLs if you set them.
               </li>
               <li>
-                <strong>Usage counts</strong> — daily counters for rate limiting (AI uses,
+                <strong>Usage counts</strong>{" "}— daily counters for rate limiting (AI uses,
                 follow-ups, closet uses, source picks). No request content is stored.
               </li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>What we do NOT collect</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>What we do NOT collect</h2>
             <ul className="list-disc pl-5 space-y-1">
               <li>We do not track you across other websites.</li>
               <li>We do not sell or share your data with data brokers.</li>
@@ -229,7 +229,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Local storage</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Local storage</h2>
             <p>Some preferences are stored locally on your device using browser local storage, including:</p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
               <li>Gender preference (optional)</li>
@@ -243,7 +243,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Third-party services</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Third-party services</h2>
             <p>Sky Style relies on the following third-party services. Your data may be processed by them according to their own privacy policies:</p>
             <ul className="list-disc pl-5 space-y-2 mt-2">
               <li>
@@ -268,7 +268,7 @@ export default function PrivacyClient() {
                 each request.
               </li>
               <li>
-                <strong>Weather providers:</strong> OpenWeatherMap, Open-Meteo, BOM, WeatherAPI, Visual Crossing, Pirate Weather — only coordinates are sent.
+                <strong>Weather providers:</strong>{" "}OpenWeatherMap, Open-Meteo, BOM, WeatherAPI, Visual Crossing, Pirate Weather — only coordinates are sent.
               </li>
               <li>
                 <strong>
@@ -286,12 +286,12 @@ export default function PrivacyClient() {
                 </strong>{" "}
                 — hosting.
               </li>
-              <li><strong>GitHub / Google OAuth</strong> — authentication providers.</li>
+              <li><strong>GitHub / Google OAuth</strong>{" "}— authentication providers.</li>
             </ul>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>International data transfers</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>International data transfers</h2>
             <p>
               Sky Style is hosted on Vercel, which operates servers globally. Your data may be
               processed in countries outside your own. By using Sky Style, you acknowledge that
@@ -300,7 +300,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Data retention</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Data retention</h2>
             <p>
               Your account data and settings are kept for as long as your account exists. Daily
               usage counters are transient rate-limiting data and are not linked to specific
@@ -309,7 +309,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Security</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Security</h2>
             <p>
               We take reasonable measures to protect your data, including HTTPS, OAuth-based
               authentication, and Supabase&apos;s built-in row-level security. However, no system
@@ -328,18 +328,18 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Your rights</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Your rights</h2>
             <p>
               Regardless of where you live, we respect your data rights under the{" "}
               <em>Australian Privacy Act 1988</em>, <em>GDPR</em>, and similar laws:
             </p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
-              <li><strong>Access</strong> — request a copy of all data we hold about you.</li>
-              <li><strong>Correction</strong> — ask us to correct inaccurate data.</li>
-              <li><strong>Deletion</strong> — request deletion of your account and all data.</li>
-              <li><strong>Portability</strong> — request your data in machine-readable format.</li>
-              <li><strong>Objection</strong> — object to specific processing of your data.</li>
-              <li><strong>Withdraw consent</strong> — e.g. location sharing with AI, via settings.</li>
+              <li><strong>Access</strong>{" "}— request a copy of all data we hold about you.</li>
+              <li><strong>Correction</strong>{" "}— ask us to correct inaccurate data.</li>
+              <li><strong>Deletion</strong>{" "}— request deletion of your account and all data.</li>
+              <li><strong>Portability</strong>{" "}— request your data in machine-readable format.</li>
+              <li><strong>Objection</strong>{" "}— object to specific processing of your data.</li>
+              <li><strong>Withdraw consent</strong>{" "}— e.g. location sharing with AI, via settings.</li>
             </ul>
             <p className="mt-2">
               To exercise any of these rights, open an issue on{" "}
@@ -357,7 +357,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Cookies</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Cookies</h2>
             <p>
               We use a single session cookie for authentication (managed by NextAuth). We do not
               use tracking cookies, advertising cookies, or any third-party cookie services.
@@ -365,7 +365,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Children</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Children</h2>
             <p>
               Sky Style is not directed at children under 13 (or under 16 in the EU). We do not
               knowingly collect data from children.
@@ -373,7 +373,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Governing law</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Governing law</h2>
             <p>
               This privacy policy is governed by the laws of Australia, including the{" "}
               <em>Privacy Act 1988 (Cth)</em> and the{" "}
@@ -382,7 +382,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Changes</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Changes</h2>
             <p>
               If we change this policy, we will update this page and the date above. Continued
               use after changes constitutes acceptance of the updated policy.
@@ -390,7 +390,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Open source</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Open source</h2>
             <p>
               This entire application is open source at{" "}
               <a
@@ -407,7 +407,7 @@ export default function PrivacyClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Contact</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Contact</h2>
             <p>
               Questions or data requests? Open an issue on{" "}
               <a

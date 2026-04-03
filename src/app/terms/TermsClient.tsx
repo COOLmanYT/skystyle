@@ -82,20 +82,20 @@ export default function TermsClient() {
         /* ── Simple Mode ── */
         <div className="space-y-5 text-sm leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.85 }}>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>🚧 This is a Work in Progress</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🚧 This is a Work in Progress</p>
             <p>
-              Sky Style is a <strong>Proof of Concept (POC)</strong> project built by one person. It may be
+              Sky Style is a{" "}<strong>Proof of Concept (POC)</strong>{" "}project built by one person. It may be
               buggy, break unexpectedly, or change at any time. We make no promises about reliability or uptime.
             </p>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>☕ Donations are voluntary gifts</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>☕ Donations are voluntary gifts</p>
             <p>
               If you donate via Buy Me a Coffee, that money is a voluntary gift to support server costs — it is{" "}
               <strong>not a purchase</strong>. You get no paid plan, no SLA, no guaranteed uptime, and no
@@ -103,39 +103,39 @@ export default function TermsClient() {
             </p>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>⚠️ Zero liability</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>⚠️ Zero liability</p>
             <p>
               AI outfit suggestions are just suggestions — we&apos;re not liable if you dress wrong for the weather.
               This is a fun helper, not professional advice. Use your own judgement.
             </p>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>👤 Your data</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>👤 Your data</p>
             <p>
               We store your name and email (from Google/GitHub login) so you can sign in. We track daily
               usage counts for rate-limiting. We don&apos;t sell your data or track you across the web.
             </p>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>🔑 Bring Your Own Key</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🔑 Bring Your Own Key</p>
             <p>
               Pro and Dev users may provide their own AI API key. This key is stored locally on your device and sent only for requests you initiate. Sky Style does not store your API key on our servers.
             </p>
           </div>
           <div
-            className="rounded-2xl p-5 space-y-4"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold pb-1 border-b" style={{ opacity: 1, borderColor: "var(--card-border)" }}>🔓 Open source &amp; honest</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🔓 Open source &amp; honest</p>
             <p>
               The entire codebase is{" "}
               <a
@@ -166,9 +166,9 @@ export default function TermsClient() {
         </div>
       ) : (
         /* ── Full Legal Text ── */
-        <div className="space-y-8 text-sm leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.8 }}>
+        <div className="space-y-6 text-sm leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.8 }}>
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Plain language first</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Plain language first</h2>
             <p>
               Sky Style is built by an individual developer based in Australia — not a
               corporation. We follow{" "}
@@ -197,9 +197,9 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Proof of Concept status</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Proof of Concept status</h2>
             <p>
-              Sky Style is a <strong>Work in Progress (WIP) / Proof of Concept (POC)</strong>. Features may
+              Sky Style is a{" "}<strong>Work in Progress (WIP) / Proof of Concept (POC)</strong>. Features may
               change, break, or be removed at any time without notice. There are no paid Service Level
               Agreements (SLAs) or uptime guarantees of any kind. The project is operated by a single
               individual on a best-effort basis.
@@ -207,7 +207,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>What Sky Style does</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>What Sky Style does</h2>
             <p>
               Sky Style fetches real-time weather data from multiple sources and uses AI
               (large language models) to suggest what you might wear. It is a helpful tool —
@@ -216,7 +216,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Your account</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Your account</h2>
             <p>
               You sign in via GitHub or Google OAuth. We store your user ID, name, email, and
               profile image so you can log in again. We do not create a separate password for you.
@@ -225,7 +225,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Free plan</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Free plan</h2>
             <p>
               Sky Style is free to use during its POC phase. Free accounts have daily limits
               (5 AI uses, 10 follow-ups, 1 closet use, 1 source pick per day). These limits may
@@ -234,7 +234,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Donations</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Donations</h2>
             <p>
               Sky Style is supported by voluntary donations through{" "}
               <a
@@ -254,14 +254,14 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Bring Your Own Key</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Bring Your Own Key</h2>
             <p>
               You may provide your own AI API key. This key is stored locally on your device and sent only for requests you initiate. Sky Style does not store your API key on our servers. You are responsible for any charges from your API provider.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>AI disclaimer</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>AI disclaimer</h2>
             <p>
               Outfit recommendations are generated by third-party AI models (OpenAI and/or Google
               Gemini). AI output may be inaccurate, inappropriate, or unhelpful. Sky Style does
@@ -271,7 +271,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Weather data attribution</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Weather data attribution</h2>
             <p>Weather data is sourced from:</p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
               <li><a href="https://openweathermap.org/" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>OpenWeatherMap</a></li>
@@ -288,11 +288,11 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>&quot;As-is&quot; disclaimer</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>&quot;As-is&quot; disclaimer</h2>
             <p>
               To the maximum extent permitted by law — including the{" "}
               <em>Australian Consumer Law (Schedule 2 of the Competition and Consumer Act 2010)</em>{" "}
-              — Sky Style is provided <strong>&quot;as is&quot;</strong> and{" "}
+              — Sky Style is provided{" "}<strong>&quot;as is&quot;</strong>{" "}and{" "}
               <strong>&quot;as available&quot;</strong>, without warranties of any kind, whether express or
               implied. This includes, but is not limited to, implied warranties of
               merchantability, fitness for a particular purpose, and non-infringement.
@@ -304,7 +304,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Limitation of liability</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Limitation of liability</h2>
             <p>
               To the maximum extent permitted by law, the developer of Sky Style is not liable
               for any indirect, incidental, special, consequential, or punitive damages, or any
@@ -324,7 +324,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Availability</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Availability</h2>
             <p>
               We do our best to keep the service running, but outages happen — especially for a
               one-person, WIP/POC project. We do not guarantee any specific uptime, and are not
@@ -333,7 +333,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>No dark patterns</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>No dark patterns</h2>
             <p>
               We do not use guilt buttons, fake urgency, confusing opt-outs, or tricks of any
               kind. If you want to stop using Sky Style, simply stop. Your data can be deleted on
@@ -342,7 +342,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Your responsibilities</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Your responsibilities</h2>
             <ul className="list-disc pl-5 space-y-1">
               <li>Do not abuse the service or circumvent rate limits.</li>
               <li>Do not use the service for any unlawful purpose.</li>
@@ -351,7 +351,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Termination</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Termination</h2>
             <p>
               You may stop using Sky Style at any time. We may suspend or terminate your access
               if you violate these terms or abuse the service. On termination, you may request
@@ -370,7 +370,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Governing law</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Governing law</h2>
             <p>
               These terms are governed by the laws of Australia. Any dispute arising from your
               use of Sky Style will be subject to the jurisdiction of the courts of Australia.
@@ -380,7 +380,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Changes to these terms</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Changes to these terms</h2>
             <p>
               If we change these terms, we will update this page and the &quot;last updated&quot; date.
               For material changes, we will try to notify users through the dashboard. Continued
@@ -389,7 +389,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Open source</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Open source</h2>
             <p>
               Sky Style is open source. You can view the full source code at{" "}
               <a
@@ -406,7 +406,7 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-3" style={{ opacity: 1 }}>Contact</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Contact</h2>
             <p>
               Questions? Open an issue on{" "}
               <a

@@ -72,12 +72,12 @@ export default function UpgradePlanModal({ onClose }: Props) {
         </h2>
 
         {/* Body */}
-        <p className="text-sm text-center leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.75 }}>
+        <p className="text-sm text-center leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.65 }}>
           We&apos;re still setting up secure payment processing with Stripe — paid plans aren&apos;t
-          available yet. Sky Style is currently <strong>free</strong> while we&apos;re in our
+          available yet. Sky Style is currently{" "}<strong>free</strong>{" "}while we&apos;re in our
           Proof of Concept phase.
         </p>
-        <p className="text-sm text-center leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.75 }}>
+        <p className="text-sm text-center leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.65 }}>
           If you&apos;d like to support server costs and help keep the project running, you can
           donate voluntarily via Buy Me a Coffee — no obligation, no perks, just gratitude. ❤️
         </p>

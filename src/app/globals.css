@@ -475,10 +475,3 @@ textarea:focus-visible {
 :focus:not(:focus-visible) {
   outline: none;
 }
-
-/* ── Typography: bold/strong inline legibility ── */
-/* Add a tiny letter-spacing to bold inline text so it doesn't feel cramped
-   against adjacent normal-weight characters. */
-strong, b {
-  letter-spacing: 0.01em;
-}
