@@ -475,3 +475,19 @@ textarea:focus-visible {
 :focus:not(:focus-visible) {
   outline: none;
 }
+
+/* ── Plan-based focus rings (used in feedback form) ── */
+.focus-plan-free:focus-visible {
+  outline: 2px solid #3b7cf4;
+  outline-offset: 2px;
+}
+
+.focus-plan-pro:focus-visible {
+  outline: 2px solid #9b59b6;
+  outline-offset: 2px;
+}
+
+.focus-plan-dev:focus-visible {
+  outline: 2px solid #ff9500;
+  outline-offset: 2px;
+}

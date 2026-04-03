@@ -153,6 +153,29 @@ CREATE POLICY "Users can read own daily_usage"
   ON daily_usage FOR SELECT
   USING ((select auth.uid()) = user_id);
 
+-- ------------------------------------------------------------
+-- 6. Feedback
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.feedback (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES next_auth.users(id) ON DELETE CASCADE,
+  plan       text        NOT NULL DEFAULT 'free',
+  category   text        NOT NULL,
+  rating     integer     NOT NULL CHECK (rating BETWEEN 1 AND 5),
+  comment    text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.feedback ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can insert own feedback"
+  ON public.feedback FOR INSERT
+  WITH CHECK (user_id = (SELECT auth.uid()));
+
+CREATE POLICY "Users can read own feedback"
+  ON public.feedback FOR SELECT
+  USING (user_id = (SELECT auth.uid()));
+
 -- ============================================================
 -- MIGRATIONS — Run once in Supabase SQL Editor if upgrading
 -- ============================================================

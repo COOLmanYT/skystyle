@@ -1,5 +1,17 @@
 [
   {
+    "date": "2026-04-03T12:31:52.000Z",
+    "version": "1.7.1",
+    "title": "Server-side rate limiting on feedback submissions",
+    "description": "Added 10-minute server-side rate limiting to feedback entries for security and data integrity. UI shows a plan-colored alert and live countdown timer."
+  },
+  {
+    "date": "2026-04-03T11:47:00.000Z",
+    "version": "1.7.0",
+    "title": "Multi-point feedback ecosystem with Simple Mode reactivity",
+    "description": "Integrated multi-point feedback ecosystem with Simple Mode reactivity and plan-based styling. Includes /feedback route, modal, footer link, outfit card hook, and Settings card."
+  },
+  {
     "date": "2026-04-03T10:31:55.000Z",
     "version": "1.6.1",
     "title": "Fix missing whitespace between bold and regular text",
