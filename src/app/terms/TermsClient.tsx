@@ -126,6 +126,15 @@ export default function TermsClient() {
             className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🔑 Bring Your Own Key</p>
+            <p>
+              Pro and Dev users may provide their own AI API key. This key is stored locally on your device and sent only for requests you initiate. Sky Style does not store your API key on our servers.
+            </p>
+          </div>
+          <div
+            className="rounded-2xl p-5 space-y-3"
+            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+          >
             <p className="text-base font-semibold" style={{ opacity: 1 }}>🔓 Open source &amp; honest</p>
             <p>
               The entire codebase is{" "}
@@ -247,9 +256,7 @@ export default function TermsClient() {
           <section>
             <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Bring Your Own Key</h2>
             <p>
-              Pro users can provide their own AI API key for requests. This key is used only for
-              that single request and is <strong>never stored</strong> on our servers. You are
-              responsible for any charges from your own API provider.
+              You may provide your own AI API key. This key is stored locally on your device and sent only for requests you initiate. Sky Style does not store your API key on our servers. You are responsible for any charges from your API provider.
             </p>
           </section>
 

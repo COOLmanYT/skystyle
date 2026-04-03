@@ -27,8 +27,26 @@ interface SettingsClientProps {
 }
 
 export default function SettingsClient({ initialUnitPreference }: SettingsClientProps) {
-  const [gender, setGender] = useState<string>("N/A");
-  const [customGender, setCustomGender] = useState("");
+  const [gender, setGender] = useState<string>(() => {
+    const stored = getLocalStorage("skystyle_gender", "N/A");
+    if (!stored) return "N/A";
+    try {
+      // Decode stored gender; fall back to raw value if decoding fails
+      return atob(stored);
+    } catch {
+      return stored;
+    }
+  });
+  const [customGender, setCustomGender] = useState<string>(() => {
+    const stored = getLocalStorage("skystyle_custom_gender", "");
+    if (!stored) return "";
+    try {
+      // Decode stored custom gender; fall back to raw value if decoding fails
+      return atob(stored);
+    } catch {
+      return stored;
+    }
+  });
   const [unitPreference, setUnitPreference] = useState<"metric" | "imperial">(initialUnitPreference);
   const [themeMode, setThemeMode] = useState<ThemeMode>(
     () => (getLocalStorage("skystyle_theme_mode", "system") as ThemeMode)
@@ -68,9 +86,9 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
 
   function saveToLocalStorage() {
     // localStorage is used intentionally for client-side UI preferences (theme,
-    // layout, spacing). BYOK API keys are stored separately in the Dashboard
-    // component — all client-side storage is by design so preferences survive
-    // page reloads without requiring server round-trips.
+    // layout, spacing). Gender preference and BYOK API keys are also stored
+    // client-side only — never sent to Sky Style servers except when required
+    // for AI requests.
     try {
       localStorage.setItem("skystyle_theme_mode", themeMode);
       localStorage.setItem("skystyle_location_consent", String(shareLocation));
@@ -80,6 +98,18 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       localStorage.setItem("skystyle_extra_spacing", String(extraSpacing));
       localStorage.setItem("skystyle_extra_spacing_pages", extraSpacingPages.join(","));
       localStorage.setItem("skystyle_custom_spacing", String(customSpacing));
+      try {
+        // Encode gender before storing
+        localStorage.setItem("skystyle_gender", btoa(gender));
+      } catch {
+        /* ignore encoding errors */
+      }
+      try {
+        // Encode custom gender before storing
+        localStorage.setItem("skystyle_custom_gender", btoa(customGender));
+      } catch {
+        /* ignore encoding errors */
+      }
       window.dispatchEvent(new Event("skystyle-preferences-updated"));
     } catch { /* ignore */ }
   }

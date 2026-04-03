@@ -126,6 +126,7 @@ export default function Dashboard({
   const [dailyLimits, setDailyLimits] = useState<DailyLimits | null>(initialDailyLimits);
   const [gender, setGender] = useState<string>("N/A");
   const [customGender, setCustomGender] = useState("");
+  const [userApiKey, setUserApiKey] = useState<string>("");
   const [shareLocation, setShareLocation] = useState(false);
   const [closetItems, setClosetItems] = useState<string[]>([]);
   const [newClosetItem, setNewClosetItem] = useState("");
@@ -177,9 +178,27 @@ export default function Dashboard({
   const syncStoredPreferences = useCallback(() => {
     try {
       const savedGender = localStorage.getItem("skystyle_gender");
-      if (savedGender) setGender(savedGender);
+      if (savedGender) {
+        try {
+          // Decode stored gender; fall back to raw value if decoding fails
+          const decodedGender = atob(savedGender);
+          setGender(decodedGender);
+        } catch {
+          setGender(savedGender);
+        }
+      }
       const savedCustomGender = localStorage.getItem("skystyle_custom_gender");
-      if (savedCustomGender) setCustomGender(savedCustomGender);
+      if (savedCustomGender) {
+        try {
+          // Decode stored custom gender; fall back to raw value if decoding fails
+          const decodedCustomGender = atob(savedCustomGender);
+          setCustomGender(decodedCustomGender);
+        } catch {
+          setCustomGender(savedCustomGender);
+        }
+      }
+      const savedApiKey = localStorage.getItem("skystyle_byok_key");
+      if (savedApiKey) setUserApiKey(savedApiKey);
       const savedLocationConsent = localStorage.getItem("skystyle_location_consent");
       if (savedLocationConsent !== null) setShareLocation(savedLocationConsent === "true");
       const savedWeatherOnly = localStorage.getItem("skystyle_weather_only");
@@ -218,6 +237,25 @@ export default function Dashboard({
       }
     } catch { /* ignore */ }
   }, []);
+
+  // Persist gender preference to localStorage when changed
+  useEffect(() => {
+    try {
+      // Encode gender before storing to avoid clear text storage
+      localStorage.setItem("skystyle_gender", btoa(gender));
+    } catch {
+      /* ignore */
+    }
+  }, [gender]);
+
+  useEffect(() => {
+    try {
+      // Encode custom gender before storing
+      localStorage.setItem("skystyle_custom_gender", btoa(customGender));
+    } catch {
+      /* ignore */
+    }
+  }, [customGender]);
 
   // Check for unread changelog entries on mount
   useEffect(() => {
@@ -383,6 +421,7 @@ export default function Dashboard({
           body: JSON.stringify({
             lat: loc.lat, lon: loc.lon, gender: effectiveGender, shareLocation, forceCloset,
             unitPreference: userUnitPreference, sourceMode, customSources,
+            ...(userApiKey ? { userApiKey } : {}),
           }),
         });
         if (!res.ok) {
@@ -408,7 +447,7 @@ export default function Dashboard({
     } finally {
       setLoading(false);
     }
-  }, [weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, userUnitPreference, sourceMode, customSources]);
+  }, [weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, userUnitPreference, sourceMode, customSources, userApiKey]);
 
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
@@ -424,6 +463,7 @@ export default function Dashboard({
           previousOutfit: result.recommendation.outfit,
           previousReasoning: result.recommendation.reasoning,
           weather: result.weather,
+          ...(userApiKey ? { userApiKey } : {}),
         }),
       });
       if (!res.ok) {
@@ -1855,6 +1895,56 @@ export default function Dashboard({
                 </div>
               )}
             </div>
+
+            {/* ── Bring Your Own Key (Pro / Dev) ── */}
+            {(isPro || isDev) && (
+              <div
+                className="rounded-2xl p-4 space-y-3"
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid var(--card-border)",
+                }}
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: "var(--foreground)", opacity: 0.4 }}
+                >
+                  🔑 Bring Your Own Key
+                </p>
+                <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.55 }}>
+                  Provide your own OpenAI API key. Stored locally on your device only — never sent to Sky Style servers.
+                </p>
+                <input
+                  type="password"
+                  value={userApiKey}
+                  onChange={(e) => {
+                    const val = e.target.value.slice(0, 200);
+                    setUserApiKey(val);
+                    try { localStorage.setItem("skystyle_byok_key", val); } catch { /* ignore */ }
+                  }}
+                  placeholder="sk-… (optional)"
+                  autoComplete="off"
+                  className="w-full rounded-xl px-3 py-2 text-xs outline-none"
+                  style={{
+                    background: "var(--background)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--card-border)",
+                  }}
+                />
+                {userApiKey && (
+                  <button
+                    onClick={() => {
+                      setUserApiKey("");
+                      try { localStorage.removeItem("skystyle_byok_key"); } catch { /* ignore */ }
+                    }}
+                    className="text-xs btn-interact rounded-lg px-2 py-1"
+                    style={{ color: "#ff3b30" }}
+                  >
+                    Clear key
+                  </button>
+                )}
+              </div>
+            )}
 
           </div>
         </div>

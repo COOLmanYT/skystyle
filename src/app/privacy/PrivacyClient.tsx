@@ -89,9 +89,23 @@ export default function PrivacyClient() {
             <ul className="space-y-2 list-disc pl-5">
               <li><strong>Name &amp; email</strong> — from your GitHub or Google login, so you can sign in.</li>
               <li><strong>Location</strong> — only used to fetch weather. Never stored.</li>
+              <li><strong>Gender preference</strong> — optional. Stored locally on your device and sent to the AI when generating recommendations.</li>
               <li><strong>Closet items</strong> — optional. Stored so AI can personalise recommendations.</li>
               <li><strong>Daily usage counts</strong> — for rate limiting only. No request content stored.</li>
             </ul>
+          </div>
+          <div
+            className="rounded-2xl p-5 space-y-3"
+            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+          >
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>🔒 Local storage</p>
+            <p>Some preferences are stored locally on your device, including:</p>
+            <ul className="space-y-2 list-disc pl-5">
+              <li>Gender preference (optional)</li>
+              <li>Bring Your Own Key — AI API key (optional, Pro/Dev only)</li>
+              <li>UI preferences (theme, layout, spacing)</li>
+            </ul>
+            <p>This data stays on your device and is not stored on Sky Style servers. Local storage data may be cleared if you clear your browser data.</p>
           </div>
           <div
             className="rounded-2xl p-5 space-y-3"
@@ -185,8 +199,7 @@ export default function PrivacyClient() {
                 consent via the &quot;Share my location with AI&quot; toggle.
               </li>
               <li>
-                <strong>Gender preference</strong> — if you choose to set one, it is sent to the AI
-                to tailor recommendations. This is entirely optional and not stored permanently.
+                <strong>Gender preference</strong> — optional. Stored locally on your device and sent to the AI only when generating recommendations. This data is not stored on Sky Style servers.
               </li>
               <li>
                 <strong>Closet items</strong> — clothing descriptions you choose to add. Stored so
@@ -209,9 +222,24 @@ export default function PrivacyClient() {
               <li>We do not track you across other websites.</li>
               <li>We do not sell or share your data with data brokers.</li>
               <li>We do not use advertising trackers or analytics cookies.</li>
-              <li>We do not store your AI API keys (Bring Your Own Key is single-request only).</li>
+              <li>We do not store your AI API keys on our servers (BYOK keys are stored locally on your device only).</li>
               <li>We do not store your location history or weather request logs.</li>
+              <li>We do not store your gender preference on our servers.</li>
             </ul>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Local storage</h2>
+            <p>Some preferences are stored locally on your device using browser local storage, including:</p>
+            <ul className="list-disc pl-5 space-y-1 mt-2">
+              <li>Gender preference (optional)</li>
+              <li>Bring Your Own Key — AI API key (optional, Pro/Dev only)</li>
+              <li>UI preferences (theme, layout, spacing)</li>
+            </ul>
+            <p className="mt-2">
+              This data remains on your device and is not stored on Sky Style servers.
+              Local storage data may be cleared if you clear your browser data.
+            </p>
           </section>
 
           <section>
