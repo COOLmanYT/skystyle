@@ -18,7 +18,7 @@ AI-powered outfit recommendations based on hyper-local weather data. Never overd
 ## Plans
 
 | | Free | Pro Monthly |
-|---|---|---|---|
+|---|---|---|
 | Price | A$0 | A$4/mo |
 | AI uses | 5/day | 50 credits/week |
 | Follow-ups | 10/day | 100/day |
