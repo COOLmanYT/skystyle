@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { submitFeedback } from "@/app/actions";
 
 const CATEGORIES = [
@@ -18,6 +18,13 @@ function getLocalStorage(key: string, fallback: string): string {
   } catch {
     return fallback;
   }
+}
+
+function formatCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  if (m > 0) return `${m}m ${s}s`;
+  return `${s}s`;
 }
 
 interface FeedbackFormProps {
@@ -42,10 +49,37 @@ export default function FeedbackForm({
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     setSimpleMode(getLocalStorage("skystyle_simple_mode", "true") === "true");
   }, []);
+
+  // Clear countdown interval on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
+
+  function startCooldown(seconds: number) {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setCooldownSeconds(seconds);
+    setRateLimited(true);
+    timerRef.current = setInterval(() => {
+      setCooldownSeconds((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current!);
+          timerRef.current = null;
+          setRateLimited(false);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }
 
   const planBtnClass = isDev
     ? "btn-plan-dev"
@@ -58,6 +92,9 @@ export default function FeedbackForm({
     : isPro
     ? "focus-plan-pro"
     : "focus-plan-free";
+
+  // Plan-based accent color for the rate-limit alert border/text
+  const planAccentColor = isDev ? "#ff9500" : isPro ? "#9b59b6" : "#3b7cf4";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -72,6 +109,8 @@ export default function FeedbackForm({
     if (result.success) {
       setSuccess(true);
       if (onSuccess) setTimeout(onSuccess, 2000);
+    } else if (result.rateLimited) {
+      startCooldown(result.retryAfterSeconds ?? 600);
     } else {
       setError(result.error ?? "Something went wrong. Please try again.");
     }
@@ -183,7 +222,29 @@ export default function FeedbackForm({
         />
       </div>
 
-      {error && (
+      {/* Rate-limit alert */}
+      {rateLimited && (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="rounded-xl px-4 py-3 text-xs space-y-1"
+          style={{
+            background: `${planAccentColor}18`,
+            border: `1px solid ${planAccentColor}55`,
+            color: planAccentColor,
+          }}
+        >
+          <p className="font-semibold">⏳ Slow down!</p>
+          <p style={{ opacity: 0.85 }}>
+            I&apos;ve already got your last message. Please wait{" "}
+            <span className="font-mono font-bold">{formatCountdown(cooldownSeconds)}</span>{" "}
+            before sending more feedback.
+          </p>
+        </div>
+      )}
+
+      {/* Generic error */}
+      {error && !rateLimited && (
         <p role="alert" className="text-xs" style={{ color: "#ff3b30" }}>
           {error}
         </p>
@@ -192,10 +253,14 @@ export default function FeedbackForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || rateLimited}
           className={`flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold btn-interact disabled:opacity-40 ${planBtnClass}`}
         >
-          {submitting ? "Sending…" : "Submit"}
+          {submitting
+            ? "Sending…"
+            : rateLimited
+            ? `Cooling down… ${formatCountdown(cooldownSeconds)}`
+            : "Submit"}
         </button>
         {onCancel && (
           <button
