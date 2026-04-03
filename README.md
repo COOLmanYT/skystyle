@@ -44,7 +44,7 @@ See **[SETUP.md](SETUP.md)** for full deployment and local development instructi
 Quick start:
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env.local # or vercel env pull if you have access to vercel env vars
 # fill in values in .env.local
 npm install
 npm run dev
