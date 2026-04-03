@@ -178,7 +178,15 @@ export default function Dashboard({
   const syncStoredPreferences = useCallback(() => {
     try {
       const savedGender = localStorage.getItem("skystyle_gender");
-      if (savedGender) setGender(savedGender);
+      if (savedGender) {
+        try {
+          // Decode stored gender; fall back to raw value if decoding fails
+          const decodedGender = atob(savedGender);
+          setGender(decodedGender);
+        } catch {
+          setGender(savedGender);
+        }
+      }
       const savedCustomGender = localStorage.getItem("skystyle_custom_gender");
       if (savedCustomGender) {
         try {
@@ -232,7 +240,12 @@ export default function Dashboard({
 
   // Persist gender preference to localStorage when changed
   useEffect(() => {
-    try { localStorage.setItem("skystyle_gender", gender); } catch { /* ignore */ }
+    try {
+      // Encode gender before storing to avoid clear text storage
+      localStorage.setItem("skystyle_gender", btoa(gender));
+    } catch {
+      /* ignore */
+    }
   }, [gender]);
 
   useEffect(() => {
