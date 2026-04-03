@@ -17,15 +17,15 @@ AI-powered outfit recommendations based on hyper-local weather data. Never overd
 
 ## Plans
 
-| | Free | Pro Monthly | Pro Lifetime |
+| | Free | Pro Monthly |
 |---|---|---|---|
-| Price | A$0 | A$4/mo | A$30 once |
-| AI uses | 5/day | 50 credits/week | 50 credits/week |
-| Follow-ups | 10/day | 100/day | 100/day |
-| Closet | 1 use/day | Unlimited | Unlimited |
-| Source picker | 1/day | Unlimited | Unlimited |
-| BYOK AI key | — | ✅ | ✅ |
-| Custom prompts | — | ✅ | ✅ |
+| Price | A$0 | A$4/mo |
+| AI uses | 5/day | 50 credits/week |
+| Follow-ups | 10/day | 100/day |
+| Closet | 1 use/day | Unlimited |
+| Source picker | 1/day | Unlimited |
+| BYOK AI key | — | ✅ |
+| Custom prompts | — | ✅ |
 
 ## Tech stack
 
