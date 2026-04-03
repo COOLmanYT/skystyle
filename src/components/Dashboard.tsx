@@ -180,7 +180,15 @@ export default function Dashboard({
       const savedGender = localStorage.getItem("skystyle_gender");
       if (savedGender) setGender(savedGender);
       const savedCustomGender = localStorage.getItem("skystyle_custom_gender");
-      if (savedCustomGender) setCustomGender(savedCustomGender);
+      if (savedCustomGender) {
+        try {
+          // Decode stored custom gender; fall back to raw value if decoding fails
+          const decodedCustomGender = atob(savedCustomGender);
+          setCustomGender(decodedCustomGender);
+        } catch {
+          setCustomGender(savedCustomGender);
+        }
+      }
       const savedApiKey = localStorage.getItem("skystyle_byok_key");
       if (savedApiKey) setUserApiKey(savedApiKey);
       const savedLocationConsent = localStorage.getItem("skystyle_location_consent");
@@ -228,7 +236,12 @@ export default function Dashboard({
   }, [gender]);
 
   useEffect(() => {
-    try { localStorage.setItem("skystyle_custom_gender", customGender); } catch { /* ignore */ }
+    try {
+      // Encode custom gender before storing
+      localStorage.setItem("skystyle_custom_gender", btoa(customGender));
+    } catch {
+      /* ignore */
+    }
   }, [customGender]);
 
   // Check for unread changelog entries on mount

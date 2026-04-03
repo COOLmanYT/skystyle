@@ -28,7 +28,16 @@ interface SettingsClientProps {
 
 export default function SettingsClient({ initialUnitPreference }: SettingsClientProps) {
   const [gender, setGender] = useState<string>(() => getLocalStorage("skystyle_gender", "N/A"));
-  const [customGender, setCustomGender] = useState<string>(() => getLocalStorage("skystyle_custom_gender", ""));
+  const [customGender, setCustomGender] = useState<string>(() => {
+    const stored = getLocalStorage("skystyle_custom_gender", "");
+    if (!stored) return "";
+    try {
+      // Decode stored custom gender; fall back to raw value if decoding fails
+      return atob(stored);
+    } catch {
+      return stored;
+    }
+  });
   const [unitPreference, setUnitPreference] = useState<"metric" | "imperial">(initialUnitPreference);
   const [themeMode, setThemeMode] = useState<ThemeMode>(
     () => (getLocalStorage("skystyle_theme_mode", "system") as ThemeMode)
@@ -81,7 +90,12 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       localStorage.setItem("skystyle_extra_spacing_pages", extraSpacingPages.join(","));
       localStorage.setItem("skystyle_custom_spacing", String(customSpacing));
       localStorage.setItem("skystyle_gender", gender);
-      localStorage.setItem("skystyle_custom_gender", customGender);
+      try {
+        // Encode custom gender before storing
+        localStorage.setItem("skystyle_custom_gender", btoa(customGender));
+      } catch {
+        /* ignore encoding errors */
+      }
       window.dispatchEvent(new Event("skystyle-preferences-updated"));
     } catch { /* ignore */ }
   }
