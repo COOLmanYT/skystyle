@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Toggle from "@/components/Toggle";
+import Checkbox from "@/components/Checkbox";
 
 const MAX_GENDER_LENGTH = 30;
 
@@ -139,24 +141,30 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       >
         <div className="flex items-center justify-between max-w-2xl mx-auto">
           <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
+            <button
+              onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign("/dashboard")}
               className="text-sm btn-interact rounded-xl px-3 py-2"
               style={{ color: "var(--foreground)", opacity: 0.6 }}
+              aria-label="Go back"
             >
-              ← Dashboard
-            </Link>
+              ←
+            </button>
             <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
               <span aria-hidden="true">⚙️ </span>Settings
             </span>
           </div>
-          <button
-            onClick={handleSave}
-            className="rounded-xl px-4 py-2 text-sm font-medium btn-interact"
-            style={{ background: "var(--accent)", color: "#fff" }}
-          >
-            Save
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href="/account" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Account</Link>
+            <Link href="/settings/security" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Security</Link>
+            <Link href="/settings/privacy" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Privacy</Link>
+            <button
+              onClick={handleSave}
+              className="rounded-xl px-4 py-2 text-sm font-medium btn-interact"
+              style={{ background: "var(--accent)", color: "#fff" }}
+            >
+              Save
+            </button>
+          </div>
         </div>
       </nav>
 
@@ -288,29 +296,21 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
             Preferences
           </p>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={shareLocation} onChange={(e) => setShareLocation(e.target.checked)} className="rounded" />
-            <span className="text-xs" style={{ color: "var(--foreground)", opacity: 0.6 }}>
-              Share my location with AI for more relevant recommendations
-            </span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={weatherOnly} onChange={(e) => setWeatherOnly(e.target.checked)} className="rounded" />
-            <span className="text-xs" style={{ color: "var(--foreground)", opacity: 0.6 }}>
-              Weather only (skip AI outfit recommendation)
-            </span>
-          </label>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={defaultSimpleMode}
-              onChange={(e) => setDefaultSimpleMode(e.target.checked)}
-              className="rounded"
-            />
-            <span className="text-xs" style={{ color: "var(--foreground)", opacity: 0.6 }}>
-              Default to Simple Mode on Terms &amp; Privacy pages (plain-English summaries)
-            </span>
-          </label>
+          <Checkbox
+            checked={shareLocation}
+            onChange={setShareLocation}
+            label="Share my location with AI for more relevant recommendations"
+          />
+          <Checkbox
+            checked={weatherOnly}
+            onChange={setWeatherOnly}
+            label="Weather only (skip AI outfit recommendation)"
+          />
+          <Checkbox
+            checked={defaultSimpleMode}
+            onChange={setDefaultSimpleMode}
+            label="Default to Simple Mode on Terms & Privacy pages (plain-English summaries)"
+          />
         </div>
 
         {/* ── Layout Mode ── */}
@@ -392,48 +392,23 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
           className="rounded-2xl p-5 space-y-4"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-                Extra Side Spacing
-              </p>
-              <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-                Adds extra horizontal padding to selected pages.
-              </p>
-            </div>
-            {/* Toggle switch */}
-            <button
-              role="switch"
-              aria-checked={extraSpacing}
-              onClick={() => setExtraSpacing((v) => !v)}
-              className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 btn-interact"
-              style={{ background: extraSpacing ? "var(--accent)" : "var(--card-border)" }}
-            >
-              <span
-                className="pointer-events-none inline-block h-5 w-5 rounded-full shadow transform transition-transform duration-200"
-                style={{
-                  background: "#fff",
-                  transform: extraSpacing ? "translate(22px, 2px)" : "translate(2px, 2px)",
-                }}
-              />
-            </button>
-          </div>
+          <Toggle
+            checked={extraSpacing}
+            onChange={setExtraSpacing}
+            label="Extra Side Spacing"
+            description="Adds extra horizontal padding to selected pages."
+          />
 
           {extraSpacing && (
             <div className="space-y-2 pt-1">
               <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Apply to pages:</p>
               {(["dashboard", "account", "settings"] as const).map((page) => (
-                <label key={page} className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={extraSpacingPages.includes(page)}
-                    onChange={() => toggleExtraSpacingPage(page)}
-                    className="rounded"
-                  />
-                  <span className="text-xs capitalize" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-                    {page === "dashboard" ? "Dashboard" : page === "account" ? "Account" : "Settings"}
-                  </span>
-                </label>
+                <Checkbox
+                  key={page}
+                  checked={extraSpacingPages.includes(page)}
+                  onChange={() => toggleExtraSpacingPage(page)}
+                  label={page === "dashboard" ? "Dashboard" : page === "account" ? "Account" : "Settings"}
+                />
               ))}
             </div>
           )}
@@ -444,32 +419,12 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
           className="rounded-2xl p-5 space-y-4"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-                Custom Column Spacing
-              </p>
-              <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-                When on, drag the divider between panels on the dashboard to resize them freely.
-              </p>
-            </div>
-            {/* Toggle switch */}
-            <button
-              role="switch"
-              aria-checked={customSpacing}
-              onClick={() => setCustomSpacing((v) => !v)}
-              className="relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full transition-colors duration-200 btn-interact"
-              style={{ background: customSpacing ? "var(--accent)" : "var(--card-border)" }}
-            >
-              <span
-                className="pointer-events-none inline-block h-5 w-5 rounded-full shadow transform transition-transform duration-200"
-                style={{
-                  background: "#fff",
-                  transform: customSpacing ? "translate(22px, 2px)" : "translate(2px, 2px)",
-                }}
-              />
-            </button>
-          </div>
+          <Toggle
+            checked={customSpacing}
+            onChange={setCustomSpacing}
+            label="Custom Column Spacing"
+            description="When on, drag the divider between panels on the dashboard to resize them freely."
+          />
           {customSpacing && (
             <p className="text-xs rounded-xl px-3 py-2" style={{ background: "var(--background)", color: "var(--foreground)", opacity: 0.6 }}>
               💡 On the dashboard, hover between the two panels to reveal a drag handle. Drag it left or right to adjust column widths. The ratio is saved automatically.
@@ -526,6 +481,12 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
         <p className="text-xs text-center" style={{ color: "var(--foreground)", opacity: 0.4 }}>
           These settings apply to your outfit recommendations on the dashboard.
         </p>
+        {/* Quick links to security/privacy */}
+        <div className="flex items-center justify-center gap-4 text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <Link href="/settings/security" className="underline hover:opacity-70">Security</Link>
+          <Link href="/settings/privacy" className="underline hover:opacity-70">Privacy Hub</Link>
+          <Link href="/account" className="underline hover:opacity-70">Account</Link>
+        </div>
       </div>
       </main>
     </div>

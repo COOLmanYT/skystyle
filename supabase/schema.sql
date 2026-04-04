@@ -54,13 +54,15 @@ CREATE TABLE IF NOT EXISTS next_auth.accounts (
 --    API routes query public.users for app-specific data.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS users (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          text,
-  email         text UNIQUE,
-  "emailVerified" timestamptz,
-  image         text,
-  is_pro        boolean NOT NULL DEFAULT false,
-  is_dev        boolean NOT NULL DEFAULT false
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             text,
+  email            text UNIQUE,
+  "emailVerified"  timestamptz,
+  image            text,
+  is_pro           boolean NOT NULL DEFAULT false,
+  is_dev           boolean NOT NULL DEFAULT false,
+  pending_deletion boolean NOT NULL DEFAULT false,
+  mfa_enabled      boolean NOT NULL DEFAULT false
 );
 
 -- ------------------------------------------------------------
@@ -175,6 +177,135 @@ CREATE POLICY "Users can insert own feedback"
 CREATE POLICY "Users can read own feedback"
   ON public.feedback FOR SELECT
   USING (user_id = (SELECT auth.uid()));
+
+-- ------------------------------------------------------------
+-- 7. User Sessions  (JWT sessions tracked server-side for management UI)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_sessions (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  session_token text       NOT NULL UNIQUE,
+  ip_address   text,
+  region       text,
+  browser      text,
+  os           text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  last_active  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE user_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own sessions"
+  ON user_sessions FOR SELECT USING ((select auth.uid()) = user_id);
+
+-- ------------------------------------------------------------
+-- 8. Security Audit Logs
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS security_logs (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  event_type text        NOT NULL,
+  metadata   jsonb       NOT NULL DEFAULT '{}'::jsonb,
+  ip_address text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE security_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own security_logs"
+  ON security_logs FOR SELECT USING ((select auth.uid()) = user_id);
+
+-- ------------------------------------------------------------
+-- 9. MFA Secrets (TOTP)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS mfa_secrets (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  secret     text        NOT NULL,
+  enabled    boolean     NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE mfa_secrets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own mfa_secrets"
+  ON mfa_secrets FOR SELECT USING ((select auth.uid()) = user_id);
+
+-- ------------------------------------------------------------
+-- 10. Passkeys (WebAuthn credentials)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS passkeys (
+  id              uuid   PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         uuid   NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  credential_id   text   NOT NULL UNIQUE,
+  public_key      text   NOT NULL,
+  counter         bigint NOT NULL DEFAULT 0,
+  transports      text,
+  display_name    text,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE passkeys ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own passkeys"
+  ON passkeys FOR SELECT USING ((select auth.uid()) = user_id);
+
+-- ------------------------------------------------------------
+-- 11. Recovery Codes (hashed, single-use)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS recovery_codes (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash  text        NOT NULL,
+  used_at    timestamptz
+);
+
+ALTER TABLE recovery_codes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own recovery_codes"
+  ON recovery_codes FOR SELECT USING ((select auth.uid()) = user_id);
+
+-- ------------------------------------------------------------
+-- 12. Deletion Requests
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS deletion_requests (
+  id           uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  reason       text,
+  status       text        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'declined')),
+  admin_note   text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  resolved_at  timestamptz
+);
+
+ALTER TABLE deletion_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own deletion_requests"
+  ON deletion_requests FOR SELECT USING ((select auth.uid()) = user_id);
+
+-- ------------------------------------------------------------
+-- 13. Dev Messages (User-Dev Chat)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS dev_messages (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    uuid        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  content    text        NOT NULL,
+  from_dev   boolean     NOT NULL DEFAULT false,
+  read_at    timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE dev_messages ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own dev_messages"
+  ON dev_messages FOR SELECT USING ((select auth.uid()) = user_id);
+
+-- ------------------------------------------------------------
+-- 14. Changelog Posts (CMS — DB-driven, Markdown/Image)
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS changelog_posts (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  version     text        NOT NULL UNIQUE,
+  title       text        NOT NULL,
+  body        text        NOT NULL DEFAULT '',
+  image_url   text,
+  published   boolean     NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now()
+);
 
 -- ============================================================
 -- MIGRATIONS — Run once in Supabase SQL Editor if upgrading

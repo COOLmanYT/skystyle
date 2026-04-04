@@ -64,6 +64,11 @@ export default async function AccountPage() {
               <span aria-hidden="true">👤 </span>Account
             </span>
           </div>
+          <div className="flex items-center gap-2">
+            <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
+            <Link href="/settings/security" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Security</Link>
+            <Link href="/settings/privacy" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Privacy</Link>
+          </div>
         </div>
       </nav>
 

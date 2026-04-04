@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-04T11:06:04.892Z",
+    "version": "2.0.0",
+    "title": "Privacy and Security Update",
+    "description": "Passkeys (WebAuthn), Stacked MFA with TOTP & recovery codes, Session Management, Security Audit Log, Data Sovereignty Hub, CSS-only Apple toggles, and Dev Command Center."
+  },
+  {
     "date": "2026-04-03T12:31:52.000Z",
     "version": "1.7.1",
     "title": "Server-side rate limiting on feedback submissions",

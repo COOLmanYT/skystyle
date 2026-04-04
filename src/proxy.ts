@@ -5,6 +5,12 @@ import type { NextRequest } from "next/server";
 // Public paths that never require auth
 const PUBLIC_PATHS = ["/", "/login", "/api/auth", "/preview", "/api/demo", "/terms", "/privacy"];
 
+/** Returns the set of emails permitted to access /dev routes. */
+function getDevEmails(): Set<string> {
+  const raw = process.env.DEV_EMAILS ?? "";
+  return new Set(raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
+}
+
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -26,6 +32,18 @@ export async function proxy(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  // Protect /dev routes: only emails listed in DEV_EMAILS may access them.
+  // OAuth users land here the same as anyone else — no email-verification gate.
+  if (pathname.startsWith("/dev")) {
+    const email = session.user.email?.toLowerCase() ?? "";
+    if (!getDevEmails().has(email)) {
+      const deniedUrl = req.nextUrl.clone();
+      deniedUrl.pathname = "/dashboard";
+      deniedUrl.searchParams.set("access", "denied");
+      return NextResponse.redirect(deniedUrl);
+    }
+  }
+
   return NextResponse.next();
 }
 
@@ -34,3 +52,4 @@ export const config = {
     "/((?!_next/static|_next/image|favicon\\.ico|.*\\.svg).*)",
   ],
 };
+
