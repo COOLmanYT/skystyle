@@ -37,9 +37,11 @@ const EVENT_LABELS: Record<string, string> = {
 
 interface SecurityClientProps {
   mfaEnabled: boolean;
+  /** When true, suppresses the full-page shell (nav + min-h-screen wrapper) for embedding inside another page. */
+  embedded?: boolean;
 }
 
-export default function SecurityClient({ mfaEnabled: initialMfaEnabled }: SecurityClientProps) {
+export default function SecurityClient({ mfaEnabled: initialMfaEnabled, embedded = false }: SecurityClientProps) {
   const [mfaEnabled, setMfaEnabled] = useState(initialMfaEnabled);
   const [setupStep, setSetupStep] = useState<"idle" | "qr" | "codes">("idle");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -164,40 +166,15 @@ export default function SecurityClient({ mfaEnabled: initialMfaEnabled }: Securi
     URL.revokeObjectURL(url);
   }
 
-  return (
-    <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <nav
-        className="sticky-nav px-4 py-3"
-        style={{ borderBottom: "1px solid var(--card-border)" }}
-      >
-        <div className="flex items-center justify-between max-w-3xl mx-auto">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign("/dashboard")}
-              className="text-sm btn-interact rounded-xl px-3 py-2"
-              style={{ color: "var(--foreground)", opacity: 0.6 }}
-            >
-              ←
-            </button>
-            <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-              🛡️ Security
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
-            <Link href="/account" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Account</Link>
-          </div>
-        </div>
-      </nav>
+  const content = (
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
-      <main id="main-content" className="max-w-3xl mx-auto px-4 py-8 space-y-6">
-
-        {error && (
-          <div
-            role="alert"
-            className="rounded-2xl p-4 text-sm"
-            style={{ background: "rgba(255,59,48,0.1)", color: "#ff3b30", border: "1px solid rgba(255,59,48,0.2)" }}
-          >
+      {error && (
+        <div
+          role="alert"
+          className="rounded-2xl p-4 text-sm"
+          style={{ background: "rgba(255,59,48,0.1)", color: "#ff3b30", border: "1px solid rgba(255,59,48,0.2)" }}
+        >
             {error}
           </div>
         )}
@@ -469,6 +446,54 @@ export default function SecurityClient({ mfaEnabled: initialMfaEnabled }: Securi
           )}
         </section>
 
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {content}
+        {toast && (
+          <div
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-medium shadow-lg"
+            style={{ background: "var(--foreground)", color: "var(--background)", zIndex: 100 }}
+            role="status"
+          >
+            {toast}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen" style={{ background: "var(--background)" }}>
+      <nav
+        className="sticky-nav px-4 py-3"
+        style={{ borderBottom: "1px solid var(--card-border)" }}
+      >
+        <div className="flex items-center justify-between max-w-3xl mx-auto">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign("/dashboard")}
+              className="text-sm btn-interact rounded-xl px-3 py-2"
+              style={{ color: "var(--foreground)", opacity: 0.6 }}
+            >
+              ←
+            </button>
+            <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+              🛡️ Security
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
+            <Link href="/account" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Account</Link>
+          </div>
+        </div>
+      </nav>
+
+      <main id="main-content">
+        {content}
       </main>
 
       {toast && (

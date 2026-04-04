@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-04T21:38:11.093Z",
+    "version": "2.1.1",
+    "title": "Security & Privacy UI embedded in Account page",
+    "description": "MFA/2FA, Passkeys, Security Audit Log, Data Export, and Account Deletion sections now appear directly on the Account page."
+  },
+  {
     "date": "2026-04-04T11:58:39.187Z",
     "version": "2.1.0",
     "title": "Interface & Content Update",

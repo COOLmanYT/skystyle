@@ -7,6 +7,8 @@ import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
 import AccountUpgradeButton from "@/components/AccountUpgradeButton";
 import SmartBackButton from "@/components/SmartBackButton";
+import SecurityClient from "@/app/settings/security/SecurityClient";
+import PrivacyHubClient from "@/app/settings/privacy/PrivacyHubClient";
 
 function getDevEmails(): Set<string> {
   const raw = process.env.DEV_EMAILS ?? "";
@@ -31,6 +33,8 @@ export default async function AccountPage() {
 
   let isPro = false;
   let isDev = false;
+  let mfaEnabled = false;
+  let pendingDeletion = false;
   let initialCredits: number | null = null;
   let dailyLimits: DailyLimits | null = null;
 
@@ -43,10 +47,19 @@ export default async function AccountPage() {
         .single();
       isPro = data?.is_pro ?? false;
       isDev = data?.is_dev ?? false;
+      pendingDeletion = data?.pending_deletion ?? false;
       if (isPro) {
         initialCredits = await getCredits(userId);
       }
       dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
+    } catch { /* Non-fatal */ }
+    try {
+      const { data: mfaRow } = await supabaseAdmin
+        .from("mfa_secrets")
+        .select("enabled")
+        .eq("user_id", userId)
+        .single();
+      mfaEnabled = mfaRow?.enabled ?? false;
     } catch { /* Non-fatal */ }
   }
 
@@ -336,6 +349,29 @@ export default async function AccountPage() {
           <Link href="/terms" className="underline hover:opacity-70">Terms</Link>
           <Link href="/privacy" className="underline hover:opacity-70">Privacy</Link>
         </div>
+
+        {/* ── Security ── */}
+        <div className="max-w-3xl mx-auto space-y-2">
+          <h2
+            className="text-xs font-semibold uppercase tracking-widest px-1"
+            style={{ color: "var(--foreground)", opacity: 0.4 }}
+          >
+            🛡️ Security
+          </h2>
+          <SecurityClient mfaEnabled={mfaEnabled} embedded />
+        </div>
+
+        {/* ── Privacy ── */}
+        <div className="max-w-3xl mx-auto space-y-2">
+          <h2
+            className="text-xs font-semibold uppercase tracking-widest px-1"
+            style={{ color: "var(--foreground)", opacity: 0.4 }}
+          >
+            🔐 Privacy &amp; Data
+          </h2>
+          <PrivacyHubClient isPendingDeletion={pendingDeletion} embedded />
+        </div>
+
       </PageSpacingWrapper>
       </main>
     </div>

@@ -5,9 +5,11 @@ import Link from "next/link";
 
 interface PrivacyHubClientProps {
   isPendingDeletion: boolean;
+  /** When true, suppresses the full-page shell (nav + min-h-screen wrapper) for embedding inside another page. */
+  embedded?: boolean;
 }
 
-export default function PrivacyHubClient({ isPendingDeletion: initialPending }: PrivacyHubClientProps) {
+export default function PrivacyHubClient({ isPendingDeletion: initialPending, embedded = false }: PrivacyHubClientProps) {
   const [isPendingDeletion, setIsPendingDeletion] = useState(initialPending);
   const [deletionReason, setDeletionReason] = useState("");
   const [showDeleteForm, setShowDeleteForm] = useState(false);
@@ -71,33 +73,8 @@ export default function PrivacyHubClient({ isPendingDeletion: initialPending }: 
     }
   }
 
-  return (
-    <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <nav
-        className="sticky-nav px-4 py-3"
-        style={{ borderBottom: "1px solid var(--card-border)" }}
-      >
-        <div className="flex items-center justify-between max-w-3xl mx-auto">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign("/dashboard")}
-              className="text-sm btn-interact rounded-xl px-3 py-2"
-              style={{ color: "var(--foreground)", opacity: 0.6 }}
-            >
-              ←
-            </button>
-            <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-              🔐 Privacy Hub
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
-            <Link href="/settings/security" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Security</Link>
-          </div>
-        </div>
-      </nav>
-
-      <main id="main-content" className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+  const content = (
+    <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
 
         {/* Pending Deletion Banner */}
         {isPendingDeletion && (
@@ -235,6 +212,54 @@ export default function PrivacyHubClient({ isPendingDeletion: initialPending }: 
           <Link href="/settings/security" className="underline hover:opacity-70">Security Settings</Link>
         </div>
 
+    </div>
+  );
+
+  if (embedded) {
+    return (
+      <>
+        {content}
+        {toast && (
+          <div
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-medium shadow-lg"
+            style={{ background: "var(--foreground)", color: "var(--background)", zIndex: 100 }}
+            role="status"
+          >
+            {toast}
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <div className="min-h-screen" style={{ background: "var(--background)" }}>
+      <nav
+        className="sticky-nav px-4 py-3"
+        style={{ borderBottom: "1px solid var(--card-border)" }}
+      >
+        <div className="flex items-center justify-between max-w-3xl mx-auto">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => window.history.length > 1 ? window.history.back() : window.location.assign("/dashboard")}
+              className="text-sm btn-interact rounded-xl px-3 py-2"
+              style={{ color: "var(--foreground)", opacity: 0.6 }}
+            >
+              ←
+            </button>
+            <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+              🔐 Privacy Hub
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
+            <Link href="/settings/security" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Security</Link>
+          </div>
+        </div>
+      </nav>
+
+      <main id="main-content">
+        {content}
       </main>
 
       {toast && (
