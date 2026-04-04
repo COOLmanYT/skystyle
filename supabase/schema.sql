@@ -304,7 +304,15 @@ CREATE TABLE IF NOT EXISTS changelog_posts (
   image_url   text,
   published   boolean     NOT NULL DEFAULT false,
   created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now()
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  -- v2.1.0 additions --
+  category    text,
+  type        text        NOT NULL DEFAULT 'update',
+  content     text,
+  image       text,
+  cta         jsonb,
+  expanded    boolean     NOT NULL DEFAULT false,
+  slug        text        UNIQUE
 );
 
 -- ============================================================
@@ -317,6 +325,18 @@ CREATE TABLE IF NOT EXISTS changelog_posts (
 --
 -- Then reload the PostgREST schema cache (Settings > API > Reload):
 --    NOTIFY pgrst, 'reload schema';
+--
+-- v2.1.0: If your changelog_posts table was created before v2.1.0, run:
+--
+--    ALTER TABLE changelog_posts
+--      ADD COLUMN IF NOT EXISTS category  text,
+--      ADD COLUMN IF NOT EXISTS type      text NOT NULL DEFAULT 'update',
+--      ADD COLUMN IF NOT EXISTS content   text,
+--      ADD COLUMN IF NOT EXISTS image     text,
+--      ADD COLUMN IF NOT EXISTS cta       jsonb,
+--      ADD COLUMN IF NOT EXISTS expanded  boolean NOT NULL DEFAULT false,
+--      ADD COLUMN IF NOT EXISTS slug      text UNIQUE;
+--
 -- ============================================================
 
 -- ============================================================

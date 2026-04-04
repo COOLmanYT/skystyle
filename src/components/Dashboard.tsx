@@ -8,6 +8,7 @@ import FeedbackModal from "./FeedbackModal";
 import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import Checkbox from "@/components/Checkbox";
 
 /** Returns true if version string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -719,19 +720,31 @@ export default function Dashboard({
             </div>
             <nav className="space-y-1" aria-label="Menu navigation">
               {[
-                { label: "🏠 Home", action: () => { setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); } },
-                { label: "👤 Account", action: () => { setMenuOpen(false); router.push("/account"); } },
-                { label: "⚙️ Settings", action: () => { setMenuOpen(false); router.push("/settings"); } },
+                { label: "🏠 Home", action: () => { setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }, active: true },
+                { label: "👤 Account", action: () => { setMenuOpen(false); router.push("/account"); }, active: false },
+                { label: "⚙️ Settings", action: () => { setMenuOpen(false); router.push("/settings"); }, active: false },
               ].map((item) => (
                 <button
                   key={item.label}
                   onClick={item.action}
                   className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
-                  style={{ color: "var(--foreground)" }}
+                  style={{
+                    color: item.active ? "#fff" : "var(--foreground)",
+                    background: item.active ? "#007AFF" : "transparent",
+                  }}
                 >
                   {item.label}
                 </button>
               ))}
+              {isDev && (
+                <button
+                  onClick={() => { setMenuOpen(false); router.push("/dev"); }}
+                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
+                  style={{ color: "var(--foreground)" }}
+                >
+                  🛠️ Dev Dashboard
+                </button>
+              )}
               <form action={handleSignOut}>
                 <button
                   type="submit"
@@ -1610,34 +1623,16 @@ export default function Dashboard({
                   ))}
                 </div>
               </div>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={shareLocation}
-                  onChange={(e) => setShareLocation(e.target.checked)}
-                  className="rounded"
-                />
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.6 }}
-                >
-                  Share my location with AI for more relevant recommendations
-                </span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={weatherOnly}
-                  onChange={(e) => setWeatherOnly(e.target.checked)}
-                  className="rounded"
-                />
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.6 }}
-                >
-                  Weather only (skip AI outfit recommendation)
-                </span>
-              </label>
+              <Checkbox
+                checked={shareLocation}
+                onChange={setShareLocation}
+                label="Share my location with AI for more relevant recommendations"
+              />
+              <Checkbox
+                checked={weatherOnly}
+                onChange={setWeatherOnly}
+                label="Weather only (skip AI outfit recommendation)"
+              />
             </div>
 
             {/* ── Closet Management ── */}
@@ -1711,23 +1706,12 @@ export default function Dashboard({
                   No items in your closet yet. Add some to get personalized recommendations!
                 </p>
               )}
-              <label
-                className="flex items-center gap-2 cursor-pointer"
-                title={closetItems.length === 0 ? "Add items to your closet for more accurate recommendations" : undefined}
-              >
-                <input
-                  type="checkbox"
-                  checked={forceCloset}
-                  onChange={(e) => setForceCloset(e.target.checked)}
-                  className="rounded"
-                />
-                <span
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.6 }}
-                >
-                  Force recommendation to use closet
-                </span>
-              </label>
+              <Checkbox
+                checked={forceCloset}
+                onChange={setForceCloset}
+                label="Force recommendation to use closet"
+                description={closetItems.length === 0 ? "Add items to your closet for more accurate recommendations" : undefined}
+              />
             </div>
 
             {/* ── Weather Sources ── */}

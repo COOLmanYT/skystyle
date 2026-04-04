@@ -1,7 +1,8 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
+import DevNavBar from "@/components/DevNavBar";
+import Link from "next/link";
 
 function getDevEmails(): Set<string> {
   const raw = process.env.DEV_EMAILS ?? "";
@@ -15,31 +16,7 @@ export default async function DevLandingPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <nav
-        className="sticky-nav px-4 py-3"
-        style={{ borderBottom: "1px solid var(--card-border)" }}
-      >
-        <div className="flex items-center justify-between max-w-5xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dashboard"
-              className="text-sm btn-interact rounded-xl px-3 py-2"
-              style={{ color: "var(--foreground)", opacity: 0.6 }}
-            >
-              ← Dashboard
-            </Link>
-            <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-              🛠️ Dev Command Center
-            </span>
-          </div>
-          <span
-            className="text-xs font-medium px-2 py-1 rounded-full"
-            style={{ background: "#ff9500", color: "#fff" }}
-          >
-            {session.user.email}
-          </span>
-        </div>
-      </nav>
+      <DevNavBar email={session.user.email} isDev={true} />
 
       <main id="main-content">
         <PageSpacingWrapper page="account" className="max-w-5xl mx-auto px-4 py-10 space-y-8">
