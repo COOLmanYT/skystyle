@@ -50,6 +50,8 @@ export default async function AccountPage() {
     } catch { /* Non-fatal */ }
   }
 
+  const canAccessDevDashboard = isDevEmail || isDev;
+
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       {/* Navigation */}
@@ -66,7 +68,7 @@ export default async function AccountPage() {
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {isDevEmail && (
+            {canAccessDevDashboard && (
               <Link href="/dev" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block font-medium" style={{ background: "#ff9500", color: "#fff" }}>🛠️ Dev Dashboard</Link>
             )}
             <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>

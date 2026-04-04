@@ -16,7 +16,7 @@ export default async function DevLandingPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <DevNavBar email={session.user.email} isDev={true} />
+      <DevNavBar email={session.user.email} />
 
       <main id="main-content">
         <PageSpacingWrapper page="account" className="max-w-5xl mx-auto px-4 py-10 space-y-8">

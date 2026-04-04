@@ -7,7 +7,6 @@ import { handleSignOut } from "@/app/actions";
 
 interface DevNavBarProps {
   email: string;
-  isDev?: boolean;
 }
 
 const NAV_ITEMS = [
