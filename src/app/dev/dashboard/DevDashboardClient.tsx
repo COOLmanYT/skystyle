@@ -24,8 +24,8 @@ interface DevMessage {
 
 type Section = "triage" | "chat" | "changelog" | "health";
 
-export default function DevDashboardClient() {
-  const [section, setSection] = useState<Section>("triage");
+export default function DevDashboardClient({ initialSection = "triage" }: { initialSection?: Section }) {
+  const [section, setSection] = useState<Section>(initialSection);
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<DevMessage[]>([]);
@@ -56,14 +56,6 @@ export default function DevDashboardClient() {
   useEffect(() => {
     if (selectedUserId) fetchChat(selectedUserId);
   }, [selectedUserId, fetchChat]);
-
-  // Handle hash navigation
-  useEffect(() => {
-    const hash = window.location.hash.replace("#", "") as Section;
-    if (["triage", "chat", "changelog", "health"].includes(hash)) {
-      setSection(hash);
-    }
-  }, []);
 
   async function handleTriage(id: string, action: "approve" | "decline") {
     setLoading(true);
@@ -118,7 +110,7 @@ export default function DevDashboardClient() {
               ← Dev Center
             </Link>
             <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
-              Admin Dashboard
+              Dev Center
             </span>
           </div>
         </div>

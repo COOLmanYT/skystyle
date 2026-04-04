@@ -9,7 +9,7 @@
     "date": "2026-04-04T11:58:39.187Z",
     "version": "2.1.0",
     "title": "Interface & Content Update",
-    "description": "Public Markdown Devlog, Apple-Style CSS UI, and Intelligent State-Aware Navigation."
+    "description": "Public Markdown Devlog, Apple-Style CSS UI, Intelligent State-Aware Navigation, and flattened Dev Center routing (/dev/triage, /dev/chat, /dev/health, /dev/changelog)."
   },
   {
     "date": "2026-04-04T11:06:04.892Z",

@@ -33,28 +33,28 @@ export default async function DevLandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
               {
-                href: "/dev/dashboard",
-                emoji: "🎛️",
-                title: "Admin Dashboard",
-                desc: "Triage deletion requests, manage users, view health metrics",
+                href: "/dev/triage",
+                emoji: "🗂️",
+                title: "Triage",
+                desc: "Review and action pending deletion requests",
                 color: "#ff9500",
               },
               {
-                href: "/dev/dashboard#chat",
+                href: "/dev/chat",
                 emoji: "💬",
                 title: "User Chat",
                 desc: "Read and reply to user messages",
                 color: "var(--accent)",
               },
               {
-                href: "/dev/dashboard#changelog",
+                href: "/dev/changelog",
                 emoji: "📝",
                 title: "Changelog CMS",
                 desc: "Publish and manage changelog posts",
                 color: "#30d158",
               },
               {
-                href: "/dev/dashboard#health",
+                href: "/dev/health",
                 emoji: "📊",
                 title: "System Health",
                 desc: "API usage, error rates, and diagnostics",
