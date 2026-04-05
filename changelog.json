@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-05T02:00:25.641Z",
+    "version": "2.1.2",
+    "title": "README refresh with screenshots",
+    "description": "Updated plan limits in README to match current server behavior and added a screenshots section using docs/images assets."
+  },
+  {
     "date": "2026-04-04T21:38:11.093Z",
     "version": "2.1.1",
     "title": "Security & Privacy UI embedded in Account page",
