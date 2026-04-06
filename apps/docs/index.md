@@ -7,7 +7,7 @@ hero:
   text: "Weather-aware outfit intelligence"
   tagline: Product architecture, deployment guides, and API references
   image:
-    src: /images/dashboard-2.png
+    src: docs/images/dashboard-2.png
     alt: Sky Style dashboard preview
   actions:
     - theme: brand
