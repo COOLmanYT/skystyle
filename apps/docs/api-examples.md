@@ -2,48 +2,69 @@
 outline: deep
 ---
 
-# Runtime API Examples
+# API Guide
 
-This page demonstrates usage of some of the runtime APIs provided by VitePress.
+This page summarizes the currently available API surface in the Sky Style web app.
 
-The main `useData()` API can be used to access site, theme, and page data for the current page. It works in both `.md` and `.vue` files:
+## Base Path
 
-```md
-<script setup>
-import { useData } from 'vitepress'
+Current API endpoints are served from the web app under:
 
-const { theme, page, frontmatter } = useData()
-</script>
+- /api/*
 
-## Results
+Future plan:
 
-### Theme Data
-<pre>{{ theme }}</pre>
+- Dedicated API host at api.skystyle.app
 
-### Page Data
-<pre>{{ page }}</pre>
+## Common Endpoints
 
-### Page Frontmatter
-<pre>{{ frontmatter }}</pre>
-```
+### Recommendations
 
-<script setup>
-import { useData } from 'vitepress'
+- POST /api/style
+- Generates outfit recommendations based on weather and profile context
 
-const { site, theme, page, frontmatter } = useData()
-</script>
+### Weather
 
-## Results
+- POST /api/weather
+- POST /api/geocode
+- POST /api/demo/weather
+- POST /api/demo/geocode
 
-### Theme Data
-<pre>{{ theme }}</pre>
+### User Data
 
-### Page Data
-<pre>{{ page }}</pre>
+- POST /api/closet
+- GET or POST /api/settings
+- GET /api/credits
+- GET /api/daily-limits
 
-### Page Frontmatter
-<pre>{{ frontmatter }}</pre>
+### Follow-up and Chat
 
-## More
+- POST /api/followup
 
-Check out the documentation for the [full list of runtime APIs](https://vitepress.dev/reference/runtime-api#usedata).
+### Security and Privacy
+
+- POST /api/mfa/setup
+- POST /api/mfa/verify
+- POST /api/mfa/disable
+- GET /api/passkeys/list
+- POST /api/passkeys/register
+- GET /api/security/logs
+- POST /api/privacy/export
+- POST /api/privacy/request-deletion
+- POST /api/privacy/cancel-deletion
+
+## Auth
+
+Sky Style uses NextAuth v5 with JWT sessions. Client-side session reads are available via:
+
+- /api/auth/session
+
+Auth route handler:
+
+- /api/auth/[...nextauth]
+
+## Integration Notes
+
+- Expect JSON request and response payloads for API endpoints.
+- Treat endpoints as product-internal APIs until the standalone API project is launched.
+- Apply rate-limit and plan-tier checks in any client integration flow.

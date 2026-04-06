@@ -1,85 +1,57 @@
-# Markdown Extension Examples
+# Platform Guide
 
-This page demonstrates some of the built-in markdown extensions provided by VitePress.
+This guide explains how Sky Style is organized and operated across projects.
 
-## Syntax Highlighting
+## Product Overview
 
-VitePress provides Syntax Highlighting powered by [Shiki](https://github.com/shikijs/shiki), with additional features like line-highlighting:
+Sky Style delivers weather-aware outfit recommendations powered by AI and user wardrobe context.
 
-**Input**
+Core capabilities:
 
-````md
-```js{4}
-export default {
-  data () {
-    return {
-      msg: 'Highlighted!'
-    }
-  }
-}
-```
-````
+- Hyper-local weather ingestion and aggregation
+- AI recommendations with follow-up prompts
+- Closet-aware suggestions
+- Account, privacy, and security tooling
 
-**Output**
+## Architecture
 
-```js{4}
-export default {
-  data () {
-    return {
-      msg: 'Highlighted!'
-    }
-  }
-}
-```
+Sky Style uses a single monorepo with separate deployable apps.
 
-## Custom Containers
+- apps/web: Main Next.js app
+- apps/docs: Documentation website
+- apps/api: Future standalone API surface
 
-**Input**
+## Deployment Targets
 
-```md
-::: info
-This is an info box.
-:::
+- skystyle.app: Main product experience
+- docs.skystyle.app: Documentation and integration guides
+- api.skystyle.app: Future API endpoint base
 
-::: tip
-This is a tip.
-:::
+## Environment Notes
 
-::: warning
-This is a warning.
-:::
+The current public preview is still a work-in-progress and proof of concept:
 
-::: danger
-This is a dangerous warning.
-:::
+- https://what2wear-two.vercel.app
 
-::: details
-This is a details block.
-:::
+## Local Development
+
+From repository root:
+
+```bash
+npm install
+npm run dev
 ```
 
-**Output**
+For docs only:
 
-::: info
-This is an info box.
-:::
+```bash
+cd apps/docs
+npm install
+npm run dev
+```
 
-::: tip
-This is a tip.
-:::
+## Operational Tips
 
-::: warning
-This is a warning.
-:::
-
-::: danger
-This is a dangerous warning.
-:::
-
-::: details
-This is a details block.
-:::
-
-## More
-
-Check out the documentation for the [full list of markdown extensions](https://vitepress.dev/guide/markdown).
+- Keep web and docs as independent Vercel projects with their own root directories.
+- Treat apps/api as non-production scaffold until API contracts are finalized.
+- Keep changelog updates synchronized with user-facing behavior changes.

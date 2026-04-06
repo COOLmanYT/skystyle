@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-06T03:25:05.652Z",
+    "version": "2.3.0",
+    "title": "Sky Style docs launch and theming",
+    "description": "Set up apps/docs as a standalone Vercel project, replaced starter content with Sky Style docs, archived the original templates, and applied a custom Sky Style visual theme."
+  },
+  {
     "date": "2026-04-06T03:03:56.230Z",
     "version": "2.2.1",
     "title": "Fix Vercel Next.js detection for apps/web",
