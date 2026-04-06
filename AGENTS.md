@@ -47,10 +47,10 @@ The array is **newest-first** — insert your entry at **index 0**.
 ## Key codebase facts
 
 - **Build:** `npm run build` (Next.js 16.1.6 with Turbopack)
-- **Lint:** `npx eslint src/`
+- **Lint:** `npm run lint` (targets `apps/web`)
 - **No test suite** — validate with build + lint only
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`)
 - **Auth:** NextAuth v5 JWT — `auth()` server-side, `/api/auth/session` client-side
-- **DB:** Supabase admin client at `src/lib/supabase.ts`; always set `onConflict` on upserts
+- **DB:** Supabase admin client at `apps/web/src/lib/supabase.ts`; always set `onConflict` on upserts
 - **Rate limits:** `free` 5 AI/day · `demo` 10× free · `pro` credits · `dev` unlimited
 - **localStorage prefix:** all keys use `skystyle_` (e.g. `skystyle_last_seen_changelog`)

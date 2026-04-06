@@ -2,6 +2,8 @@
 
 AI-powered outfit recommendations based on hyper-local weather data. Never overdress or underdress again.
 
+Current live site (WIP / proof of concept): **https://what2wear-two.vercel.app**
+
 [![Buy Me A Coffee](https://img.shields.io/badge/Support_Me!-Buy%20Me%20A%20Coffee-yellow)](https://buymeacoffee.com/coolmanyt)
 
 ## Features
@@ -31,13 +33,33 @@ AI-powered outfit recommendations based on hyper-local weather data. Never overd
 
 | Dashboard | Weather Flow |
 |---|---|
-| ![Dashboard overview](docs/images/dashboard-1.png) | ![Weather and recommendation flow](docs/images/dashboard-2.png) |
+| ![Dashboard overview](apps/docs/images/dashboard-1.png) | ![Weather and recommendation flow](apps/docs/images/dashboard-2.png) |
 
 | Usage + Limits | Account + Security |
 |---|---|
-| ![Usage and limits panel](docs/images/dashboard-3.png) | ![Account settings overview](docs/images/account.png) |
+| ![Usage and limits panel](apps/docs/images/dashboard-3.png) | ![Account settings overview](apps/docs/images/account.png) |
 
-![Settings page](docs/images/settings.png)
+![Settings page](apps/docs/images/settings.png)
+
+## Architecture
+
+This repository is now organized as a single monorepo for multiple deployable projects.
+
+```text
+/
+├── apps/
+│   ├── web/        # Sky Style main app (Next.js)
+│   ├── docs/       # VitePress docs website
+│   └── api/        # Future standalone API placeholder (api.skystyle.app)
+├── packages/       # Shared packages for future reuse
+├── supabase/       # Database schema and SQL assets
+└── ...root config files
+```
+
+Project targets:
+- `apps/web` -> `skystyle.app` (or current preview domain)
+- `apps/docs` -> `docs.skystyle.app`
+- `apps/api` -> `api.skystyle.app` (future)
 
 ## Tech stack
 
@@ -56,10 +78,16 @@ See **[SETUP.md](SETUP.md)** for full deployment and local development instructi
 Quick start:
 
 ```bash
-cp .env.example .env.local # or vercel env pull if you have access to vercel env vars
-# fill in values in .env.local
+cp .env.example apps/web/.env.local # or use vercel env pull
+# fill in values in apps/web/.env.local
 npm install
 npm run dev
+```
+
+Docs quick start:
+
+```bash
+npm run docs:dev
 ```
 
 ## Security

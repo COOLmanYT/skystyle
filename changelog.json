@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-06T02:33:46.830Z",
+    "version": "2.2.0",
+    "title": "Monorepo architecture for web, docs, and API",
+    "description": "Reorganized the repo into apps/web and apps/docs, added an apps/api placeholder, and updated scripts/config docs to preserve current behavior while preparing multi-project deployment."
+  },
+  {
     "date": "2026-04-05T02:00:25.641Z",
     "version": "2.1.2",
     "title": "README refresh with screenshots",

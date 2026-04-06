@@ -3,10 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint"
+    "dev": "next dev apps/web",
+    "build": "next build apps/web",
+    "start": "next start apps/web",
+    "lint": "eslint --config apps/web/eslint.config.mjs apps/web/src apps/web/next.config.ts",
+    "docs:dev": "vitepress dev apps/docs",
+    "docs:build": "vitepress build apps/docs",
+    "docs:preview": "vitepress preview apps/docs"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.1",
@@ -35,6 +38,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "vitepress": "^1.6.4"
   }
 }

@@ -44,11 +44,11 @@ The array is **newest-first** — insert your entry at **index 0**.
 
 ## Codebase conventions
 
-- **Build:** `npm run build` · **Lint:** `npx eslint src/` · No test suite exists.
+- **Build:** `npm run build` · **Lint:** `npm run lint` (targets `apps/web`) · No test suite exists.
 - **Framework:** Next.js 16 App Router + Turbopack.
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`).
 - **Auth:** NextAuth v5 JWT — `auth()` server-side, `/api/auth/session` client-side. Demo user: `DEMO_USER_ID` from `@/auth`.
-- **DB:** Supabase admin client at `src/lib/supabase.ts`. Always set `onConflict` on upserts for tables with non-PK unique constraints.
-- **Rate limits:** `free` 5 AI/day · `demo` 10× free · `pro` credits · `dev` unlimited (`src/lib/daily-usage.ts`).
+- **DB:** Supabase admin client at `apps/web/src/lib/supabase.ts`. Always set `onConflict` on upserts for tables with non-PK unique constraints.
+- **Rate limits:** `free` 5 AI/day · `demo` 10× free · `pro` credits · `dev` unlimited (`apps/web/src/lib/daily-usage.ts`).
 - **localStorage prefix:** all keys start with `skystyle_` (e.g. `skystyle_last_seen_changelog`).
 - **TypeScript:** `tsconfig` uses `jsx: react-jsx` so React is in scope without an explicit import; use `React.ReactNode`, `React.CSSProperties`, etc. as needed.

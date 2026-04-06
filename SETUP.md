@@ -2,6 +2,16 @@
 
 Full instructions for deploying and developing Sky Style locally.
 
+## Repository layout
+
+This repository uses a monorepo-style layout:
+
+- `apps/web` - Sky Style Next.js app
+- `apps/docs` - VitePress docs site
+- `apps/api` - future standalone API placeholder
+
+The current deployment is still a work in progress / proof of concept at `https://what2wear-two.vercel.app`.
+
 ## Deploying to Vercel
 
 ### 1. Set up external services
@@ -37,6 +47,8 @@ Before deploying, create accounts and obtain credentials for:
 - **Google** — add `https://<your-domain>/api/auth/callback/google` as an *Authorised redirect URI*
 
 ### 4. Deploy to Vercel
+
+For the main web app, configure the Vercel project **Root Directory** as `apps/web`.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/COOLmanYT/what2wear)
 
@@ -77,8 +89,14 @@ After saving the environment variables, trigger a redeployment from the Vercel d
 ## Local development
 
 ```bash
-cp .env.example .env.local
-# fill in values in .env.local
+cp .env.example apps/web/.env.local
+# fill in values in apps/web/.env.local
 npm install
 npm run dev
+```
+
+## Docs local development
+
+```bash
+npm run docs:dev
 ```
