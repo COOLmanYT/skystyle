@@ -46,7 +46,8 @@ async function checkWeatherApi(): Promise<ServiceCheck> {
   const start = Date.now();
   try {
     // Lightweight status check — fetch weather for a known coordinate (Sydney)
-    const url = `https://api.openweathermap.org/data/2.5/weather?lat=-33.87&lon=151.21&appid=${apiKey}&units=metric`;
+    const params = new URLSearchParams({ lat: "-33.87", lon: "151.21", appid: apiKey, units: "metric" });
+    const url = `https://api.openweathermap.org/data/2.5/weather?${params.toString()}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
     const latencyMs = Date.now() - start;
     if (!res.ok) {
@@ -101,8 +102,9 @@ async function checkAiProvider(): Promise<ServiceCheck & { provider: string }> {
   // Gemini fallback
   const start = Date.now();
   try {
+    const geminiParams = new URLSearchParams({ key: geminiKey! });
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?key=${geminiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models?${geminiParams.toString()}`,
       { signal: AbortSignal.timeout(6000) }
     );
     const latencyMs = Date.now() - start;

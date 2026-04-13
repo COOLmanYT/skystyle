@@ -427,6 +427,12 @@ export default function Dashboard({
 
   const creditsRemaining = result?.meta?.creditsRemaining ?? initialCredits;
 
+  /** True when the user has hit their daily follow-up limit (client-side guard). */
+  const isFollowUpLimitReached =
+    dailyLimits !== null &&
+    dailyLimits.followUps.limit !== null &&
+    dailyLimits.followUps.used >= dailyLimits.followUps.limit;
+
   /** Called by LocationPicker — only stores the selected location, no auto-fetch. */
   const handleLocationResolved = useCallback((loc: ResolvedLocation) => {
     setLocation(loc);
@@ -565,8 +571,8 @@ export default function Dashboard({
     e.preventDefault();
     if (!followUpText.trim() || !result) return;
     // Client-side limit guard (server enforces definitively)
-    if (dailyLimits && dailyLimits.followUps.limit !== null && dailyLimits.followUps.used >= dailyLimits.followUps.limit) {
-      setFollowUpError(`Daily follow-up limit reached (${dailyLimits.followUps.used}/${dailyLimits.followUps.limit}).`);
+    if (isFollowUpLimitReached) {
+      setFollowUpError(`Daily follow-up limit reached (${dailyLimits!.followUps.used}/${dailyLimits!.followUps.limit}).`);
       return;
     }
     setFollowUpLoading(true);
@@ -1492,7 +1498,7 @@ export default function Dashboard({
                       />
                       <button
                         type="submit"
-                        disabled={followUpLoading || !followUpText.trim() || (dailyLimits !== null && dailyLimits.followUps.limit !== null && dailyLimits.followUps.used >= dailyLimits.followUps.limit)}
+                        disabled={followUpLoading || !followUpText.trim() || isFollowUpLimitReached}
                         className={`rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40 ${planBtnClass}`}
                       >
                         {followUpLoading ? "…" : "Ask"}

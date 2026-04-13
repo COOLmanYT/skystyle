@@ -439,7 +439,7 @@ function HealthPanel() {
   const [fetchedAt, setFetchedAt] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState<string | null>(null);
 
-  const runChecks = async () => {
+  const runChecks = useCallback(async () => {
     setLoading(true);
     setFetchError(null);
     try {
@@ -456,12 +456,11 @@ function HealthPanel() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     runChecks();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [runChecks]);
 
   const statusColor = (s: ServiceCheck["status"]) => {
     if (s === "ok") return "#30d158";
