@@ -163,7 +163,7 @@ export default function Dashboard({
   const [diagLastWeatherStatus, setDiagLastWeatherStatus] = useState<"success" | "error" | null>(null);
   const [diagSessionErrors, setDiagSessionErrors] = useState(0);
   const [diagLastFetchAt, setDiagLastFetchAt] = useState<string | null>(null);
-  const [diagFallbackEvents, setDiagFallbackEvents] = useState<string[]>([]);
+  const [diagFallbackEvents, _setDiagFallbackEvents] = useState<string[]>([]);
 
   // Returns the gradient/background CSS class for plan-based primary buttons
   const planBtnClass = isDev ? "btn-plan-dev" : isPro ? "btn-plan-pro" : "btn-plan-free";
