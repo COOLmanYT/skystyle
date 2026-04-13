@@ -415,35 +415,214 @@ function ChangelogCMS() {
 }
 
 function HealthPanel() {
+  interface ServiceCheck {
+    status: "ok" | "degraded" | "error" | "unconfigured";
+    latencyMs: number | null;
+    detail: string;
+  }
+  interface HealthData {
+    checkedAt: string;
+    supabase: ServiceCheck;
+    weather: ServiceCheck;
+    ai: ServiceCheck & { provider: string };
+    env: {
+      openaiConfigured: boolean;
+      geminiConfigured: boolean;
+      openweatherConfigured: boolean;
+      supabaseConfigured: boolean;
+      nodeEnv: string;
+    };
+  }
+
+  const [health, setHealth] = useState<HealthData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const runChecks = async () => {
+    setLoading(true);
+    setFetchError(null);
+    try {
+      const res = await fetch("/api/dev/health");
+      if (!res.ok) {
+        setFetchError(`Health API returned ${res.status}`);
+      } else {
+        const data = await res.json() as HealthData;
+        setHealth(data);
+        setFetchedAt(new Date().toISOString());
+      }
+    } catch {
+      setFetchError("Failed to reach health endpoint.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    runChecks();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const statusColor = (s: ServiceCheck["status"]) => {
+    if (s === "ok") return "#30d158";
+    if (s === "degraded") return "#ff9500";
+    if (s === "error") return "#ff3b30";
+    return "var(--foreground)";
+  };
+  const statusLabel = (s: ServiceCheck["status"]) => {
+    if (s === "ok") return "✅ Operational";
+    if (s === "degraded") return "⚠️ Degraded";
+    if (s === "error") return "❌ Error";
+    return "— Not configured";
+  };
+
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-        System Health
-      </h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {[
-          { label: "API Status", value: "Operational", color: "#30d158" },
-          { label: "DB Connection", value: "Healthy", color: "#30d158" },
-          { label: "Auth Provider", value: "GitHub + Google", color: "var(--accent)" },
-          { label: "Rate Limits", value: "Active", color: "#ff9500" },
-        ].map((item) => (
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
+          System Health
+        </h2>
+        <div className="flex items-center gap-3">
+          {fetchedAt && (
+            <span className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
+              Last checked: {new Date(fetchedAt).toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={runChecks}
+            disabled={loading}
+            className="rounded-xl px-4 py-2 text-xs font-medium btn-interact disabled:opacity-40"
+            style={{ background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
+          >
+            {loading ? "Checking…" : "↻ Refresh"}
+          </button>
+        </div>
+      </div>
+
+      {fetchError && (
+        <p className="text-sm text-red-500">{fetchError}</p>
+      )}
+
+      {health ? (
+        <>
+          {/* Service Status Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {(
+              [
+                { label: "Weather API", svc: health.weather, sub: health.env.openweatherConfigured ? "OpenWeatherMap" : "BOM only" },
+                { label: "AI Provider", svc: health.ai, sub: health.ai.provider !== "none" ? health.ai.provider : "—" },
+                { label: "Supabase DB", svc: health.supabase, sub: "PostgreSQL" },
+              ] as { label: string; svc: ServiceCheck; sub: string }[]
+            ).map((item) => (
+              <div
+                key={item.label}
+                className="rounded-2xl p-5 space-y-2"
+                style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+              >
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+                  {item.label}
+                </p>
+                <p className="text-sm font-semibold" style={{ color: statusColor(item.svc.status) }}>
+                  {statusLabel(item.svc.status)}
+                </p>
+                <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.55 }}>
+                  {item.sub}
+                </p>
+                {item.svc.latencyMs !== null && (
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+                    {item.svc.latencyMs} ms
+                  </p>
+                )}
+                {item.svc.detail && item.svc.status !== "ok" && (
+                  <p className="text-xs rounded-lg px-2 py-1 break-all" style={{ background: "var(--background)", color: "#ff3b30", border: "1px solid var(--card-border)" }}>
+                    {item.svc.detail}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Latency Summary */}
           <div
-            key={item.label}
-            className="rounded-2xl p-5"
+            className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-              {item.label}
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+              API Response Latency
             </p>
-            <p className="text-base font-semibold" style={{ color: item.color }}>
-              {item.value}
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Weather", ms: health.weather.latencyMs },
+                { label: "AI Provider", ms: health.ai.latencyMs },
+                { label: "Supabase", ms: health.supabase.latencyMs },
+              ].map((r) => (
+                <div key={r.label} className="text-center">
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>{r.label}</p>
+                  <p
+                    className="text-xl font-bold mt-1"
+                    style={{
+                      color: r.ms === null ? "var(--foreground)"
+                        : r.ms < 300 ? "#30d158"
+                        : r.ms < 800 ? "#ff9500"
+                        : "#ff3b30",
+                      opacity: r.ms === null ? 0.3 : 1,
+                    }}
+                  >
+                    {r.ms === null ? "—" : `${r.ms}ms`}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Environment Config */}
+          <div
+            className="rounded-2xl p-5 space-y-3"
+            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+          >
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+              Environment
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { label: "OpenAI", ok: health.env.openaiConfigured },
+                { label: "Gemini", ok: health.env.geminiConfigured },
+                { label: "OpenWeather", ok: health.env.openweatherConfigured },
+                { label: "Supabase", ok: health.env.supabaseConfigured },
+              ].map((e) => (
+                <span
+                  key={e.label}
+                  className="text-xs px-3 py-1 rounded-full font-medium"
+                  style={{
+                    background: e.ok ? "rgba(48,209,88,0.12)" : "rgba(255,59,48,0.1)",
+                    color: e.ok ? "#30d158" : "#ff3b30",
+                    border: `1px solid ${e.ok ? "rgba(48,209,88,0.25)" : "rgba(255,59,48,0.2)"}`,
+                  }}
+                >
+                  {e.ok ? "✓" : "✗"} {e.label}
+                </span>
+              ))}
+              <span
+                className="text-xs px-3 py-1 rounded-full font-medium"
+                style={{
+                  background: "rgba(191,90,242,0.1)",
+                  color: "#bf5af2",
+                  border: "1px solid rgba(191,90,242,0.2)",
+                }}
+              >
+                {health.env.nodeEnv}
+              </span>
+            </div>
+            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.35 }}>
+              Checked at {new Date(health.checkedAt).toLocaleString()}
             </p>
           </div>
-        ))}
-      </div>
-      <p className="text-xs text-center" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-        Full diagnostics dashboard coming in a future update.
-      </p>
+        </>
+      ) : !loading && (
+        <p className="text-sm text-center py-8" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          No health data yet — click Refresh to run checks.
+        </p>
+      )}
     </div>
   );
 }

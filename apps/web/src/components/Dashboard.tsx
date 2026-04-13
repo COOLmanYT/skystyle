@@ -157,6 +157,14 @@ export default function Dashboard({
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
   const router = useRouter();
 
+  // Session diagnostics (dev-only, never persisted)
+  const [diagLastAiStatus, setDiagLastAiStatus] = useState<"success" | "error" | null>(null);
+  const [diagLastAiProvider, setDiagLastAiProvider] = useState<string | null>(null);
+  const [diagLastWeatherStatus, setDiagLastWeatherStatus] = useState<"success" | "error" | null>(null);
+  const [diagSessionErrors, setDiagSessionErrors] = useState(0);
+  const [diagLastFetchAt, setDiagLastFetchAt] = useState<string | null>(null);
+  const [diagFallbackEvents, setDiagFallbackEvents] = useState<string[]>([]);
+
   // Returns the gradient/background CSS class for plan-based primary buttons
   const planBtnClass = isDev ? "btn-plan-dev" : isPro ? "btn-plan-pro" : "btn-plan-free";
   const planBtnStyle: React.CSSProperties = {};
@@ -504,8 +512,21 @@ export default function Dashboard({
       if (weatherRes.ok) {
         const weather = await weatherRes.json();
         setWeatherData(weather);
+        if (isDev) {
+          setDiagLastWeatherStatus("success");
+          setDiagLastFetchAt(new Date().toISOString());
+        }
+      } else if (isDev) {
+        setDiagLastWeatherStatus("error");
+        setDiagSessionErrors((n) => n + 1);
       }
-    } catch { /* weather network error — style result may still save us */ }
+    } catch {
+      if (isDev) {
+        setDiagLastWeatherStatus("error");
+        setDiagSessionErrors((n) => n + 1);
+      }
+      /* weather network error — style result may still save us */
+    }
     setLoading(false);
 
     // Stage 2: AI recommendation (slower — reveal with animation)
@@ -515,13 +536,26 @@ export default function Dashboard({
         let errorMessage = "Something went wrong.";
         try { const data = await styleRes.json(); errorMessage = data.error ?? errorMessage; } catch { /* non-JSON */ }
         setError(errorMessage);
+        if (isDev) {
+          setDiagLastAiStatus("error");
+          setDiagSessionErrors((n) => n + 1);
+        }
       } else {
         const data = await styleRes.json() as StyleResponse;
         setResult(data);
         if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
+        if (isDev) {
+          setDiagLastAiStatus("success");
+          const provider = data.recommendation?.modelUsed ?? data.meta?.modelUsed ?? null;
+          if (provider) setDiagLastAiProvider(provider);
+        }
       }
     } catch {
       setError("Network error — please try again.");
+      if (isDev) {
+        setDiagLastAiStatus("error");
+        setDiagSessionErrors((n) => n + 1);
+      }
     } finally {
       setAiLoading(false);
     }
@@ -530,6 +564,11 @@ export default function Dashboard({
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
     if (!followUpText.trim() || !result) return;
+    // Client-side limit guard (server enforces definitively)
+    if (dailyLimits && dailyLimits.followUps.limit !== null && dailyLimits.followUps.used >= dailyLimits.followUps.limit) {
+      setFollowUpError(`Daily follow-up limit reached (${dailyLimits.followUps.used}/${dailyLimits.followUps.limit}).`);
+      return;
+    }
     setFollowUpLoading(true);
     setFollowUpError(null);
     try {
@@ -553,6 +592,10 @@ export default function Dashboard({
           /* non-JSON */
         }
         setFollowUpError(errorMessage);
+        if (isDev) {
+          setDiagLastAiStatus("error");
+          setDiagSessionErrors((n) => n + 1);
+        }
       } else {
         const data = await res.json();
         setResult((prev) =>
@@ -562,9 +605,14 @@ export default function Dashboard({
           setDailyLimits(data.meta.dailyLimits);
         }
         setFollowUpText("");
+        if (isDev) setDiagLastAiStatus("success");
       }
     } catch {
       setFollowUpError("Network error — please try again.");
+      if (isDev) {
+        setDiagLastAiStatus("error");
+        setDiagSessionErrors((n) => n + 1);
+      }
     } finally {
       setFollowUpLoading(false);
     }
@@ -1444,7 +1492,7 @@ export default function Dashboard({
                       />
                       <button
                         type="submit"
-                        disabled={followUpLoading || !followUpText.trim()}
+                        disabled={followUpLoading || !followUpText.trim() || (dailyLimits !== null && dailyLimits.followUps.limit !== null && dailyLimits.followUps.used >= dailyLimits.followUps.limit)}
                         className={`rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40 ${planBtnClass}`}
                       >
                         {followUpLoading ? "…" : "Ask"}
@@ -1539,6 +1587,67 @@ export default function Dashboard({
                         </pre>
                       </>
                     )}
+                  </div>
+                )}
+              </WeatherEffectCard>
+            )}
+
+            {isDev && (
+              <WeatherEffectCard
+                condition={w ? getWeatherCondition(w.description) : "default"}
+                windSpeed={w?.windSpeed ?? 0}
+                className="rounded-2xl p-5 space-y-3"
+                style={{
+                  background: "var(--card)",
+                  border: "1px solid #bf5af2",
+                }}
+              >
+                <h2
+                  className="text-xs font-semibold uppercase tracking-widest"
+                  style={{ color: "#bf5af2" }}
+                >
+                  🔬 Session Diagnostics
+                </h2>
+                <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: "var(--foreground)" }}>
+                  <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
+                    <span style={{ opacity: 0.5 }}>Last AI</span>
+                    <p className="font-semibold mt-0.5" style={{ color: diagLastAiStatus === "success" ? "#30d158" : diagLastAiStatus === "error" ? "#ff3b30" : "var(--foreground)", opacity: diagLastAiStatus ? 1 : 0.4 }}>
+                      {diagLastAiStatus ?? "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
+                    <span style={{ opacity: 0.5 }}>AI Provider</span>
+                    <p className="font-semibold mt-0.5" style={{ opacity: diagLastAiProvider ? 1 : 0.4 }}>
+                      {diagLastAiProvider ?? "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
+                    <span style={{ opacity: 0.5 }}>Last Weather</span>
+                    <p className="font-semibold mt-0.5" style={{ color: diagLastWeatherStatus === "success" ? "#30d158" : diagLastWeatherStatus === "error" ? "#ff3b30" : "var(--foreground)", opacity: diagLastWeatherStatus ? 1 : 0.4 }}>
+                      {diagLastWeatherStatus ?? "—"}
+                    </p>
+                  </div>
+                  <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
+                    <span style={{ opacity: 0.5 }}>Session Errors</span>
+                    <p className="font-semibold mt-0.5" style={{ color: diagSessionErrors > 0 ? "#ff9500" : "#30d158" }}>
+                      {diagSessionErrors}
+                    </p>
+                  </div>
+                  <div className="col-span-2 rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
+                    <span style={{ opacity: 0.5 }}>Last Fetch</span>
+                    <p className="font-semibold mt-0.5" style={{ opacity: diagLastFetchAt ? 1 : 0.4, fontFamily: "monospace" }}>
+                      {diagLastFetchAt ? new Date(diagLastFetchAt).toLocaleTimeString() : "—"}
+                    </p>
+                  </div>
+                </div>
+                {diagFallbackEvents.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: "#ff9500", opacity: 0.7 }}>Fallback Events</p>
+                    <ul className="space-y-1">
+                      {diagFallbackEvents.map((ev, i) => (
+                        <li key={i} className="text-xs rounded-xl px-2 py-1" style={{ background: "var(--background)", color: "#ff9500", border: "1px solid var(--card-border)" }}>{ev}</li>
+                      ))}
+                    </ul>
                   </div>
                 )}
               </WeatherEffectCard>

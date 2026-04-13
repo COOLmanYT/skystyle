@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-13T22:23:56.000Z",
+    "version": "2.6.0",
+    "title": "Health Panel + System Diagnostics + UX Hardening (SKY-3)",
+    "description": "Live health panel for dev center (Weather/AI/Supabase status + latency). Session diagnostics in dev dashboard. Follow-up limit UI hardening."
+  },
+  {
     "date": "2026-04-13T03:05:31.000Z",
     "version": "2.5.3",
     "title": "Runtime crash stability fix (SKY-1E)",
