@@ -508,7 +508,13 @@ function HealthPanel() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {(
               [
-                { label: "Weather API", svc: health.weather, sub: health.env.openweatherConfigured ? "OpenWeatherMap" : "BOM only" },
+                {
+                  label: "Weather API",
+                  svc: health.weather,
+                  sub: health.env.openweatherConfigured
+                    ? "OpenWeatherMap"
+                    : "OpenWeatherMap · Not configured",
+                },
                 { label: "AI Provider", svc: health.ai, sub: health.ai.provider !== "none" ? health.ai.provider : "—" },
                 { label: "Supabase DB", svc: health.supabase, sub: "PostgreSQL" },
               ] as { label: string; svc: ServiceCheck; sub: string }[]
