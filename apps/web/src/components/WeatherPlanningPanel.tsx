@@ -35,7 +35,11 @@ function newSlot(): TimeSlot {
 }
 
 function formatSlotTime(time: string) {
-  const [h, m] = time.split(":").map(Number);
+  if (!time || !time.includes(":")) return time || "";
+  const parts = time.split(":");
+  const h = Number(parts[0]);
+  const m = Number(parts[1]);
+  if (isNaN(h) || isNaN(m)) return time;
   const ampm = h < 12 ? "am" : "pm";
   const hour = h % 12 === 0 ? 12 : h % 12;
   return `${hour}:${m.toString().padStart(2, "0")}${ampm}`;

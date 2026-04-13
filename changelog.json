@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-13T03:05:31.000Z",
+    "version": "2.5.3",
+    "title": "Runtime crash stability fix (SKY-1E)",
+    "description": "Guard formatSlotTime against empty/malformed time inputs (m.toString crash). Defensive null guards in closet-link regex and renderOutfitWithClosetLinks."
+  },
+  {
     "date": "2026-04-13T02:24:34.000Z",
     "version": "2.5.2",
     "title": "Export cooldown system (SKY-1D)",

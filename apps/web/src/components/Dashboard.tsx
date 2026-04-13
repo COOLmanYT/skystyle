@@ -653,8 +653,9 @@ export default function Dashboard({
 
   // Pre-build the closet-items regex whenever the closet changes, avoiding per-render reconstruction
   const closetLinksData = useMemo(() => {
-    if (!closetItems.length) return null;
-    const sorted = [...closetItems].sort((a, b) => b.length - a.length);
+    const validItems = closetItems.filter((s): s is string => typeof s === "string" && s.length > 0);
+    if (!validItems.length) return null;
+    const sorted = [...validItems].sort((a, b) => b.length - a.length);
     const escaped = sorted.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
     const regex = new RegExp(`(${escaped.join("|")})`, "gi");
     return { sorted, regex };
@@ -662,6 +663,7 @@ export default function Dashboard({
 
   /** Renders outfit text with matching closet item names as clickable underlined links */
   const renderOutfitWithClosetLinks = useCallback((text: string): React.ReactNode => {
+    if (!text) return text ?? "";
     if (!closetLinksData) return text;
     const { sorted, regex } = closetLinksData;
     // Reset lastIndex in case of reuse (split doesn't reset it automatically on all runtimes)
