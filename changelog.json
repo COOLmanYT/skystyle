@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-14T03:02:37.000Z",
+    "version": "2.6.1",
+    "title": "Fix checkSupabase unconfigured detection",
+    "description": "checkSupabase() now returns status: unconfigured when env vars are missing, instead of throwing and reporting status: error."
+  },
+  {
     "date": "2026-04-13T22:23:56.000Z",
     "version": "2.6.0",
     "title": "Health Panel + System Diagnostics + UX Hardening (SKY-3)",

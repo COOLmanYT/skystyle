@@ -18,6 +18,9 @@ interface ServiceCheck {
 }
 
 async function checkSupabase(): Promise<ServiceCheck> {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return { status: "unconfigured", latencyMs: null, detail: "SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set" };
+  }
   const start = Date.now();
   try {
     const { error } = await getSupabaseAdmin()
