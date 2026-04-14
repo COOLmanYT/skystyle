@@ -48,7 +48,7 @@ export default function DevNavBar({ email }: DevNavBarProps) {
               </svg>
             </button>
             <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-              🛠️ Dev Command Center
+              🛠️ Dev Center
             </span>
           </div>
           <span

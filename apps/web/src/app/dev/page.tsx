@@ -96,7 +96,7 @@ export default async function DevLandingPage() {
               Security Notice
             </p>
             <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.6 }}>
-              All actions in the Dev Command Center are server-verified against{" "}
+              All actions in the Dev Center are server-verified against{" "}
               <code
                 className="px-1 py-0.5 rounded"
                 style={{ background: "var(--background)", fontFamily: "monospace" }}

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface DeletionRequest {
   id: string;
@@ -350,27 +351,58 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
 }
 
 interface ChangelogEntry {
+  id?: string;
   date: string;
   version: string;
   title: string;
   description: string;
-  large?: boolean;
-  showOnNextLogin?: boolean;
+  category?: string;
+  type?: "update" | "post";
+  content?: string;
+  image?: string;
+  imageUrl?: string;
   ctaLabel?: string;
   ctaLink?: string;
-  imageUrl?: string;
+  expanded?: boolean;
+  slug?: string;
+  large?: boolean;
+  showOnNextLogin?: boolean;
+  published?: boolean;
 }
 
-const EMPTY_ENTRY: Omit<ChangelogEntry, "date"> = {
+const EMPTY_ENTRY: Omit<ChangelogEntry, "date" | "id"> = {
   version: "",
   title: "",
   description: "",
-  large: false,
-  showOnNextLogin: false,
+  category: "",
+  type: "update",
+  content: "",
+  image: "",
+  imageUrl: "",
   ctaLabel: "",
   ctaLink: "",
-  imageUrl: "",
+  expanded: false,
+  slug: "",
+  large: false,
+  showOnNextLogin: false,
+  published: true,
 };
+
+const SKY_MARKDOWN_GUIDE = `## Standard Markdown
+**bold**, *italic*, ~~strikethrough~~, \`code\`
+[Link text](https://url.com)
+# H1  ## H2  ### H3  #### H4
+> Blockquote
+- Unordered list item
+1. Ordered list item
+\`\`\`
+code block
+\`\`\`
+
+## Sky Custom Syntax
+![CTA-BUTTON]{Button Label}[https://url.com]
+![IMAGE-alt text][https://image-url.com]
+!![IMAGE-CAR]{alt1}{alt2}[url1][url2]`;
 
 function ChangelogCMS() {
   const [entries, setEntries] = useState<ChangelogEntry[]>([]);
@@ -381,6 +413,7 @@ function ChangelogCMS() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [preview, setPreview] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     fetch("/api/dev/changelog")
@@ -401,11 +434,18 @@ function ChangelogCMS() {
       version: e.version,
       title: e.title,
       description: e.description,
-      large: e.large ?? false,
-      showOnNextLogin: e.showOnNextLogin ?? false,
+      category: e.category ?? "",
+      type: e.type ?? "update",
+      content: e.content ?? "",
+      image: e.image ?? "",
+      imageUrl: e.imageUrl ?? "",
       ctaLabel: e.ctaLabel ?? "",
       ctaLink: e.ctaLink ?? "",
-      imageUrl: e.imageUrl ?? "",
+      expanded: e.expanded ?? false,
+      slug: e.slug ?? "",
+      large: e.large ?? false,
+      showOnNextLogin: e.showOnNextLogin ?? false,
+      published: e.published ?? true,
     });
     setEditingVersion(e.version);
     setSaveError(null);
@@ -456,6 +496,27 @@ function ChangelogCMS() {
         <button onClick={startNew} className="rounded-xl px-4 py-2 text-sm font-medium btn-interact" style={{ background: "var(--accent)", color: "#fff" }}>+ New Entry</button>
       </div>
 
+      {/* Formatting guide (closed by default) */}
+      <div style={{ background: "var(--card)", border: "1px solid var(--card-border)", borderRadius: 16 }}>
+        <button
+          onClick={() => setGuideOpen((v) => !v)}
+          className="w-full flex items-center justify-between px-5 py-3 text-sm btn-interact"
+          style={{ color: "var(--foreground)" }}
+        >
+          <span className="font-medium">📖 Formatting Guide</span>
+          <span style={{ opacity: 0.5, fontSize: 11 }}>{guideOpen ? "▲" : "▼"}</span>
+        </button>
+        {guideOpen && (
+          <div className="px-5 pb-5">
+            <MarkdownRenderer
+              content={SKY_MARKDOWN_GUIDE}
+              className="text-xs leading-relaxed"
+              style={{ color: "var(--foreground)", opacity: 0.8 }}
+            />
+          </div>
+        )}
+      </div>
+
       {/* Form */}
       <div style={cardStyle} className="space-y-3">
         <div className="flex items-center justify-between mb-1">
@@ -466,31 +527,93 @@ function ChangelogCMS() {
           </div>
         </div>
         {preview ? (
-          <div className="space-y-2">
-            <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{form.title || "(no title)"} <span style={{ opacity: 0.5 }}>v{form.version}</span></p>
-            <pre className="text-sm whitespace-pre-wrap" style={{ color: "var(--foreground)", opacity: 0.8, fontFamily: "inherit" }}>{form.description || "(no description)"}</pre>
-            {form.ctaLabel && form.ctaLink && <a href={form.ctaLink} target="_blank" rel="noopener noreferrer" className="text-xs px-3 py-1.5 rounded-lg inline-block" style={{ background: "var(--accent)", color: "#fff" }}>{form.ctaLabel}</a>}
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+          >
+            {form.image && (
+              <div
+                style={{ height: 160, backgroundImage: `url(${form.image})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                aria-hidden="true"
+              />
+            )}
+            <div className="p-4 space-y-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-mono px-2 py-0.5 rounded-lg" style={{ background: "var(--card)", color: "var(--foreground)", opacity: 0.7 }}>
+                  v{form.version || "0.0.0"}
+                </span>
+                {form.category && (
+                  <span className="text-xs px-2 py-0.5 rounded-lg font-medium" style={{ background: "var(--accent)", color: "#fff", opacity: 0.85 }}>
+                    {form.category}
+                  </span>
+                )}
+                {form.large && (
+                  <span className="text-xs px-2 py-0.5 rounded-lg" style={{ background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}>
+                    📰 Full Post
+                  </span>
+                )}
+              </div>
+              <p className="text-sm font-semibold" style={{ color: "var(--foreground)" }}>{form.title || "(no title)"}</p>
+              {form.description && (
+                <p className="text-xs leading-relaxed" style={{ color: "var(--foreground)", opacity: 0.65 }}>{form.description}</p>
+              )}
+              {form.content && (
+                <MarkdownRenderer
+                  content={form.content}
+                  className="text-xs leading-relaxed mt-2"
+                  style={{ color: "var(--foreground)", opacity: 0.75 }}
+                />
+              )}
+              {form.ctaLabel && form.ctaLink && (
+                <div className="pt-1">
+                  <span className="inline-block rounded-xl px-4 py-2 text-xs font-medium" style={{ background: "var(--accent)", color: "#fff" }}>
+                    {form.ctaLabel}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="space-y-2.5">
             <div className="flex gap-2">
-              <input value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="Version (e.g. 2.7.0)" style={{ ...inputStyle, flex: "0 0 40%" }} />
+              <input value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="Version (e.g. 2.9.0)" style={{ ...inputStyle, flex: "0 0 40%" }} />
               <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" style={{ ...inputStyle, flex: 1 }} />
             </div>
-            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Description (Markdown supported)" rows={5} style={{ ...inputStyle, resize: "vertical" }} />
-            <input value={form.imageUrl} onChange={e => setForm(f => ({ ...f, imageUrl: e.target.value }))} placeholder="Image URL (optional)" style={inputStyle} />
+            <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Short description (plain text summary)" rows={2} style={{ ...inputStyle, resize: "vertical" }} />
+            <textarea value={form.content} onChange={e => setForm(f => ({ ...f, content: e.target.value }))} placeholder="Full Markdown content (supports Sky custom syntax — see Formatting Guide)" rows={7} style={{ ...inputStyle, resize: "vertical", fontFamily: "monospace", fontSize: 13 }} />
+            <div className="flex gap-2">
+              <input value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value }))} placeholder="Category (e.g. ✨ Feature)" style={{ ...inputStyle, flex: 1 }} />
+              <select
+                value={form.type ?? "update"}
+                onChange={e => setForm(f => ({ ...f, type: e.target.value as "update" | "post" }))}
+                style={{ ...inputStyle, flex: "0 0 120px", cursor: "pointer" }}
+              >
+                <option value="update">update</option>
+                <option value="post">post</option>
+              </select>
+            </div>
+            <input value={form.image} onChange={e => setForm(f => ({ ...f, image: e.target.value }))} placeholder="Header image URL (optional)" style={inputStyle} />
             <div className="flex gap-2">
               <input value={form.ctaLabel} onChange={e => setForm(f => ({ ...f, ctaLabel: e.target.value }))} placeholder="CTA Label (optional)" style={{ ...inputStyle, flex: 1 }} />
               <input value={form.ctaLink} onChange={e => setForm(f => ({ ...f, ctaLink: e.target.value }))} placeholder="CTA Link (optional)" style={{ ...inputStyle, flex: 1 }} />
             </div>
-            <div className="flex items-center gap-4">
+            <input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="Slug (optional, e.g. my-changelog-post)" style={inputStyle} />
+            <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={!!form.large} onChange={e => setForm(f => ({ ...f, large: e.target.checked }))} />
-                <span className="text-xs" style={{ color: "var(--foreground)" }}>Large changelog</span>
+                <span className="text-xs" style={{ color: "var(--foreground)" }}>Large (modal)</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!form.expanded} onChange={e => setForm(f => ({ ...f, expanded: e.target.checked }))} />
+                <span className="text-xs" style={{ color: "var(--foreground)" }}>Expanded (slug page)</span>
               </label>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={!!form.showOnNextLogin} onChange={e => setForm(f => ({ ...f, showOnNextLogin: e.target.checked }))} />
                 <span className="text-xs" style={{ color: "var(--foreground)" }}>Show on next login</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={!!form.published} onChange={e => setForm(f => ({ ...f, published: e.target.checked }))} />
+                <span className="text-xs" style={{ color: "var(--foreground)" }}>Published</span>
               </label>
             </div>
             {saveError && <p className="text-xs" style={{ color: "#ff3b30" }}>{saveError}</p>}
@@ -514,6 +637,7 @@ function ChangelogCMS() {
                 v{e.version} · {e.title}
                 {e.large && <span className="ml-1 text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--accent)", color: "#fff" }}>large</span>}
                 {e.showOnNextLogin && <span className="ml-1 text-xs px-1.5 py-0.5 rounded" style={{ background: "#ff9500", color: "#fff" }}>login popup</span>}
+                {!e.published && <span className="ml-1 text-xs px-1.5 py-0.5 rounded" style={{ background: "var(--card-border)", color: "var(--foreground)" }}>draft</span>}
               </p>
               <p className="text-xs truncate" style={{ color: "var(--foreground)", opacity: 0.5 }}>{e.date.slice(0, 10)} — {e.description.slice(0, 80)}{e.description.length > 80 ? "…" : ""}</p>
             </div>

@@ -297,22 +297,25 @@ CREATE POLICY "Users can read own dev_messages"
 -- 14. Changelog Posts (CMS — DB-driven, Markdown/Image)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS changelog_posts (
-  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  version     text        NOT NULL UNIQUE,
-  title       text        NOT NULL,
-  body        text        NOT NULL DEFAULT '',
-  image_url   text,
-  published   boolean     NOT NULL DEFAULT false,
-  created_at  timestamptz NOT NULL DEFAULT now(),
-  updated_at  timestamptz NOT NULL DEFAULT now(),
+  id                uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  version           text        NOT NULL UNIQUE,
+  title             text        NOT NULL,
+  body              text        NOT NULL DEFAULT '',
+  image_url         text,
+  published         boolean     NOT NULL DEFAULT false,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  updated_at        timestamptz NOT NULL DEFAULT now(),
   -- v2.1.0 additions --
-  category    text,
-  type        text        NOT NULL DEFAULT 'update',
-  content     text,
-  image       text,
-  cta         jsonb,
-  expanded    boolean     NOT NULL DEFAULT false,
-  slug        text        UNIQUE
+  category          text,
+  type              text        NOT NULL DEFAULT 'update',
+  content           text,
+  image             text,
+  cta               jsonb,
+  expanded          boolean     NOT NULL DEFAULT false,
+  slug              text        UNIQUE,
+  -- v2.9.0 additions --
+  large             boolean     NOT NULL DEFAULT false,
+  show_on_next_login boolean    NOT NULL DEFAULT false
 );
 
 -- ============================================================
@@ -336,6 +339,12 @@ CREATE TABLE IF NOT EXISTS changelog_posts (
 --      ADD COLUMN IF NOT EXISTS cta       jsonb,
 --      ADD COLUMN IF NOT EXISTS expanded  boolean NOT NULL DEFAULT false,
 --      ADD COLUMN IF NOT EXISTS slug      text UNIQUE;
+--
+-- v2.9.0: If your changelog_posts table was created before v2.9.0, run:
+--
+--    ALTER TABLE changelog_posts
+--      ADD COLUMN IF NOT EXISTS large              boolean NOT NULL DEFAULT false,
+--      ADD COLUMN IF NOT EXISTS show_on_next_login boolean NOT NULL DEFAULT false;
 --
 -- ============================================================
 
