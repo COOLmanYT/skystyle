@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-14T03:13:08.000Z",
+    "version": "2.6.2",
+    "title": "Fix preview deployments redirecting to production dashboard",
+    "description": "signIn() calls now use host-derived absolute redirectTo URLs so preview deployments stay on their own domain instead of bouncing to what2wear-two.vercel.app."
+  },
+  {
     "date": "2026-04-14T03:02:37.000Z",
     "version": "2.6.1",
     "title": "Fix checkSupabase unconfigured detection",

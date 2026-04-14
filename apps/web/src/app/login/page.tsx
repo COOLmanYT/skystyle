@@ -1,6 +1,7 @@
 import { signIn } from "@/auth";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { headers } from "next/headers";
 
 export default async function LoginPage() {
   const session = await auth();
@@ -36,7 +37,10 @@ export default async function LoginPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("github", { redirectTo: "/dashboard" });
+            const h = await headers();
+            const host = h.get("host") ?? "localhost:3000";
+            const proto = h.get("x-forwarded-proto") ?? "https";
+            await signIn("github", { redirectTo: `${proto}://${host}/dashboard` });
           }}
         >
           <button
@@ -55,7 +59,10 @@ export default async function LoginPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("google", { redirectTo: "/dashboard" });
+            const h = await headers();
+            const host = h.get("host") ?? "localhost:3000";
+            const proto = h.get("x-forwarded-proto") ?? "https";
+            await signIn("google", { redirectTo: `${proto}://${host}/dashboard` });
           }}
         >
           <button
@@ -92,7 +99,10 @@ export default async function LoginPage() {
               ) {
                 return;
               }
-              await signIn("demo", { redirectTo: "/dashboard" });
+              const h = await headers();
+              const host = h.get("host") ?? "localhost:3000";
+              const proto = h.get("x-forwarded-proto") ?? "https";
+              await signIn("demo", { redirectTo: `${proto}://${host}/dashboard` });
             }}
           >
             <button
