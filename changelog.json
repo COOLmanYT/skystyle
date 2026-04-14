@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-14T11:36:47.000Z",
+    "version": "2.8.0",
+    "title": "Full Markdown system, changelog modals, open closet",
+    "description": "Full custom Markdown renderer with CTA buttons, image/carousel syntax, all heading levels, nested lists, blockquotes, code blocks, and links. Large-changelog entries now open as modals; showOnNextLogin popup support added. Closet item minimum removed — all users access the full closet immediately."
+  },
+  {
     "date": "2026-04-14T10:13:53.000Z",
     "version": "2.7.1",
     "title": "Complexity-aware AI output + closet scroll/highlight",

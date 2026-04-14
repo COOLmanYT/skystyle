@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
 import SmartBackButton from "@/components/SmartBackButton";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
+import ChangelogModal, { type ChangelogModalEntry } from "@/components/ChangelogModal";
 
 interface ChangelogCta {
   text: string;
@@ -19,9 +20,17 @@ interface ChangelogEntry {
   type?: "update" | "post";
   content?: string;
   image?: string;
+  /** Legacy image URL field from dev CMS */
+  imageUrl?: string;
   cta?: ChangelogCta;
+  /** Legacy CTA fields from dev CMS */
+  ctaLabel?: string;
+  ctaLink?: string;
   expanded?: boolean;
   slug?: string;
+  /** When true, clicking the entry opens it in a modal popup */
+  large?: boolean;
+  showOnNextLogin?: boolean;
 }
 
 function formatRelativeTime(dateStr: string): string {
@@ -118,9 +127,31 @@ export default function ChangelogPage() {
 
 export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[]; limit?: number }) {
   const shown = limit ? entries.slice(0, limit) : entries;
+  const [modalEntry, setModalEntry] = useState<ChangelogModalEntry | null>(null);
+
+  function toModalEntry(entry: ChangelogEntry): ChangelogModalEntry {
+    return {
+      version: entry.version,
+      title: entry.title,
+      description: entry.description,
+      imageUrl: entry.imageUrl ?? entry.image,
+      ctaLabel: entry.ctaLabel ?? entry.cta?.text,
+      ctaLink: entry.ctaLink ?? entry.cta?.url,
+      content: entry.content,
+    };
+  }
 
   return (
     <div className="relative">
+      {/* Changelog entry modal */}
+      {modalEntry && (
+        <ChangelogModal
+          entry={modalEntry}
+          onClose={() => setModalEntry(null)}
+          showChangelogLink={false}
+        />
+      )}
+
       {/* Vertical line */}
       <div
         className="absolute left-[7px] top-3"
@@ -158,10 +189,10 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
               style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
             >
               {/* Header image */}
-              {entry.image && (
+              {(entry.image ?? entry.imageUrl) && (
                 <div
                   className="w-full"
-                  style={{ height: 160, backgroundImage: `url(${entry.image})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                  style={{ height: 160, backgroundImage: `url(${entry.image ?? entry.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
                   aria-hidden="true"
                 />
               )}
@@ -183,6 +214,14 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
                       {entry.category}
                     </span>
                   )}
+                  {entry.large && (
+                    <span
+                      className="text-xs px-2 py-0.5 rounded-lg font-medium"
+                      style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)", opacity: 0.7 }}
+                    >
+                      📰 Full Post
+                    </span>
+                  )}
                   <span className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
                     {formatDate(entry.date)} · {formatRelativeTime(entry.date)}
                   </span>
@@ -200,31 +239,45 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
                   </p>
                 )}
 
-                {/* Extended Markdown content */}
-                {entry.content && (
-                  <div
-                    className="prose-sky text-xs leading-relaxed mt-2"
+                {/* Extended Markdown content (inline, for non-large entries) */}
+                {entry.content && !entry.large && (
+                  <MarkdownRenderer
+                    content={entry.content}
+                    className="text-xs leading-relaxed mt-2"
                     style={{ color: "var(--foreground)", opacity: 0.75 }}
-                  >
-                    <ReactMarkdown>{entry.content}</ReactMarkdown>
-                  </div>
+                  />
                 )}
 
-                {/* CTA button */}
-                {entry.cta && (
+                {/* CTA button (non-large entries) */}
+                {!entry.large && (entry.cta ?? (entry.ctaLabel && entry.ctaLink)) && (
                   <div className="pt-1">
                     <a
-                      href={entry.cta.url}
+                      href={entry.cta?.url ?? entry.ctaLink ?? "#"}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="inline-block rounded-xl px-4 py-2 text-xs font-medium btn-interact"
                       style={{ background: "var(--accent)", color: "#fff" }}
                     >
-                      {entry.cta.text}
+                      {entry.cta?.text ?? entry.ctaLabel}
                     </a>
                   </div>
                 )}
 
-                {/* Read more link for expanded entries */}
-                {entry.expanded && entry.slug && (
+                {/* Large entry: "Read more" opens modal */}
+                {entry.large && (
+                  <div className="pt-1">
+                    <button
+                      onClick={() => setModalEntry(toModalEntry(entry))}
+                      className="text-xs btn-interact rounded-lg px-2 py-1 inline-block"
+                      style={{ color: "var(--accent)" }}
+                    >
+                      Read more →
+                    </button>
+                  </div>
+                )}
+
+                {/* Expanded slug entries get a page link */}
+                {entry.expanded && entry.slug && !entry.large && (
                   <div className="pt-1">
                     <Link
                       href={`/changelog/${entry.slug}`}

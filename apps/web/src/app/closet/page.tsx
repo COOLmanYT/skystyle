@@ -8,8 +8,6 @@ import ClosetHighlighter from "@/components/ClosetHighlighter";
 
 export const dynamic = "force-dynamic";
 
-const CLOSET_UNLOCK_THRESHOLD = 15;
-
 /** Converts an item name to the same slug used for element IDs */
 function itemSlug(name: string): string {
   return "closet-item-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
@@ -40,7 +38,6 @@ export default async function ClosetPage({
     items = data?.items ?? [];
   }
 
-  const isLocked = items.length < CLOSET_UNLOCK_THRESHOLD;
   const userName = session.user.name ?? session.user.email ?? undefined;
   const highlight = typeof searchParams?.highlight === "string" ? searchParams.highlight : null;
 
@@ -69,80 +66,31 @@ export default async function ClosetPage({
               👕 My Closet
             </h1>
 
-            {isLocked ? (
-              /* ── Locked State ── */
-              <div className="space-y-4">
+            <div className="space-y-3">
+              <p
+                className="text-xs"
+                style={{ color: "var(--foreground)", opacity: 0.5 }}
+              >
+                {items.length} item{items.length !== 1 ? "s" : ""} in your wardrobe
+              </p>
+
+              {items.length === 0 ? (
                 <div
-                  className="rounded-xl p-4 text-center space-y-3"
+                  className="rounded-xl p-4 text-center space-y-2"
                   style={{
                     background: "var(--background)",
                     border: "1px dashed var(--card-border)",
                   }}
                 >
-                  <p className="text-3xl" aria-hidden="true">🔒</p>
+                  <p className="text-2xl" aria-hidden="true">👗</p>
                   <p
-                    className="text-base font-medium"
-                    style={{ color: "var(--foreground)" }}
-                  >
-                    Advanced Closet Locked
-                  </p>
-                  <p
-                    className="text-sm leading-relaxed"
+                    className="text-sm"
                     style={{ color: "var(--foreground)", opacity: 0.6 }}
                   >
-                    Add at least {CLOSET_UNLOCK_THRESHOLD} items to your wardrobe to unlock the full
-                    Closet view. You currently have{" "}
-                    <strong style={{ color: "var(--accent)" }}>
-                      {items.length}
-                    </strong>{" "}
-                    item{items.length !== 1 ? "s" : ""}.
-                  </p>
-                  <div
-                    className="rounded-full h-2 overflow-hidden"
-                    style={{ background: "var(--card-border)" }}
-                    role="progressbar"
-                    aria-valuenow={items.length}
-                    aria-valuemin={0}
-                    aria-valuemax={CLOSET_UNLOCK_THRESHOLD}
-                    aria-label={`${items.length} of ${CLOSET_UNLOCK_THRESHOLD} items added`}
-                  >
-                    <div
-                      className="h-full rounded-full transition-all duration-500"
-                      style={{
-                        width: `${Math.min(100, (items.length / CLOSET_UNLOCK_THRESHOLD) * 100)}%`,
-                        background: "var(--accent)",
-                      }}
-                    />
-                  </div>
-                  <p
-                    className="text-xs"
-                    style={{ color: "var(--foreground)", opacity: 0.4 }}
-                  >
-                    {CLOSET_UNLOCK_THRESHOLD - items.length} more item
-                    {CLOSET_UNLOCK_THRESHOLD - items.length !== 1 ? "s" : ""} to unlock
+                    Your closet is empty. Add items in the Dashboard to get started.
                   </p>
                 </div>
-
-                <Link
-                  href="/dashboard"
-                  className="block w-full text-center rounded-xl py-2.5 text-sm font-medium transition-opacity hover:opacity-80"
-                  style={{
-                    background: "var(--accent)",
-                    color: "#fff",
-                  }}
-                >
-                  Add Items in Dashboard →
-                </Link>
-              </div>
-            ) : (
-              /* ── Full Closet View ── */
-              <div className="space-y-3">
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.5 }}
-                >
-                  {items.length} item{items.length !== 1 ? "s" : ""} in your wardrobe
-                </p>
+              ) : (
                 <ul className="space-y-1.5">
                   {items.map((item) => (
                     <li
@@ -160,19 +108,20 @@ export default async function ClosetPage({
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href="/dashboard"
-                  className="block w-full text-center rounded-xl py-2.5 text-sm font-medium mt-2 transition-opacity hover:opacity-80"
-                  style={{
-                    background: "var(--background)",
-                    border: "1px solid var(--card-border)",
-                    color: "var(--foreground)",
-                  }}
-                >
-                  ← Manage in Dashboard
-                </Link>
-              </div>
-            )}
+              )}
+
+              <Link
+                href="/dashboard"
+                className="block w-full text-center rounded-xl py-2.5 text-sm font-medium mt-2 transition-opacity hover:opacity-80"
+                style={{
+                  background: "var(--background)",
+                  border: "1px solid var(--card-border)",
+                  color: "var(--foreground)",
+                }}
+              >
+                ← Manage in Dashboard
+              </Link>
+            </div>
           </div>
         </div>
       </div>

@@ -6,6 +6,7 @@ import WeatherPlanningPanel from "./WeatherPlanningPanel";
 import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
 import UpgradePlanModal from "./UpgradePlanModal";
 import FeedbackModal from "./FeedbackModal";
+import ChangelogModal, { type ChangelogModalEntry } from "./ChangelogModal";
 import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -146,6 +147,8 @@ export default function Dashboard({
   const [homeSubmenuOpen, setHomeSubmenuOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [changelogUnread, setChangelogUnread] = useState(false);
+  // Login changelog popup (showOnNextLogin entries)
+  const [loginPopupEntry, setLoginPopupEntry] = useState<ChangelogModalEntry | null>(null);
   // Two-stage fetch state: weather arrives first, AI recommendation second
   const [weatherData, setWeatherData] = useState<StyleResponse["weather"] | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
@@ -291,17 +294,47 @@ export default function Dashboard({
     }
   }, [customGender]);
 
-  // Check for unread changelog entries on mount
+  // Check for unread changelog entries and showOnNextLogin popups on mount
   useEffect(() => {
     fetch("/api/changelog")
       .then((r) => r.json())
-      .then((entries: { version: string }[]) => {
+      .then((entries: {
+        version: string;
+        title: string;
+        description?: string;
+        imageUrl?: string;
+        image?: string;
+        ctaLabel?: string;
+        ctaLink?: string;
+        cta?: { text: string; url: string };
+        content?: string;
+        large?: boolean;
+        showOnNextLogin?: boolean;
+      }[]) => {
         if (!entries.length) return;
         const latest = entries[0].version;
         try {
           const seen = localStorage.getItem("skystyle_last_seen_changelog");
           if (!seen || isVersionGreater(latest, seen)) {
             setChangelogUnread(true);
+          }
+          // Check for showOnNextLogin entries
+          const seenPopups: string[] = JSON.parse(
+            localStorage.getItem("skystyle_seen_login_popups") ?? "[]"
+          );
+          const popup = entries.find(
+            (e) => e.showOnNextLogin && !seenPopups.includes(e.version)
+          );
+          if (popup) {
+            setLoginPopupEntry({
+              version: popup.version,
+              title: popup.title,
+              description: popup.description,
+              imageUrl: popup.imageUrl ?? popup.image,
+              ctaLabel: popup.ctaLabel ?? popup.cta?.text,
+              ctaLink: popup.ctaLink ?? popup.cta?.url,
+              content: popup.content,
+            });
           }
         } catch { /* ignore */ }
       })
@@ -760,6 +793,26 @@ export default function Dashboard({
           isPro={isPro}
           isDev={isDev}
           initialCategory={feedbackCategory}
+        />
+      )}
+      {loginPopupEntry && (
+        <ChangelogModal
+          entry={loginPopupEntry}
+          showChangelogLink
+          onClose={() => {
+            try {
+              const prev: string[] = JSON.parse(
+                localStorage.getItem("skystyle_seen_login_popups") ?? "[]"
+              );
+              if (!prev.includes(loginPopupEntry.version)) {
+                localStorage.setItem(
+                  "skystyle_seen_login_popups",
+                  JSON.stringify([...prev, loginPopupEntry.version])
+                );
+              }
+            } catch { /* ignore */ }
+            setLoginPopupEntry(null);
+          }}
         />
       )}
       {/* ── Top Bar ── */}
