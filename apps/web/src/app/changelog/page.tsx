@@ -5,6 +5,7 @@ import Link from "next/link";
 import SmartBackButton from "@/components/SmartBackButton";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import ChangelogModal, { type ChangelogModalEntry } from "@/components/ChangelogModal";
+import { sanitizeUrl } from "@/lib/sanitize-url";
 
 interface ChangelogCta {
   text: string;
@@ -61,15 +62,6 @@ function formatDate(dateStr: string): string {
     month: "long",
     day: "numeric",
   });
-}
-
-// Allow only http/https and relative URLs; return null for unsafe schemes.
-function sanitizeUrl(url: string): string | null {
-  const trimmed = url.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return trimmed;
-  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return null;
-  return trimmed;
 }
 
 export default function ChangelogPage() {

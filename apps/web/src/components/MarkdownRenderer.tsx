@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { sanitizeUrl } from "@/lib/sanitize-url";
 
 interface Props {
   content: string;
@@ -8,18 +9,6 @@ interface Props {
   style?: React.CSSProperties;
   /** If provided, matching closet item names become links to /closet */
   closetItems?: string[];
-}
-
-// ── URL sanitizer ─────────────────────────────────────────────────────────────
-// Allows only http/https absolute URLs and relative paths. Returns null for
-// unsafe schemes (javascript:, data:, vbscript:, etc.).
-
-function sanitizeUrl(url: string): string | null {
-  const trimmed = url.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return trimmed;
-  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return null; // unsafe scheme
-  return trimmed; // relative path with no scheme
 }
 
 // ── Closet link helper ────────────────────────────────────────────────────────

@@ -56,7 +56,7 @@ export async function GET() {
         cta: row.cta as ChangelogCta | undefined,
         expanded: (row.expanded as boolean | null) ?? false,
         slug: (row.slug as string | null) ?? undefined,
-        large: (row.large as boolean | null) ?? (row.type === "post"),
+        large: (row.large as boolean | null) ?? (row.type === "post"), // "post" entries are always large by convention
         showOnNextLogin: (row.show_on_next_login as boolean | null) ?? false,
       }));
       return NextResponse.json(entries);

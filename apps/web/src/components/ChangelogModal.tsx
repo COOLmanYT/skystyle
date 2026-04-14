@@ -3,15 +3,7 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-
-// Allow only http/https and relative URLs; return null for unsafe schemes.
-function sanitizeUrl(url: string): string | null {
-  const trimmed = url.trim();
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return trimmed;
-  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return null;
-  return trimmed;
-}
+import { sanitizeUrl } from "@/lib/sanitize-url";
 
 export interface ChangelogModalEntry {
   version: string;
