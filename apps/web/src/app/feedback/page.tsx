@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import Link from "next/link";
 import type { Metadata } from "next";
 import FeedbackForm from "@/components/FeedbackForm";
+import HamburgerNav from "@/components/HamburgerNav";
 
 export const metadata: Metadata = {
   title: "Feedback — Sky Style",
@@ -51,27 +52,17 @@ export default async function FeedbackPage() {
   const isPro = profile?.is_pro ?? false;
   const isDev = profile?.is_dev ?? false;
 
-  const backLinkClass = isDev
-    ? "text-[#ff9500]"
-    : isPro
-    ? "text-[#9b59b6]"
-    : "text-[#3b7cf4]";
+  const userName = session.user.name ?? session.user.email ?? undefined;
 
   return (
     <div
-      className="min-h-screen flex flex-col p-4"
+      className="min-h-screen flex flex-col"
       style={{ background: "var(--background)" }}
     >
-      <div className="w-full max-w-md mx-auto space-y-6 py-8">
-        {/* Back link */}
-        <Link
-          href="/dashboard"
-          className={`text-xs inline-flex items-center gap-1 btn-interact rounded-xl px-3 py-1.5 ${backLinkClass} hover:opacity-80`}
-          style={{ border: "1px solid var(--card-border)", background: "var(--card)" }}
-        >
-          ← Back to Dashboard
-        </Link>
+      <HamburgerNav currentPage="feedback" userName={userName} title="💬 Feedback" />
 
+      <div className="flex-1 px-4">
+      <div className="w-full max-w-md mx-auto space-y-6 py-8">
         {/* Main card */}
         <div
           className="rounded-2xl p-6 space-y-5"
@@ -94,6 +85,7 @@ export default async function FeedbackPage() {
 
           <FeedbackForm isPro={isPro} isDev={isDev} />
         </div>
+      </div>
       </div>
     </div>
   );

@@ -6,7 +6,7 @@ import { getDailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
 import AccountUpgradeButton from "@/components/AccountUpgradeButton";
-import SmartBackButton from "@/components/SmartBackButton";
+import HamburgerNav from "@/components/HamburgerNav";
 import SecurityClient from "@/app/settings/security/SecurityClient";
 import PrivacyHubClient from "@/app/settings/privacy/PrivacyHubClient";
 
@@ -65,31 +65,25 @@ export default async function AccountPage() {
 
   const canAccessDevDashboard = isDevEmail || isDev;
 
+  const rightContent = (
+    <>
+      {canAccessDevDashboard && (
+        <Link href="/dev" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block font-medium" style={{ background: "#ff9500", color: "#fff" }}>🛠️ Dev Dashboard</Link>
+      )}
+      <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
+      <Link href="/settings/security" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Security</Link>
+      <Link href="/settings/privacy" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Privacy</Link>
+    </>
+  );
+
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      {/* Navigation */}
-      <nav
-        className="sticky-nav px-4 py-3"
-        aria-label="Account navigation"
-        style={{ borderBottom: "1px solid var(--card-border)" }}
-      >
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div className="flex items-center gap-3">
-            <SmartBackButton fallback="/dashboard" label="← Dashboard" />
-            <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-              <span aria-hidden="true">👤 </span>Account
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {canAccessDevDashboard && (
-              <Link href="/dev" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block font-medium" style={{ background: "#ff9500", color: "#fff" }}>🛠️ Dev Dashboard</Link>
-            )}
-            <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
-            <Link href="/settings/security" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Security</Link>
-            <Link href="/settings/privacy" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Privacy</Link>
-          </div>
-        </div>
-      </nav>
+      <HamburgerNav
+        currentPage="account"
+        userName={name}
+        title="👤 Account"
+        rightContent={rightContent}
+      />
 
       {/* Content */}
       <main id="main-content">

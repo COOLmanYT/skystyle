@@ -10,6 +10,7 @@ import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Checkbox from "@/components/Checkbox";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 /** Returns true if version string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -142,6 +143,7 @@ export default function Dashboard({
   const [devChatError, setDevChatError] = useState<string | null>(null);
   const [devChatResult, setDevChatResult] = useState<{ outfit: string; reasoning: string; rawOutput?: string } | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [homeSubmenuOpen, setHomeSubmenuOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [changelogUnread, setChangelogUnread] = useState(false);
   // Two-stage fetch state: weather arrives first, AI recommendation second
@@ -840,8 +842,39 @@ export default function Dashboard({
               </button>
             </div>
             <nav className="space-y-1" aria-label="Menu navigation">
+              {/* 🏠 Home (expandable submenu) */}
+              <div>
+                <button
+                  onClick={() => setHomeSubmenuOpen((v) => !v)}
+                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact flex items-center justify-between"
+                  style={{ color: "#fff", background: "#007AFF" }}
+                >
+                  <span>🏠 Home</span>
+                  <span style={{ opacity: 0.8, fontSize: 11 }}>
+                    {homeSubmenuOpen ? "▲" : "▼"}
+                  </span>
+                </button>
+                {homeSubmenuOpen && (
+                  <div className="pl-4 mt-1 space-y-0.5">
+                    <button
+                      onClick={() => { setMenuOpen(false); setHomeSubmenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                      className="w-full text-left rounded-xl px-3 py-2 text-sm btn-interact"
+                      style={{ color: "var(--foreground)", opacity: 0.9 }}
+                    >
+                      Dashboard
+                    </button>
+                    <button
+                      onClick={() => { setMenuOpen(false); setHomeSubmenuOpen(false); router.push("/closet"); }}
+                      className="w-full text-left rounded-xl px-3 py-2 text-sm btn-interact"
+                      style={{ color: "var(--foreground)", opacity: 0.9 }}
+                    >
+                      👕 Closet
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {[
-                { label: "🏠 Home", action: () => { setMenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }, active: true },
                 { label: "👤 Account", action: () => { setMenuOpen(false); router.push("/account"); }, active: false },
                 { label: "⚙️ Settings", action: () => { setMenuOpen(false); router.push("/settings"); }, active: false },
               ].map((item) => (
@@ -1375,12 +1408,12 @@ export default function Dashboard({
                     >
                       Outfit Recommendation
                     </h2>
-                    <p
-                      className="text-base leading-relaxed whitespace-pre-line"
+                    <MarkdownRenderer
+                      content={rec!.outfit}
+                      closetItems={closetItems}
+                      className="text-base leading-relaxed"
                       style={{ color: "var(--foreground)" }}
-                    >
-                      {renderOutfitWithClosetLinks(rec!.outfit)}
-                    </p>
+                    />
                     {rec!.reasoning && (
                       <>
                         <h3
@@ -1389,12 +1422,11 @@ export default function Dashboard({
                         >
                           Reasoning
                         </h3>
-                        <p
+                        <MarkdownRenderer
+                          content={rec!.reasoning}
                           className="text-sm leading-relaxed"
                           style={{ color: "var(--foreground)", opacity: 0.7 }}
-                        >
-                          {rec!.reasoning}
-                        </p>
+                        />
                         <div className="flex items-center gap-2 pt-1">
                           <span
                             className="text-xs"
@@ -1898,6 +1930,17 @@ export default function Dashboard({
                 label="Force recommendation to use closet"
                 description={closetItems.length === 0 ? "Add items to your closet for more accurate recommendations" : undefined}
               />
+              <Link
+                href="/closet"
+                className="block w-full text-center rounded-xl py-2 text-xs btn-interact"
+                style={{
+                  color: "var(--foreground)",
+                  opacity: 0.55,
+                  border: "1px solid var(--card-border)",
+                }}
+              >
+                See full closet →
+              </Link>
             </div>
 
             {/* ── Weather Sources ── */}
