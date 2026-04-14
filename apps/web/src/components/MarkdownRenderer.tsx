@@ -33,7 +33,7 @@ function applyClosetLinks(
       return (
         <Link
           key={i}
-          href="/closet"
+          href={`/closet?highlight=${encodeURIComponent(part)}`}
           style={{
             textDecoration: "underline",
             textDecorationStyle: "dotted",

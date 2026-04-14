@@ -1,5 +1,11 @@
 [
   {
+    "date": "2026-04-14T10:13:53.000Z",
+    "version": "2.7.1",
+    "title": "Complexity-aware AI output + closet scroll/highlight",
+    "description": "Recommendation mode now enforces explicit format/tone per level (Simple=1 sentence, Pro=full Markdown). Closet item links scroll to and highlight the item on /closet."
+  },
+  {
     "date": "2026-04-14T09:34:38.000Z",
     "version": "2.7.0",
     "title": "Hamburger nav on all pages, Changelog CMS",

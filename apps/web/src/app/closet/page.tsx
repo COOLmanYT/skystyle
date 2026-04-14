@@ -4,12 +4,22 @@ import { DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import Link from "next/link";
 import HamburgerNav from "@/components/HamburgerNav";
+import ClosetHighlighter from "@/components/ClosetHighlighter";
 
 export const dynamic = "force-dynamic";
 
 const CLOSET_UNLOCK_THRESHOLD = 15;
 
-export default async function ClosetPage() {
+/** Converts an item name to the same slug used for element IDs */
+function itemSlug(name: string): string {
+  return "closet-item-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+}
+
+export default async function ClosetPage({
+  searchParams,
+}: {
+  searchParams?: { highlight?: string };
+}) {
   const session = await auth();
   if (!session?.user?.id) {
     redirect("/login");
@@ -32,6 +42,7 @@ export default async function ClosetPage() {
 
   const isLocked = items.length < CLOSET_UNLOCK_THRESHOLD;
   const userName = session.user.name ?? session.user.email ?? undefined;
+  const highlight = typeof searchParams?.highlight === "string" ? searchParams.highlight : null;
 
   return (
     <div
@@ -39,6 +50,7 @@ export default async function ClosetPage() {
       style={{ background: "var(--background)" }}
     >
       <HamburgerNav currentPage="closet" userName={userName} title="👕 Closet" />
+      <ClosetHighlighter highlight={highlight} />
 
       <div className="flex-1 flex flex-col items-center justify-start py-8 px-4">
         <div className="w-full max-w-lg space-y-6">
@@ -135,6 +147,7 @@ export default async function ClosetPage() {
                   {items.map((item) => (
                     <li
                       key={item}
+                      id={itemSlug(item)}
                       className="rounded-xl px-4 py-2.5 text-sm flex items-center gap-2"
                       style={{
                         background: "var(--background)",

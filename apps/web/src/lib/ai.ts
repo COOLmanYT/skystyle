@@ -216,12 +216,16 @@ export async function getStyleRecommendation(
     }
   }
 
-  // Complexity modifier — shapes the detail level of the AI response
+  // Complexity modifier — shapes the detail level and format of the AI response
   const COMPLEXITY_INSTRUCTIONS: Record<number, string> = {
-    0: "Keep your recommendation brief and easy to read (2–3 sentences maximum).",
-    1: "Provide a clear recommendation with a short explanation.",
-    2: "Provide a detailed recommendation with reasoning about layering and accessories.",
-    3: "Provide a comprehensive recommendation with full styling advice: specific colors, materials, how to pair items, and any optional accessories for a complete look.",
+    // Simple: absolute minimum — one terse sentence, no explanation whatsoever
+    0: `RESPONSE STYLE — SIMPLE: Be extremely terse. The "outfit" field MUST be a single sentence (e.g. "Wear jeans, a t-shirt, and a hoodie."). The "reasoning" field MUST be an empty string "". Ignore any word-count limits in the system prompt — one sentence only.`,
+    // Simple+: brief recommendation with one short reason
+    1: `RESPONSE STYLE — SIMPLE+: Keep it short. The "outfit" field should be 1–2 sentences naming the key pieces. The "reasoning" field should be at most 1–2 sentences linking the weather to the choice. Do not use bullet points or headers.`,
+    // Advanced: structured prose with layering/accessories notes
+    2: `RESPONSE STYLE — ADVANCED: Provide a clear outfit description (3–5 sentences) in the "outfit" field. The "reasoning" field should explain layering choices, fabric suitability, and any accessories in 3–5 sentences. No Markdown headers needed — plain readable prose.`,
+    // Pro: full Markdown inside both JSON fields
+    3: `RESPONSE STYLE — PRO: Write a comprehensive, well-formatted recommendation. Use Markdown inside both JSON string fields: ## headers, bullet points, **bold** for key items. The "outfit" field should cover the full outfit with sections (e.g. ## Top, ## Bottom, ## Footwear, ## Accessories). The "reasoning" field should have a ## Weather Analysis section and a ## Styling Notes section. Be detailed — up to 300 words per field is acceptable.`,
   };
   const complexityLevel = typeof planningData?.complexity === "number"
     ? Math.max(0, Math.min(3, Math.round(planningData.complexity)))
@@ -241,7 +245,11 @@ ${complexityInstruction}
 
 Please recommend an outfit.`;
 
-  const recommendation = await callAI(systemPrompt, userMessage, userApiKey, input.isDev, byokProvider);
+  // Token budget scales with complexity: Simple=200, Simple+=350, Advanced=500, Pro=900
+  const MAX_TOKENS_BY_COMPLEXITY: Record<number, number> = { 0: 200, 1: 350, 2: 500, 3: 900 };
+  const maxTokens = MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350;
+
+  const recommendation = await callAI(systemPrompt, userMessage, userApiKey, input.isDev, byokProvider, maxTokens);
   return closetWarning ? { ...recommendation, closetWarning } : recommendation;
 }
 
@@ -280,7 +288,8 @@ async function callAI(
   userMessage: string,
   userApiKey?: string,
   isDev: boolean = false,
-  byokProvider: "openai" | "gemini" = "openai"
+  byokProvider: "openai" | "gemini" = "openai",
+  maxTokens: number = 500
 ): Promise<StyleRecommendation> {
   let raw: string;
   let modelUsed: string;
@@ -304,7 +313,7 @@ async function callAI(
       try {
         const model = getGemini(userApiKey).getGenerativeModel({
           model: modelName,
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 500 },
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
         });
         const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
         geminiRaw = result.response.text();
@@ -334,7 +343,7 @@ async function callAI(
         { role: "user", content: userMessage },
       ],
       response_format: { type: "json_object" },
-      max_tokens: 500,
+      max_tokens: maxTokens,
       temperature: 0.7,
     });
     raw = response.choices[0]?.message?.content ?? "{}";
@@ -354,7 +363,7 @@ async function callAI(
       try {
         const model = getGemini().getGenerativeModel({
           model: modelName,
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: 500 },
+          generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
         });
         const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
         geminiRaw = result.response.text();
