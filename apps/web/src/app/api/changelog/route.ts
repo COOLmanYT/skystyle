@@ -27,6 +27,10 @@ export interface ChangelogEntry {
   expanded?: boolean;
   /** URL-safe slug for /changelog/[slug] */
   slug?: string;
+  /** When true, entry renders in a full modal with "Read more" button */
+  large?: boolean;
+  /** When true, a popup is shown once on next login */
+  showOnNextLogin?: boolean;
 }
 
 export async function GET() {
@@ -35,7 +39,7 @@ export async function GET() {
   try {
     const { data: dbRows, error } = await supabaseAdmin
       .from("changelog_posts")
-      .select("version, title, body, image_url, published, created_at, category, type, content, image, cta, expanded, slug")
+      .select("version, title, body, image_url, published, created_at, category, type, content, image, cta, expanded, slug, large, show_on_next_login")
       .eq("published", true)
       .order("created_at", { ascending: false });
 
@@ -52,6 +56,8 @@ export async function GET() {
         cta: row.cta as ChangelogCta | undefined,
         expanded: (row.expanded as boolean | null) ?? false,
         slug: (row.slug as string | null) ?? undefined,
+        large: (row.large as boolean | null) ?? (row.type === "post"),
+        showOnNextLogin: (row.show_on_next_login as boolean | null) ?? false,
       }));
       return NextResponse.json(entries);
     }

@@ -10,6 +10,18 @@ interface Props {
   closetItems?: string[];
 }
 
+// ── URL sanitizer ─────────────────────────────────────────────────────────────
+// Allows only http/https absolute URLs and relative paths. Returns null for
+// unsafe schemes (javascript:, data:, vbscript:, etc.).
+
+function sanitizeUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return trimmed;
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return null; // unsafe scheme
+  return trimmed; // relative path with no scheme
+}
+
 // ── Closet link helper ────────────────────────────────────────────────────────
 
 function applyClosetLinks(text: string, closetItems: string[]): React.ReactNode[] {
@@ -74,19 +86,25 @@ function renderInline(text: string, closetItems: string[], keyPrefix: string): R
     } else if (seg.startsWith("[") && seg.includes("](")) {
       const m = seg.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (m) {
-        const [, linkText, url] = m;
-        const isExternal = /^https?:\/\//.test(url);
-        nodes.push(
-          <a
-            key={k}
-            href={url}
-            target={isExternal ? "_blank" : undefined}
-            rel={isExternal ? "noopener noreferrer" : undefined}
-            style={{ color: "var(--accent)", textDecoration: "underline" }}
-          >
-            {linkText}
-          </a>
-        );
+        const [, linkText, rawUrl] = m;
+        const safeUrl = sanitizeUrl(rawUrl);
+        if (safeUrl) {
+          const isExternal = /^https?:\/\//i.test(safeUrl);
+          nodes.push(
+            <a
+              key={k}
+              href={safeUrl}
+              target={isExternal ? "_blank" : undefined}
+              rel={isExternal ? "noopener noreferrer" : undefined}
+              style={{ color: "var(--accent)", textDecoration: "underline" }}
+            >
+              {linkText}
+            </a>
+          );
+        } else {
+          // Unsafe URL — render link text as plain text
+          nodes.push(<span key={k}>{linkText}</span>);
+        }
       } else {
         // Malformed link — render as plain text with closet links
         applyClosetLinks(seg, closetItems).forEach((n, j) =>
@@ -135,7 +153,7 @@ function buildList(
   while (i < lines.length) {
     const line = lines[i];
     const indent = getIndent(line);
-    if (!isUnorderedItem(line) && !isOrderedItem(line)) break;
+    if (ordered ? !isOrderedItem(line) : !isUnorderedItem(line)) break;
     if (indent < baseIndent) break;
     if (indent > baseIndent) break;
 
@@ -236,10 +254,12 @@ function tryParseCustomBlock(line: string): CustomBlock | null {
 
 function renderCustomBlock(block: CustomBlock, key: string): React.ReactNode {
   if (block.type === "cta") {
+    const safeUrl = sanitizeUrl(block.url);
+    if (!safeUrl) return null;
     return (
       <div key={key} style={{ margin: "8px 0" }}>
         <a
-          href={block.url}
+          href={safeUrl}
           target="_blank"
           rel="noopener noreferrer"
           style={{
@@ -261,11 +281,13 @@ function renderCustomBlock(block: CustomBlock, key: string): React.ReactNode {
   }
 
   if (block.type === "image") {
+    const safeUrl = sanitizeUrl(block.url);
+    if (!safeUrl) return null;
     return (
       <figure key={key} style={{ margin: "8px 0", display: "block" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={block.url}
+          src={safeUrl}
           alt={block.alt}
           style={{ maxWidth: "100%", borderRadius: 10, display: "block" }}
         />
@@ -295,11 +317,13 @@ function renderCustomBlock(block: CustomBlock, key: string): React.ReactNode {
       aria-label="Image carousel"
     >
       {block.items.map((item, idx) => {
+        const safeImgUrl = sanitizeUrl(item.url);
+        if (!safeImgUrl) return null;
         const figure = (
           <figure key={idx} style={{ flex: "0 0 auto", maxWidth: 240, margin: 0 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
-              src={item.url}
+              src={safeImgUrl}
               alt={item.alt}
               style={{ width: "100%", borderRadius: 10, display: "block", objectFit: "cover" }}
             />
@@ -319,8 +343,10 @@ function renderCustomBlock(block: CustomBlock, key: string): React.ReactNode {
           </figure>
         );
         if (item.link) {
+          const safeLink = sanitizeUrl(item.link);
+          if (!safeLink) return figure;
           return (
-            <a key={idx} href={item.link} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
+            <a key={idx} href={safeLink} target="_blank" rel="noopener noreferrer" style={{ textDecoration: "none" }}>
               {figure}
             </a>
           );

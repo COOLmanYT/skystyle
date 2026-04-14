@@ -63,6 +63,15 @@ function formatDate(dateStr: string): string {
   });
 }
 
+// Allow only http/https and relative URLs; return null for unsafe schemes.
+function sanitizeUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return trimmed;
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return null;
+  return trimmed;
+}
+
 export default function ChangelogPage() {
   const [entries, setEntries] = useState<ChangelogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,13 +198,16 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
               style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
             >
               {/* Header image */}
-              {(entry.image ?? entry.imageUrl) && (
-                <div
-                  className="w-full"
-                  style={{ height: 160, backgroundImage: `url(${entry.image ?? entry.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
-                  aria-hidden="true"
-                />
-              )}
+              {(entry.image ?? entry.imageUrl) && (() => {
+                const safeImg = sanitizeUrl((entry.image ?? entry.imageUrl) as string);
+                return safeImg ? (
+                  <div
+                    className="w-full"
+                    style={{ height: 160, backgroundImage: `url(${safeImg})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                    aria-hidden="true"
+                  />
+                ) : null;
+              })()}
 
               <div className="p-4 space-y-2">
                 {/* Meta row */}
@@ -249,19 +261,24 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
                 )}
 
                 {/* CTA button (non-large entries) */}
-                {!entry.large && (entry.cta ?? (entry.ctaLabel && entry.ctaLink)) && (
-                  <div className="pt-1">
-                    <a
-                      href={entry.cta?.url ?? entry.ctaLink ?? "#"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block rounded-xl px-4 py-2 text-xs font-medium btn-interact"
-                      style={{ background: "var(--accent)", color: "#fff" }}
-                    >
-                      {entry.cta?.text ?? entry.ctaLabel}
-                    </a>
-                  </div>
-                )}
+                {!entry.large && (entry.cta ?? (entry.ctaLabel && entry.ctaLink)) && (() => {
+                  const rawUrl = entry.cta?.url ?? entry.ctaLink ?? "";
+                  const safeUrl = rawUrl ? sanitizeUrl(rawUrl) : null;
+                  if (!safeUrl) return null;
+                  return (
+                    <div className="pt-1">
+                      <a
+                        href={safeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block rounded-xl px-4 py-2 text-xs font-medium btn-interact"
+                        style={{ background: "var(--accent)", color: "#fff" }}
+                      >
+                        {entry.cta?.text ?? entry.ctaLabel}
+                      </a>
+                    </div>
+                  );
+                })()}
 
                 {/* Large entry: "Read more" opens modal */}
                 {entry.large && (

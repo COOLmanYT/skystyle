@@ -4,6 +4,15 @@ import { useEffect, useRef } from "react";
 import Link from "next/link";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 
+// Allow only http/https and relative URLs; return null for unsafe schemes.
+function sanitizeUrl(url: string): string | null {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return trimmed;
+  if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return null;
+  return trimmed;
+}
+
 export interface ChangelogModalEntry {
   version: string;
   title: string;
@@ -34,15 +43,34 @@ export default function ChangelogModal({ entry, onClose, showChangelogLink }: Pr
     return () => document.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
-  // Prevent body scroll while modal is open
+  // Prevent body scroll while modal is open; set initial focus; restore on close
   useEffect(() => {
     const prev = document.body.style.overflow;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
     document.body.style.overflow = "hidden";
     dialogRef.current?.focus();
     return () => {
       document.body.style.overflow = prev;
+      previouslyFocused?.focus();
     };
   }, []);
+
+  // Focus trap — keep focus inside the modal
+  useEffect(() => {
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    function handleFocusTrap(e: FocusEvent) {
+      if (!dialog!.contains(e.target as Node)) {
+        e.stopPropagation();
+        dialog!.focus();
+      }
+    }
+    document.addEventListener("focusin", handleFocusTrap);
+    return () => document.removeEventListener("focusin", handleFocusTrap);
+  }, []);
+
+  const safeImageUrl = entry.imageUrl ? sanitizeUrl(entry.imageUrl) : null;
+  const safeCtaLink = entry.ctaLink ? sanitizeUrl(entry.ctaLink) : null;
 
   return (
     <div
@@ -69,12 +97,12 @@ export default function ChangelogModal({ entry, onClose, showChangelogLink }: Pr
         }}
       >
         {/* Header image */}
-        {entry.imageUrl && (
+        {safeImageUrl && (
           <div
             style={{
               width: "100%",
               height: 160,
-              backgroundImage: `url(${entry.imageUrl})`,
+              backgroundImage: `url(${safeImageUrl})`,
               backgroundSize: "cover",
               backgroundPosition: "center",
               flexShrink: 0,
@@ -125,10 +153,10 @@ export default function ChangelogModal({ entry, onClose, showChangelogLink }: Pr
           )}
 
           {/* CTA button */}
-          {entry.ctaLabel && entry.ctaLink && (
+          {entry.ctaLabel && safeCtaLink && (
             <div className="pt-1">
               <a
-                href={entry.ctaLink}
+                href={safeCtaLink}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-block rounded-xl px-5 py-2.5 text-sm font-medium btn-interact"
