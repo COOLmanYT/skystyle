@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import ReactMarkdown from "react-markdown";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 import SmartBackButton from "@/components/SmartBackButton";
 import { supabaseAdmin } from "@/lib/supabase";
 import { readFile } from "fs/promises";
@@ -137,12 +137,11 @@ export default async function ChangelogEntryPage({ params }: { params: Promise<{
 
         {/* Markdown content */}
         {entry.content && (
-          <div
-            className="prose-sky text-sm leading-relaxed space-y-3"
+          <MarkdownRenderer
+            content={entry.content}
+            className="text-sm leading-relaxed space-y-3"
             style={{ color: "var(--foreground)" }}
-          >
-            <ReactMarkdown>{entry.content}</ReactMarkdown>
-          </div>
+          />
         )}
 
         {/* CTA */}
