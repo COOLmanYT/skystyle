@@ -44,6 +44,10 @@ The array is **newest-first** — insert your entry at **index 0**.
 
 ---
 
+## Important!
+
+Make sure to tell the user if anything in the supabase folder was changed.
+
 ## Key codebase facts
 
 - **Build:** `npm run build` (Next.js 16.1.6 with Turbopack)

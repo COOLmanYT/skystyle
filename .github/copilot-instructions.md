@@ -42,6 +42,10 @@ The array is **newest-first** — insert your entry at **index 0**.
 
 ---
 
+## Important!
+
+Make sure to tell the user if anything in the supabase folder was changed.
+
 ## Codebase conventions
 
 - **Build:** `npm run build` · **Lint:** `npm run lint` (targets `apps/web`) · No test suite exists.
