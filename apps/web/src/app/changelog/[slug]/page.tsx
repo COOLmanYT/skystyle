@@ -3,8 +3,6 @@ import Link from "next/link";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import SmartBackButton from "@/components/SmartBackButton";
 import { supabaseAdmin } from "@/lib/supabase";
-import { readFile } from "fs/promises";
-import path from "path";
 
 interface ChangelogCta {
   text: string;
@@ -26,7 +24,6 @@ interface ChangelogEntry {
 }
 
 async function getEntry(slug: string): Promise<ChangelogEntry | null> {
-  // Try Supabase first
   try {
     const { data, error } = await supabaseAdmin
       .from("changelog_posts")
@@ -51,18 +48,10 @@ async function getEntry(slug: string): Promise<ChangelogEntry | null> {
       };
     }
   } catch {
-    /* Fall through */
+    /* Supabase unavailable */
   }
 
-  // Fallback: look in changelog.json by matching slug or version
-  try {
-    const filePath = path.join(process.cwd(), "changelog.json");
-    const raw = await readFile(filePath, "utf-8");
-    const entries: ChangelogEntry[] = JSON.parse(raw);
-    return entries.find((e) => e.slug === slug || e.version === slug) ?? null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 function formatDate(dateStr: string): string {

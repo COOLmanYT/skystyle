@@ -564,19 +564,41 @@ function ChangelogCMS() {
                   style={{ color: "var(--foreground)", opacity: 0.75 }}
                 />
               )}
-              {form.ctaLabel && form.ctaLink && (
-                <div className="pt-1">
-                  <span className="inline-block rounded-xl px-4 py-2 text-xs font-medium" style={{ background: "var(--accent)", color: "#fff" }}>
-                    {form.ctaLabel}
-                  </span>
-                </div>
-              )}
+              {form.ctaLabel && form.ctaLink && (() => {
+                const safeUrl = form.ctaLink.match(/^https?:\/\//) ? form.ctaLink : null;
+                return (
+                  <div className="pt-1">
+                    {safeUrl ? (
+                      <a
+                        href={safeUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block rounded-xl px-4 py-2 text-xs font-medium"
+                        style={{ background: "var(--accent)", color: "#fff" }}
+                      >
+                        {form.ctaLabel}
+                      </a>
+                    ) : (
+                      <span className="inline-block rounded-xl px-4 py-2 text-xs font-medium" style={{ background: "var(--accent)", color: "#fff", opacity: 0.6 }}>
+                        {form.ctaLabel} <span style={{ fontSize: 10 }}>(invalid URL)</span>
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ) : (
           <div className="space-y-2.5">
             <div className="flex gap-2">
-              <input value={form.version} onChange={e => setForm(f => ({ ...f, version: e.target.value }))} placeholder="Version (e.g. 2.9.0)" style={{ ...inputStyle, flex: "0 0 40%" }} />
+              <input
+                value={form.version}
+                onChange={e => !editingVersion && setForm(f => ({ ...f, version: e.target.value }))}
+                readOnly={Boolean(editingVersion)}
+                aria-readonly={Boolean(editingVersion)}
+                placeholder="Version (e.g. 2.9.0)"
+                style={{ ...inputStyle, flex: "0 0 40%", opacity: editingVersion ? 0.6 : 1, cursor: editingVersion ? "not-allowed" : "text" }}
+              />
               <input value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} placeholder="Title" style={{ ...inputStyle, flex: 1 }} />
             </div>
             <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Short description (plain text summary)" rows={2} style={{ ...inputStyle, resize: "vertical" }} />

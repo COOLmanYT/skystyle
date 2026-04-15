@@ -75,16 +75,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "version and title are required" }, { status: 400 });
   }
 
-  const { data: existing } = await supabaseAdmin
-    .from("changelog_posts")
-    .select("version")
-    .eq("version", entry.version.trim())
-    .maybeSingle();
-
-  if (existing) {
-    return NextResponse.json({ error: `Version ${entry.version} already exists` }, { status: 409 });
-  }
-
   const cta =
     entry.ctaLabel && entry.ctaLink
       ? { text: entry.ctaLabel, url: entry.ctaLink }
@@ -107,7 +97,13 @@ export async function POST(req: NextRequest) {
     published: entry.published ?? true,
   });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    // Unique-constraint violation (version already exists)
+    if (error.code === "23505") {
+      return NextResponse.json({ error: `Version ${entry.version} already exists` }, { status: 409 });
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   return NextResponse.json({ ok: true });
 }
 
@@ -118,13 +114,16 @@ export async function PUT(req: NextRequest) {
   if (!entry.version?.trim()) {
     return NextResponse.json({ error: "version is required" }, { status: 400 });
   }
+  if (!entry.title?.trim()) {
+    return NextResponse.json({ error: "title is required" }, { status: 400 });
+  }
 
   const cta =
     entry.ctaLabel && entry.ctaLink
       ? { text: entry.ctaLabel, url: entry.ctaLink }
       : entry.cta ?? null;
 
-  const { error } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("changelog_posts")
     .update({
       title: entry.title.trim(),
@@ -142,9 +141,13 @@ export async function PUT(req: NextRequest) {
       published: entry.published ?? true,
       updated_at: new Date().toISOString(),
     })
-    .eq("version", entry.version.trim());
+    .eq("version", entry.version.trim())
+    .select("id");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!data || data.length === 0) {
+    return NextResponse.json({ error: `Version ${entry.version} not found` }, { status: 404 });
+  }
   return NextResponse.json({ ok: true });
 }
 
