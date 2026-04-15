@@ -32,7 +32,7 @@ export async function GET() {
   return NextResponse.json(data ?? []);
 }
 
-export async function POST(req: NextRequest) {
+export async function POST() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

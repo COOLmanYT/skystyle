@@ -5,6 +5,9 @@ const API_KEY_BYTES = 32;
 const SCRYPT_KEYLEN = 64;
 const HASH_SALT_BYTES = 16;
 const PREVIEW_CHARS = 4;
+const HEX_FACTOR = 2;
+const SALT_HEX_LENGTH = HASH_SALT_BYTES * HEX_FACTOR;
+const HASH_HEX_LENGTH = SCRYPT_KEYLEN * HEX_FACTOR;
 const SCRYPT_OPTIONS = {
   N: 16384,
   r: 8,
@@ -25,9 +28,10 @@ export function hashApiKey(apiKey: string): string {
 }
 
 export function verifyApiKey(apiKey: string, storedHash: string): boolean {
-  const match = /^([a-f0-9]{32}):([a-f0-9]{128})$/.exec(storedHash);
-  if (!match) return false;
-  const [, salt, expectedHash] = match;
+  const match = new RegExp(`^([a-f0-9]{${SALT_HEX_LENGTH}}):([a-f0-9]{${HASH_HEX_LENGTH}})$`).exec(storedHash);
+  const salt = match?.[1] ?? "0".repeat(SALT_HEX_LENGTH);
+  const expectedHash = match?.[2] ?? "0".repeat(HASH_HEX_LENGTH);
   const computedHash = scryptSync(apiKey, salt, SCRYPT_KEYLEN, SCRYPT_OPTIONS).toString("hex");
-  return timingSafeEqual(Buffer.from(computedHash, "hex"), Buffer.from(expectedHash, "hex"));
+  const hashesMatch = timingSafeEqual(Buffer.from(computedHash, "hex"), Buffer.from(expectedHash, "hex"));
+  return Boolean(match && hashesMatch);
 }
