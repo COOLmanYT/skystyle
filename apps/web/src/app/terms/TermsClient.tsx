@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import SmartBackButton from "@/components/SmartBackButton";
 
 function SimpleToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {

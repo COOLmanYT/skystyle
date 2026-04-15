@@ -80,6 +80,19 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
   const [byokOpenDefault, setByokOpenDefault] = useState(
     () => getLocalStorage("skystyle_byok_open", "false") === "true"
   );
+  // Default recommendation complexity (0=Simple, 1=Simple+, 2=Advanced, 3=Pro)
+  const [defaultComplexity, setDefaultComplexity] = useState<number>(
+    () => {
+      try {
+        const saved = localStorage.getItem("skystyle_planning_panel");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (parsed?.complexity != null) return Number(parsed.complexity);
+        }
+      } catch { /* ignore */ }
+      return 0;
+    }
+  );
 
   // Layout settings
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(
@@ -126,6 +139,13 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       localStorage.setItem("skystyle_followup_mode", followUpMode);
       localStorage.setItem("skystyle_show_diagnostics", String(showDiagnostics));
       localStorage.setItem("skystyle_byok_open", String(byokOpenDefault));
+      // Update planning panel default complexity (merge into existing panel state)
+      try {
+        const existing = localStorage.getItem("skystyle_planning_panel");
+        const panelState = existing ? JSON.parse(existing) : {};
+        panelState.complexity = defaultComplexity;
+        localStorage.setItem("skystyle_planning_panel", JSON.stringify(panelState));
+      } catch { /* ignore */ }
       try {
         // Encode gender before storing
         localStorage.setItem("skystyle_gender", btoa(gender));
@@ -349,6 +369,31 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
             </div>
             <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
               {WEATHER_PLANNING_OPTIONS.find((o) => o.value === weatherPlanningVisibility)?.desc}
+            </p>
+          </div>
+
+          {/* Recommendation Mode Default */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium" style={{ color: "var(--foreground)", opacity: 0.7 }}>Default Recommendation Mode</p>
+            <div className="flex flex-wrap gap-2">
+              {([["Simple", 0], ["Simple+", 1], ["Advanced", 2], ["Pro", 3]] as [string, number][]).map(([label, val]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => setDefaultComplexity(val)}
+                  className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                  style={{
+                    background: defaultComplexity === val ? "var(--accent)" : "var(--background)",
+                    color: defaultComplexity === val ? "#fff" : "var(--foreground)",
+                    border: "1px solid var(--card-border)",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
+              Sets the default complexity level in the Weather Planning panel.
             </p>
           </div>
 

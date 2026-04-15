@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo } from "react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -173,37 +173,51 @@ interface Props {
 }
 
 export default function WeatherPlanningPanel({ onChange }: Props) {
-  const [open, setOpen] = useState(false);
-  const [slots, setSlots] = useState<TimeSlot[]>([newSlot()]);
-  const [complexity, setComplexity] = useState<ComplexityLevel>(0);
-  // Prevents showing stale default slot summary before localStorage has loaded
-  const [mounted, setMounted] = useState(false);
-  // Visibility setting: "always_open" | "closed_default" | "disabled"
-  const [visibility, setVisibility] = useState<"always_open" | "closed_default" | "disabled">("closed_default");
-
-  // Load persisted state on mount
-  useEffect(() => {
+  // Visibility setting: read once from localStorage at init to avoid setState-in-effect
+  const [visibility] = useState<"always_open" | "closed_default" | "disabled">(() => {
+    if (typeof window === "undefined") return "closed_default";
     try {
-      const vis = (localStorage.getItem("skystyle_weather_planning") ?? "closed_default") as "always_open" | "closed_default" | "disabled";
-      setVisibility(vis);
-
+      return (localStorage.getItem("skystyle_weather_planning") ?? "closed_default") as "always_open" | "closed_default" | "disabled";
+    } catch { return "closed_default"; }
+  });
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    try {
+      const vis = localStorage.getItem("skystyle_weather_planning") ?? "closed_default";
+      if (vis === "always_open") return true;
       const saved = localStorage.getItem("skystyle_planning_panel");
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<WeatherPlanningState & { open: boolean }>;
-        if (Array.isArray(parsed.slots) && parsed.slots.length > 0) setSlots(parsed.slots);
-        if (parsed.complexity != null) setComplexity(parsed.complexity as ComplexityLevel);
-        // Respect visibility setting when restoring open state
-        if (vis === "always_open") {
-          setOpen(true);
-        } else if (parsed.open != null) {
-          setOpen(parsed.open as boolean);
-        }
-      } else if (vis === "always_open") {
-        setOpen(true);
+        return parsed.open === true;
       }
     } catch { /* ignore */ }
-    setMounted(true);
-  }, []);
+    return false;
+  });
+  const [slots, setSlots] = useState<TimeSlot[]>(() => {
+    if (typeof window === "undefined") return [newSlot()];
+    try {
+      const saved = localStorage.getItem("skystyle_planning_panel");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<WeatherPlanningState & { open: boolean }>;
+        if (Array.isArray(parsed.slots) && parsed.slots.length > 0) return parsed.slots;
+      }
+    } catch { /* ignore */ }
+    return [newSlot()];
+  });
+  const [complexity, setComplexity] = useState<ComplexityLevel>(() => {
+    if (typeof window === "undefined") return 0;
+    try {
+      const saved = localStorage.getItem("skystyle_planning_panel");
+      if (saved) {
+        const parsed = JSON.parse(saved) as Partial<WeatherPlanningState & { open: boolean }>;
+        if (parsed.complexity != null) return parsed.complexity as ComplexityLevel;
+      }
+    } catch { /* ignore */ }
+    return 0;
+  });
+  // Prevents showing stale default slot summary before localStorage has loaded
+  // Lazy initializer reads directly from localStorage so this is always true on client
+  const mounted = typeof window !== "undefined";
 
   // Persist and notify parent on state changes
   const persist = useCallback(

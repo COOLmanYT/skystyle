@@ -616,7 +616,7 @@ export default function Dashboard({
     } finally {
       setAiLoading(false);
     }
-  }, [location, weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, userUnitPreference, sourceMode, customSources, userApiKey, byokProvider, clientCustomPrompt]);
+  }, [location, weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, isDev, showDiagnostics, userUnitPreference, sourceMode, customSources, userApiKey, byokProvider, clientCustomPrompt]);
 
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
