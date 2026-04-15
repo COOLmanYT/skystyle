@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import SmartBackButton from "@/components/SmartBackButton";
 
 function SimpleToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -51,9 +52,7 @@ export default function PrivacyClient() {
 
   return (
     <div className="min-h-screen px-6 py-16 max-w-2xl mx-auto" style={{ background: "var(--background)" }}>
-      <Link href="/" className="text-sm mb-8 inline-block hover:opacity-70" style={{ color: "var(--accent)" }}>
-        ← Back to Sky Style
-      </Link>
+      <SmartBackButton fallback="/" label="← Back to Sky Style" className="text-sm mb-8 inline-block btn-interact" style={{ color: "var(--accent)" }} />
 
       <h1 className="text-3xl font-bold mb-2" style={{ color: "var(--foreground)" }}>
         Privacy Policy

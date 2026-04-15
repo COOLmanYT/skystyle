@@ -19,10 +19,17 @@ function getLocalStorage(key: string, fallback: string): string {
 
 type LayoutMode = "symmetric" | "large-weather" | "large-settings";
 type ThemeMode = "system" | "light" | "dark";
+type WeatherPlanningVisibility = "always_open" | "closed_default" | "disabled";
+type FollowUpMode = "replace" | "chat";
 const LAYOUT_OPTIONS: { value: LayoutMode; label: string; desc: string }[] = [
   { value: "symmetric",      label: "Symmetrical Split",  desc: "Both panels are equal width" },
   { value: "large-weather",  label: "Large Weather",      desc: "Weather panel is wider (default)" },
   { value: "large-settings", label: "Large Settings",     desc: "Settings panel is wider" },
+];
+const WEATHER_PLANNING_OPTIONS: { value: WeatherPlanningVisibility; label: string; desc: string }[] = [
+  { value: "always_open",    label: "Always Open",        desc: "Panel starts expanded every time" },
+  { value: "closed_default", label: "Closed by Default",  desc: "Panel is collapsed by default (current)" },
+  { value: "disabled",       label: "Disabled",           desc: "Hide the Weather Planning panel entirely" },
 ];
 
 interface SettingsClientProps {
@@ -58,6 +65,20 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
   const [weatherOnly, setWeatherOnly] = useState(() => getLocalStorage("skystyle_weather_only", "false") === "true");
   const [defaultSimpleMode, setDefaultSimpleMode] = useState(
     () => getLocalStorage("skystyle_simple_mode", "true") === "true"
+  );
+
+  // Dashboard Behaviour settings
+  const [weatherPlanningVisibility, setWeatherPlanningVisibility] = useState<WeatherPlanningVisibility>(
+    () => (getLocalStorage("skystyle_weather_planning", "closed_default") as WeatherPlanningVisibility)
+  );
+  const [followUpMode, setFollowUpMode] = useState<FollowUpMode>(
+    () => (getLocalStorage("skystyle_followup_mode", "replace") as FollowUpMode)
+  );
+  const [showDiagnostics, setShowDiagnostics] = useState(
+    () => getLocalStorage("skystyle_show_diagnostics", "false") === "true"
+  );
+  const [byokOpenDefault, setByokOpenDefault] = useState(
+    () => getLocalStorage("skystyle_byok_open", "false") === "true"
   );
 
   // Layout settings
@@ -101,6 +122,10 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       localStorage.setItem("skystyle_extra_spacing", String(extraSpacing));
       localStorage.setItem("skystyle_extra_spacing_pages", extraSpacingPages.join(","));
       localStorage.setItem("skystyle_custom_spacing", String(customSpacing));
+      localStorage.setItem("skystyle_weather_planning", weatherPlanningVisibility);
+      localStorage.setItem("skystyle_followup_mode", followUpMode);
+      localStorage.setItem("skystyle_show_diagnostics", String(showDiagnostics));
+      localStorage.setItem("skystyle_byok_open", String(byokOpenDefault));
       try {
         // Encode gender before storing
         localStorage.setItem("skystyle_gender", btoa(gender));
@@ -290,6 +315,82 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
             checked={defaultSimpleMode}
             onChange={setDefaultSimpleMode}
             label="Default to Simple Mode on Terms & Privacy pages (plain-English summaries)"
+          />
+        </div>
+
+        {/* ── Dashboard Behaviour ── */}
+        <div
+          className="rounded-2xl p-5 space-y-5"
+          style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+        >
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+            Dashboard Behaviour
+          </p>
+
+          {/* Weather Planning visibility */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium" style={{ color: "var(--foreground)", opacity: 0.7 }}>Weather Planning Panel</p>
+            <div className="flex flex-wrap gap-2">
+              {WEATHER_PLANNING_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => setWeatherPlanningVisibility(opt.value)}
+                  className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                  style={{
+                    background: weatherPlanningVisibility === opt.value ? "var(--accent)" : "var(--background)",
+                    color: weatherPlanningVisibility === opt.value ? "#fff" : "var(--foreground)",
+                    border: "1px solid var(--card-border)",
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
+              {WEATHER_PLANNING_OPTIONS.find((o) => o.value === weatherPlanningVisibility)?.desc}
+            </p>
+          </div>
+
+          {/* Follow-Up Mode */}
+          <div className="space-y-2">
+            <p className="text-xs font-medium" style={{ color: "var(--foreground)", opacity: 0.7 }}>Follow-Up Mode</p>
+            <div className="flex gap-2">
+              {(["replace", "chat"] as FollowUpMode[]).map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setFollowUpMode(mode)}
+                  className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
+                  style={{
+                    background: followUpMode === mode ? "var(--accent)" : "var(--background)",
+                    color: followUpMode === mode ? "#fff" : "var(--foreground)",
+                    border: "1px solid var(--card-border)",
+                  }}
+                >
+                  {mode === "replace" ? "Replace Mode" : "Chat Mode"}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
+              {followUpMode === "replace"
+                ? "Follow-ups replace the current outfit suggestion (default)."
+                : "Follow-ups add new response blocks below, maintaining a conversation history."}
+            </p>
+          </div>
+
+          {/* Session Diagnostics */}
+          <Checkbox
+            checked={showDiagnostics}
+            onChange={setShowDiagnostics}
+            label="Show Session Diagnostics panel on Dashboard"
+          />
+
+          {/* BYOK open by default */}
+          <Checkbox
+            checked={byokOpenDefault}
+            onChange={setByokOpenDefault}
+            label="Expand Bring Your Own Key panel by default"
           />
         </div>
 

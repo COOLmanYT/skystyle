@@ -178,16 +178,28 @@ export default function WeatherPlanningPanel({ onChange }: Props) {
   const [complexity, setComplexity] = useState<ComplexityLevel>(0);
   // Prevents showing stale default slot summary before localStorage has loaded
   const [mounted, setMounted] = useState(false);
+  // Visibility setting: "always_open" | "closed_default" | "disabled"
+  const [visibility, setVisibility] = useState<"always_open" | "closed_default" | "disabled">("closed_default");
 
   // Load persisted state on mount
   useEffect(() => {
     try {
+      const vis = (localStorage.getItem("skystyle_weather_planning") ?? "closed_default") as "always_open" | "closed_default" | "disabled";
+      setVisibility(vis);
+
       const saved = localStorage.getItem("skystyle_planning_panel");
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<WeatherPlanningState & { open: boolean }>;
         if (Array.isArray(parsed.slots) && parsed.slots.length > 0) setSlots(parsed.slots);
         if (parsed.complexity != null) setComplexity(parsed.complexity as ComplexityLevel);
-        if (parsed.open != null) setOpen(parsed.open as boolean);
+        // Respect visibility setting when restoring open state
+        if (vis === "always_open") {
+          setOpen(true);
+        } else if (parsed.open != null) {
+          setOpen(parsed.open as boolean);
+        }
+      } else if (vis === "always_open") {
+        setOpen(true);
       }
     } catch { /* ignore */ }
     setMounted(true);
@@ -243,6 +255,9 @@ export default function WeatherPlanningPanel({ onChange }: Props) {
     () => slots.map((s) => `${formatSlotTime(s.startTime)}–${formatSlotTime(s.endTime)}`).join(", "),
     [slots]
   );
+
+  // Hidden when user has disabled this panel
+  if (visibility === "disabled") return null;
 
   return (
     <div

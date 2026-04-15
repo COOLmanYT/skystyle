@@ -128,6 +128,9 @@ export default function Dashboard({
   const [followUpText, setFollowUpText] = useState("");
   const [followUpLoading, setFollowUpLoading] = useState(false);
   const [followUpError, setFollowUpError] = useState<string | null>(null);
+  // Chat Mode: conversation history (alternative to Replace Mode)
+  const [followUpHistory, setFollowUpHistory] = useState<{ question: string; outfit: string; reasoning: string }[]>([]);
+  const [followUpMode, setFollowUpMode] = useState<"replace" | "chat">("replace");
   const [dailyLimits, setDailyLimits] = useState<DailyLimits | null>(initialDailyLimits);
   const [gender, setGender] = useState<string>("N/A");
   const [customGender, setCustomGender] = useState("");
@@ -162,13 +165,16 @@ export default function Dashboard({
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
   const router = useRouter();
 
-  // Session diagnostics (dev-only, never persisted)
+  // Session diagnostics (dev-only by default, optionally enabled for all users)
   const [diagLastAiStatus, setDiagLastAiStatus] = useState<"success" | "error" | null>(null);
   const [diagLastAiProvider, setDiagLastAiProvider] = useState<string | null>(null);
   const [diagLastWeatherStatus, setDiagLastWeatherStatus] = useState<"success" | "error" | null>(null);
   const [diagSessionErrors, setDiagSessionErrors] = useState(0);
   const [diagLastFetchAt, setDiagLastFetchAt] = useState<string | null>(null);
   const [diagFallbackEvents, _setDiagFallbackEvents] = useState<string[]>([]);
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
+  // BYOK collapsible
+  const [byokOpen, setByokOpen] = useState(false);
 
   // Returns the gradient/background CSS class for plan-based primary buttons
   const planBtnClass = isDev ? "btn-plan-dev" : isPro ? "btn-plan-pro" : "btn-plan-free";
@@ -258,6 +264,14 @@ export default function Dashboard({
 
       const savedClientCustomPrompt = localStorage.getItem("skystyle_byok_custom_prompt");
       if (savedClientCustomPrompt !== null) setClientCustomPrompt(savedClientCustomPrompt);
+
+      // New behaviour settings
+      const savedFollowUpMode = localStorage.getItem("skystyle_followup_mode");
+      if (savedFollowUpMode === "chat" || savedFollowUpMode === "replace") setFollowUpMode(savedFollowUpMode);
+      const savedShowDiag = localStorage.getItem("skystyle_show_diagnostics");
+      setShowDiagnostics(savedShowDiag === "true");
+      const savedByokOpen = localStorage.getItem("skystyle_byok_open");
+      if (savedByokOpen !== null) setByokOpen(savedByokOpen === "true");
     } catch {
       /* ignore */
     }
@@ -477,6 +491,7 @@ export default function Dashboard({
     setAiRevealed(false);
     setFollowUpText("");
     setFollowUpError(null);
+    setFollowUpHistory([]);
   }, []);
 
   /** Triggered by the "Fetch Weather & Style" button and the Refresh button. */
@@ -488,6 +503,7 @@ export default function Dashboard({
     setAiRevealed(false);
     setFollowUpText("");
     setFollowUpError(null);
+    setFollowUpHistory([]);
 
     if (weatherOnly) {
       // Weather-only mode: single fetch, no AI
@@ -553,16 +569,16 @@ export default function Dashboard({
       if (weatherRes.ok) {
         const weather = await weatherRes.json();
         setWeatherData(weather);
-        if (isDev) {
+        if (isDev || showDiagnostics) {
           setDiagLastWeatherStatus("success");
           setDiagLastFetchAt(new Date().toISOString());
         }
-      } else if (isDev) {
+      } else if (isDev || showDiagnostics) {
         setDiagLastWeatherStatus("error");
         setDiagSessionErrors((n) => n + 1);
       }
     } catch {
-      if (isDev) {
+      if (isDev || showDiagnostics) {
         setDiagLastWeatherStatus("error");
         setDiagSessionErrors((n) => n + 1);
       }
@@ -577,7 +593,7 @@ export default function Dashboard({
         let errorMessage = "Something went wrong.";
         try { const data = await styleRes.json(); errorMessage = data.error ?? errorMessage; } catch { /* non-JSON */ }
         setError(errorMessage);
-        if (isDev) {
+        if (isDev || showDiagnostics) {
           setDiagLastAiStatus("error");
           setDiagSessionErrors((n) => n + 1);
         }
@@ -585,7 +601,7 @@ export default function Dashboard({
         const data = await styleRes.json() as StyleResponse;
         setResult(data);
         if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
-        if (isDev) {
+        if (isDev || showDiagnostics) {
           setDiagLastAiStatus("success");
           const provider = data.recommendation?.modelUsed ?? data.meta?.modelUsed ?? null;
           if (provider) setDiagLastAiProvider(provider);
@@ -593,7 +609,7 @@ export default function Dashboard({
       }
     } catch {
       setError("Network error — please try again.");
-      if (isDev) {
+      if (isDev || showDiagnostics) {
         setDiagLastAiStatus("error");
         setDiagSessionErrors((n) => n + 1);
       }
@@ -610,16 +626,24 @@ export default function Dashboard({
       setFollowUpError(`Daily follow-up limit reached (${dailyLimits!.followUps.used}/${dailyLimits!.followUps.limit}).`);
       return;
     }
+    const questionText = followUpText.trim();
     setFollowUpLoading(true);
     setFollowUpError(null);
+    // In chat mode, always base follow-up on latest outfit
+    const baseOutfit = followUpMode === "chat" && followUpHistory.length > 0
+      ? followUpHistory[followUpHistory.length - 1].outfit
+      : result.recommendation.outfit;
+    const baseReasoning = followUpMode === "chat" && followUpHistory.length > 0
+      ? followUpHistory[followUpHistory.length - 1].reasoning
+      : result.recommendation.reasoning;
     try {
       const res = await fetch("/api/followup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: followUpText.trim(),
-          previousOutfit: result.recommendation.outfit,
-          previousReasoning: result.recommendation.reasoning,
+          message: questionText,
+          previousOutfit: baseOutfit,
+          previousReasoning: baseReasoning,
           weather: result.weather,
           ...(userApiKey ? { userApiKey } : {}),
         }),
@@ -633,24 +657,33 @@ export default function Dashboard({
           /* non-JSON */
         }
         setFollowUpError(errorMessage);
-        if (isDev) {
+        if (isDev || showDiagnostics) {
           setDiagLastAiStatus("error");
           setDiagSessionErrors((n) => n + 1);
         }
       } else {
         const data = await res.json();
-        setResult((prev) =>
-          prev ? { ...prev, recommendation: data.recommendation } : prev
-        );
+        if (followUpMode === "chat") {
+          // Chat mode: append to history without replacing main result
+          setFollowUpHistory((prev) => [
+            ...prev,
+            { question: questionText, outfit: data.recommendation.outfit, reasoning: data.recommendation.reasoning },
+          ]);
+        } else {
+          // Replace mode: overwrite current result
+          setResult((prev) =>
+            prev ? { ...prev, recommendation: data.recommendation } : prev
+          );
+        }
         if (data.meta?.dailyLimits) {
           setDailyLimits(data.meta.dailyLimits);
         }
         setFollowUpText("");
-        if (isDev) setDiagLastAiStatus("success");
+        if (isDev || showDiagnostics) setDiagLastAiStatus("success");
       }
     } catch {
       setFollowUpError("Network error — please try again.");
-      if (isDev) {
+      if (isDev || showDiagnostics) {
         setDiagLastAiStatus("error");
         setDiagSessionErrors((n) => n + 1);
       }
@@ -1554,7 +1587,7 @@ export default function Dashboard({
                       className="text-xs font-semibold uppercase tracking-widest mb-2"
                       style={{ color: "var(--foreground)", opacity: 0.4 }}
                     >
-                      Follow Up
+                      {followUpMode === "chat" ? "💬 Chat" : "Follow Up"}
                       {dailyLimits && (
                         <span style={{ opacity: 0.7, fontWeight: "normal", textTransform: "none" }}>
                           {" "}
@@ -1566,6 +1599,29 @@ export default function Dashboard({
                         </span>
                       )}
                     </p>
+
+                    {/* Chat Mode: conversation history */}
+                    {followUpMode === "chat" && followUpHistory.length > 0 && (
+                      <div className="space-y-3 mb-3">
+                        {followUpHistory.map((item, idx) => (
+                          <div key={idx} className="space-y-1">
+                            <div
+                              className="rounded-xl px-3 py-2 text-xs"
+                              style={{ background: "var(--accent)", color: "#fff", opacity: 0.9, alignSelf: "flex-end", maxWidth: "85%", marginLeft: "auto" }}
+                            >
+                              {item.question}
+                            </div>
+                            <div
+                              className="rounded-xl px-3 py-2 text-xs leading-relaxed"
+                              style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
+                            >
+                              {item.outfit}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
                     <form onSubmit={handleFollowUp} className="flex gap-2">
                       <label htmlFor="followup-input" className="sr-only">Follow-up question</label>
                       <input
@@ -1573,7 +1629,7 @@ export default function Dashboard({
                         type="text"
                         value={followUpText}
                         onChange={(e) => setFollowUpText(e.target.value)}
-                        placeholder="e.g. what if I need to wear shoes?"
+                        placeholder={followUpMode === "chat" ? "Ask a follow-up…" : "e.g. what if I need to wear shoes?"}
                         className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
                         style={{
                           background: "var(--background)",
@@ -1683,21 +1739,22 @@ export default function Dashboard({
               </WeatherEffectCard>
             )}
 
-            {isDev && (
+            {(isDev || showDiagnostics) && (
               <WeatherEffectCard
                 condition={w ? getWeatherCondition(w.description) : "default"}
                 windSpeed={w?.windSpeed ?? 0}
                 className="rounded-2xl p-5 space-y-3"
                 style={{
                   background: "var(--card)",
-                  border: "1px solid #bf5af2",
+                  border: isDev ? "1px solid #ff9500" : "1px solid var(--card-border)",
                 }}
               >
                 <h2
                   className="text-xs font-semibold uppercase tracking-widest"
-                  style={{ color: "#bf5af2" }}
+                  style={{ color: isDev ? "#ff9500" : "var(--foreground)" }}
                 >
                   🔬 Session Diagnostics
+                  {!isDev && <span className="ml-1 normal-case font-normal" style={{ opacity: 0.5 }}>(enabled in settings)</span>}
                 </h2>
                 <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: "var(--foreground)" }}>
                   <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
@@ -1707,7 +1764,7 @@ export default function Dashboard({
                     </p>
                   </div>
                   <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
-                    <span style={{ opacity: 0.5 }}>AI Provider</span>
+                    <span style={{ opacity: 0.5 }}>AI Model</span>
                     <p className="font-semibold mt-0.5" style={{ opacity: diagLastAiProvider ? 1 : 0.4 }}>
                       {diagLastAiProvider ?? "—"}
                     </p>
@@ -1720,7 +1777,7 @@ export default function Dashboard({
                   </div>
                   <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
                     <span style={{ opacity: 0.5 }}>Session Errors</span>
-                    <p className="font-semibold mt-0.5" style={{ color: diagSessionErrors > 0 ? "#ff9500" : "#30d158" }}>
+                    <p className="font-semibold mt-0.5" style={{ color: diagSessionErrors > 0 ? "#ff3b30" : "#30d158" }}>
                       {diagSessionErrors}
                     </p>
                   </div>
@@ -2318,18 +2375,31 @@ export default function Dashboard({
             {/* ── Bring Your Own Key (Pro / Dev) ── */}
             {(isPro || isDev) && (
               <div
-                className="rounded-2xl p-4 space-y-3"
+                className="rounded-2xl overflow-hidden"
                 style={{
                   background: "var(--card)",
                   border: "1px solid var(--card-border)",
                 }}
               >
-                <p
-                  className="text-xs font-semibold uppercase tracking-widest"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
+                {/* Collapsible header */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !byokOpen;
+                    setByokOpen(next);
+                    try { localStorage.setItem("skystyle_byok_open", String(next)); } catch { /* ignore */ }
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-3 text-xs btn-interact"
+                  style={{ color: "var(--foreground)" }}
+                  aria-expanded={byokOpen}
                 >
-                  🔑 Bring Your Own Key
-                </p>
+                  <span className="font-semibold uppercase tracking-widest" style={{ opacity: 0.4 }}>
+                    🔑 Bring Your Own Key
+                  </span>
+                  <span style={{ opacity: 0.4, fontSize: 10 }}>{byokOpen ? "▲" : "▼"}</span>
+                </button>
+                {byokOpen && (
+                <div className="px-4 pb-4 space-y-3">
 
                 {/* AI provider selector */}
                 <div>
@@ -2434,6 +2504,8 @@ export default function Dashboard({
                     </button>
                   )}
                 </div>
+                </div>
+                )}
               </div>
             )}
 
