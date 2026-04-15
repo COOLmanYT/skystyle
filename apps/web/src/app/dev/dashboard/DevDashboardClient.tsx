@@ -51,11 +51,11 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
   }, []);
 
   useEffect(() => {
-    if (section === "triage") fetchDeletion();
+    if (section === "triage") { void (async () => fetchDeletion())(); }
   }, [section, fetchDeletion]);
 
   useEffect(() => {
-    if (selectedUserId) fetchChat(selectedUserId);
+    if (selectedUserId) { void (async () => fetchChat(selectedUserId))(); }
   }, [selectedUserId, fetchChat]);
 
   async function handleTriage(id: string, action: "approve" | "decline") {

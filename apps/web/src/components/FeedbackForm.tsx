@@ -42,7 +42,7 @@ export default function FeedbackForm({
   onSuccess,
   onCancel,
 }: FeedbackFormProps) {
-  const [simpleMode, setSimpleMode] = useState(true);
+  const simpleMode = getLocalStorage("skystyle_simple_mode", "true") === "true";
   const [category, setCategory] = useState(initialCategory ?? "Other");
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
@@ -53,9 +53,6 @@ export default function FeedbackForm({
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    setSimpleMode(getLocalStorage("skystyle_simple_mode", "true") === "true");
-  }, []);
 
   // Clear countdown interval on unmount
   useEffect(() => {

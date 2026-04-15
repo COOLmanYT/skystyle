@@ -662,7 +662,7 @@ async function validatePublicHttpsUrlForRss(parsed: URL): Promise<void> {
   }
 
   // Disallow userinfo (username:password@host)
-  if ((parsed as any).username || (parsed as any).password || parsed.href.includes("@")) {
+  if (parsed.username || parsed.password || parsed.href.includes("@")) {
     throw new Error("RSS feed URL must not contain credentials");
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
 import WeatherPlanningPanel from "./WeatherPlanningPanel";
 import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
@@ -171,7 +171,7 @@ export default function Dashboard({
   const [diagLastWeatherStatus, setDiagLastWeatherStatus] = useState<"success" | "error" | null>(null);
   const [diagSessionErrors, setDiagSessionErrors] = useState(0);
   const [diagLastFetchAt, setDiagLastFetchAt] = useState<string | null>(null);
-  const [diagFallbackEvents, _setDiagFallbackEvents] = useState<string[]>([]);
+  const [diagFallbackEvents] = useState<string[]>([]);
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   // BYOK collapsible
   const [byokOpen, setByokOpen] = useState(false);
@@ -772,47 +772,6 @@ export default function Dashboard({
     ? 1
     : layoutMode === "large-settings" ? 1.5
     : 1; // symmetric or large-weather
-
-  // Pre-build the closet-items regex whenever the closet changes, avoiding per-render reconstruction
-  const closetLinksData = useMemo(() => {
-    const validItems = closetItems.filter((s): s is string => typeof s === "string" && s.length > 0);
-    if (!validItems.length) return null;
-    const sorted = [...validItems].sort((a, b) => b.length - a.length);
-    const escaped = sorted.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
-    const regex = new RegExp(`(${escaped.join("|")})`, "gi");
-    return { sorted, regex };
-  }, [closetItems]);
-
-  /** Renders outfit text with matching closet item names as clickable underlined links */
-  const renderOutfitWithClosetLinks = useCallback((text: string): React.ReactNode => {
-    if (!text) return text ?? "";
-    if (!closetLinksData) return text;
-    const { sorted, regex } = closetLinksData;
-    // Reset lastIndex in case of reuse (split doesn't reset it automatically on all runtimes)
-    regex.lastIndex = 0;
-    const parts = text.split(regex);
-    return parts.map((part, i) => {
-      const matched = sorted.find((item) => item.toLowerCase() === part.toLowerCase());
-      if (matched) {
-        return (
-          <a
-            key={i}
-            href="#closet-section"
-            onClick={(e) => {
-              e.preventDefault();
-              document.getElementById("closet-section")?.scrollIntoView({ behavior: "smooth" });
-            }}
-            className="underline cursor-pointer hover:opacity-70"
-            style={{ color: "var(--accent)" }}
-            aria-label={`View ${part} in your closet`}
-          >
-            {part}
-          </a>
-        );
-      }
-      return <span key={i}>{part}</span>;
-    });
-  }, [closetLinksData]);
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--background)" }}>
