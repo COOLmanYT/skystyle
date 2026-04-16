@@ -51,8 +51,9 @@ interface SecurityClientProps {
   embedded?: boolean;
 }
 
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
+
 export default function SecurityClient({ mfaEnabled: initialMfaEnabled, embedded = false }: SecurityClientProps) {
-  const dateTimeOptions: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
   const [mfaEnabled, setMfaEnabled] = useState(initialMfaEnabled);
   const [setupStep, setSetupStep] = useState<"idle" | "qr" | "codes">("idle");
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -528,7 +529,7 @@ export default function SecurityClient({ mfaEnabled: initialMfaEnabled, embedded
                       {key.key_preview}
                     </p>
                     <p className="text-xs mt-0.5" style={{ color: "var(--foreground)", opacity: 0.45 }}>
-                      Created {new Date(key.created_at).toLocaleString(undefined, dateTimeOptions)} {key.revoked ? "· Revoked" : "· Active"}
+                      Created {new Date(key.created_at).toLocaleString(undefined, DATE_TIME_OPTIONS)} {key.revoked ? "· Revoked" : "· Active"}
                     </p>
                   </div>
                   {!key.revoked && (

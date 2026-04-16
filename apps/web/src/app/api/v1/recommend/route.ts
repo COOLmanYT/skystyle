@@ -24,15 +24,11 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { verifyApiKey } from "@/lib/api-keys";
+import { verifyApiKey, API_KEY_PREFIX, API_KEY_PREVIEW_LENGTH } from "@/lib/api-keys";
 import { getWeather } from "@/lib/weather";
 import { getStyleRecommendation } from "@/lib/ai";
 import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
-import { getCredits, deductCredit } from "@/lib/credits";
-
-const API_KEY_PREFIX = "sk_live_";
-// key_preview is "sk_live_" (8 chars) + 4 chars = 12 chars total
-const KEY_PREVIEW_LENGTH = 12;
+import { getCredits, deductCredit, CreditRecord } from "@/lib/credits";
 
 function extractBearerToken(req: NextRequest): string | null {
   // Support both "Authorization" and "Authorisation" (British spelling)
@@ -46,7 +42,7 @@ function extractBearerToken(req: NextRequest): string | null {
 async function resolveApiKeyUser(apiKey: string): Promise<string | null> {
   if (!apiKey.startsWith(API_KEY_PREFIX)) return null;
 
-  const preview = apiKey.slice(0, KEY_PREVIEW_LENGTH);
+  const preview = apiKey.slice(0, API_KEY_PREVIEW_LENGTH);
 
   // Narrow candidates by preview before doing the expensive scrypt verify
   const { data: candidates } = await supabaseAdmin
@@ -63,6 +59,28 @@ async function resolveApiKeyUser(apiKey: string): Promise<string | null> {
     }
   }
   return null;
+}
+
+/** Return the next weekly reset date (ISO date string) for a credit record, or a fallback. */
+async function getCreditsResetDate(userId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("credits")
+    .select("last_reset_date")
+    .eq("user_id", userId)
+    .single();
+  if (!data) return "within 7 days";
+  const record = data as Pick<CreditRecord, "last_reset_date">;
+  const reset = new Date(record.last_reset_date);
+  reset.setDate(reset.getDate() + 7);
+  return reset.toISOString().split("T")[0];
+}
+
+function celsiusToFahrenheit(c: number): number {
+  return Math.round((c * 9) / 5 + 32);
+}
+
+function kmhToMph(kmh: number): number {
+  return Math.round(kmh * 0.621371);
 }
 
 export async function POST(req: NextRequest) {
@@ -102,6 +120,12 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (body.unit !== undefined && body.unit !== "metric" && body.unit !== "imperial") {
+    return NextResponse.json(
+      { error: "unit must be \"metric\" or \"imperial\"." },
+      { status: 400 }
+    );
+  }
   const unit: "metric" | "imperial" =
     body.unit === "imperial" ? "imperial" : "metric";
 
@@ -125,8 +149,9 @@ export async function POST(req: NextRequest) {
     if (isPro) {
       const balance = await getCredits(userId);
       if (balance <= 0) {
+        const resetDate = await getCreditsResetDate(userId);
         return NextResponse.json(
-          { error: "Insufficient credits. Your weekly credits reset in a few days." },
+          { error: `Insufficient credits. Weekly credits reset on ${resetDate}.` },
           { status: 402 }
         );
       }
@@ -176,15 +201,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 8. Return clean public response
+  // 8. Return clean public response, with weather in the requested unit system
+  const isImperial = unit === "imperial";
   return NextResponse.json({
     outfit: recommendation.outfit,
     reasoning: recommendation.reasoning,
     weather: {
-      temp_c: weather.temp,
-      feels_like_c: weather.feelsLike,
+      temp: isImperial ? celsiusToFahrenheit(weather.temp) : weather.temp,
+      feels_like: isImperial ? celsiusToFahrenheit(weather.feelsLike) : weather.feelsLike,
+      temp_unit: isImperial ? "°F" : "°C",
       humidity_pct: weather.humidity,
-      wind_kmh: weather.windSpeed,
+      wind_speed: isImperial ? kmhToMph(weather.windSpeed) : weather.windSpeed,
+      wind_speed_unit: isImperial ? "mph" : "km/h",
       wind_dir: weather.windDir,
       description: weather.description,
       rain_chance_pct: weather.rainChance,
