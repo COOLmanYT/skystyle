@@ -9,6 +9,7 @@ const PREVIEW_CHARS = 4;
 const HEX_FACTOR = 2;
 const SALT_HEX_LENGTH = HASH_SALT_BYTES * HEX_FACTOR;
 const HASH_HEX_LENGTH = SCRYPT_KEYLEN * HEX_FACTOR;
+const STORED_HASH_REGEX = new RegExp(`^([a-f0-9]{${SALT_HEX_LENGTH}}):([a-f0-9]{${HASH_HEX_LENGTH}})$`);
 const SCRYPT_OPTIONS = {
   N: 16384,
   r: 8,
@@ -29,7 +30,7 @@ export function hashApiKey(apiKey: string): string {
 }
 
 export function verifyApiKey(apiKey: string, storedHash: string): boolean {
-  const match = new RegExp(`^([a-f0-9]{${SALT_HEX_LENGTH}}):([a-f0-9]{${HASH_HEX_LENGTH}})$`).exec(storedHash);
+  const match = STORED_HASH_REGEX.exec(storedHash);
   // If the stored hash is malformed, reject immediately — no scrypt needed
   if (!match) return false;
   const [, salt, expectedHash] = match;

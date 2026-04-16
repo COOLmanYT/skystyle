@@ -30,6 +30,18 @@ import { getStyleRecommendation } from "@/lib/ai";
 import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
 import { getCredits, deductCredit, CreditRecord } from "@/lib/credits";
 
+const LAT_MIN = -90;
+const LAT_MAX = 90;
+const LON_MIN = -180;
+const LON_MAX = 180;
+
+interface RecommendBody {
+  lat?: unknown;
+  lon?: unknown;
+  unit?: unknown;
+  gender?: unknown;
+}
+
 function extractBearerToken(req: NextRequest): string | null {
   // Support both "Authorization" and "Authorisation" (British spelling)
   const header =
@@ -102,7 +114,7 @@ export async function POST(req: NextRequest) {
   }
 
   // 2. Parse and validate request body
-  let body: { lat?: unknown; lon?: unknown; unit?: unknown; gender?: unknown };
+  let body: RecommendBody;
   try {
     body = await req.json();
   } catch {
@@ -112,10 +124,10 @@ export async function POST(req: NextRequest) {
   const { lat, lon } = body;
   if (
     typeof lat !== "number" || typeof lon !== "number" ||
-    lat < -90 || lat > 90 || lon < -180 || lon > 180
+    lat < LAT_MIN || lat > LAT_MAX || lon < LON_MIN || lon > LON_MAX
   ) {
     return NextResponse.json(
-      { error: "lat must be a number between -90 and 90, and lon between -180 and 180." },
+      { error: `lat must be a number between ${LAT_MIN} and ${LAT_MAX}, and lon between ${LON_MIN} and ${LON_MAX}.` },
       { status: 400 }
     );
   }
