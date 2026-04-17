@@ -50,7 +50,7 @@ function kmhToMph(kmh: number): number {
 
 async function handleWeather(
   req: NextRequest,
-  _: ApiKeyContext  // eslint-disable-line @typescript-eslint/no-unused-vars
+  _ctx: ApiKeyContext  // eslint-disable-line @typescript-eslint/no-unused-vars
 ): Promise<NextResponse> {
   const { searchParams } = req.nextUrl;
 

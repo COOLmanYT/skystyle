@@ -59,6 +59,9 @@ async function resolveApiKey(
 
   for (const row of candidates) {
     if (verifyApiKey(apiKey, row.key_hash as string)) {
+      // The preview window (API_KEY_PREVIEW_LENGTH chars) makes collisions
+      // vanishingly rare. verifyApiKey uses timingSafeEqual internally, so
+      // timing cannot reveal whether a candidate matched.
       return { id: row.id as string, userId: row.user_id as string };
     }
   }
