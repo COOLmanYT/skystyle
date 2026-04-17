@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import HamburgerNav from "@/components/HamburgerNav";
 import { handleSignOut } from "@/app/actions";
+import { API_DASHBOARD_ENDPOINTS } from "@/lib/api-key-credits";
 
 interface ApiKey {
   id: string;
@@ -25,7 +26,6 @@ interface UsagePayload {
   requestsOverTime: UsagePoint[];
 }
 
-const ENDPOINTS = ["/recommend", "/recweather", "/weather", "/closet"] as const;
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
 const MIN_VISIBLE_NON_ZERO_BAR_PERCENT = 6;
 const MIN_BAR_PERCENT = 2;
@@ -278,7 +278,7 @@ export default function ApiDashboardClient() {
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {ENDPOINTS.map((endpoint) => (
+                {API_DASHBOARD_ENDPOINTS.map((endpoint) => (
                   <div key={endpoint} className="rounded-xl p-3" style={{ background: "var(--background)" }}>
                     <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>{endpoint}</p>
                     <p className="text-lg font-semibold mt-0.5" style={{ color: "var(--foreground)" }}>

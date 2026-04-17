@@ -4,10 +4,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncPublicUser } from "@/lib/sync-user";
-import { normalizeApiUsageEndpoint } from "@/lib/api-key-credits";
+import { API_DASHBOARD_ENDPOINTS, normalizeApiUsageEndpoint } from "@/lib/api-key-credits";
 
-const DASHBOARD_ENDPOINTS = ["/recommend", "/recweather", "/weather", "/closet"] as const;
-type DashboardEndpoint = (typeof DASHBOARD_ENDPOINTS)[number];
+type DashboardEndpoint = (typeof API_DASHBOARD_ENDPOINTS)[number];
 const LOOKBACK_HOURS = 24;
 const BUCKET_COUNT = 24;
 const FIRST_BUCKET_OFFSET_HOURS = LOOKBACK_HOURS - 1;
@@ -46,7 +45,7 @@ export async function GET() {
     .map((row) => row.id)
     .filter((id): id is string => typeof id === "string" && id.length > 0);
 
-  const emptyCounts = DASHBOARD_ENDPOINTS.reduce<Record<DashboardEndpoint, number>>((acc, endpoint) => {
+  const emptyCounts = API_DASHBOARD_ENDPOINTS.reduce<Record<DashboardEndpoint, number>>((acc, endpoint) => {
     acc[endpoint] = 0;
     return acc;
   }, {} as Record<DashboardEndpoint, number>);

@@ -20,6 +20,7 @@ import { getEndpointCreditCost, getHalfCreditCharge } from "@/lib/api-key-credit
 
 /** Default rate limit when API_RATE_LIMIT_PER_MINUTE is not set. */
 const DEFAULT_RATE_LIMIT = 60;
+const MAX_CREDIT_DEDUCTION_RETRIES = 3;
 
 export interface ApiKeyContext {
   /** Primary key of the matching row in api_keys. */
@@ -81,7 +82,7 @@ async function deductApiKeyCredits(apiKeyId: string, amount: number): Promise<bo
   if (!Number.isFinite(amount) || amount <= 0) return true;
   const debit = Math.max(1, Math.floor(amount));
 
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < MAX_CREDIT_DEDUCTION_RETRIES; attempt += 1) {
     const { data: current } = await supabaseAdmin
       .from("api_keys")
       .select("credits_remaining, credits_used")

@@ -7,6 +7,7 @@ export const API_ENDPOINT_CREDIT_COSTS: Record<string, number> = {
   "/weather": 1,
   "/closet": 1,
 };
+export const API_DASHBOARD_ENDPOINTS = ["/recommend", "/recweather", "/weather", "/closet"] as const;
 
 export function getInitialApiKeyCredits(): number {
   const raw = Number.parseInt(process.env.API_KEY_INITIAL_CREDITS ?? "", 10);
@@ -20,12 +21,12 @@ export function normalizeApiUsageEndpoint(endpoint: string): string {
   if (trimmed.startsWith("/api/v1/")) {
     const segment = trimmed.split("/").filter(Boolean).pop() ?? "";
     // Keep legacy support for pre-rename logs/clients that still report recweath.
-    // Remove after old API clients are sunset (target: SKY-4.x cleanup cycle).
+    // Remove once all clients are on SKY-5.0+.
     if (segment === "recweath") return "/recweather";
     return segment ? `/${segment}` : "";
   }
   // Keep legacy support for pre-rename logs/clients that still report recweath.
-  // Remove after old API clients are sunset (target: SKY-4.x cleanup cycle).
+  // Remove once all clients are on SKY-5.0+.
   if (trimmed === "/recweath") return "/recweather";
   return trimmed;
 }
