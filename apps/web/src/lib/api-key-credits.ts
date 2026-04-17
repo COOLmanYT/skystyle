@@ -20,10 +20,12 @@ export function normalizeApiUsageEndpoint(endpoint: string): string {
   if (trimmed.startsWith("/api/v1/")) {
     const segment = trimmed.split("/").filter(Boolean).pop() ?? "";
     // Keep legacy support for pre-rename logs/clients that still report recweath.
+    // Remove after old API clients are sunset (target: SKY-4.x cleanup cycle).
     if (segment === "recweath") return "/recweather";
     return segment ? `/${segment}` : "";
   }
   // Keep legacy support for pre-rename logs/clients that still report recweath.
+  // Remove after old API clients are sunset (target: SKY-4.x cleanup cycle).
   if (trimmed === "/recweath") return "/recweather";
   return trimmed;
 }

@@ -66,7 +66,7 @@ async function resolveApiKey(
       return {
         id: row.id as string,
         userId: row.user_id as string,
-        creditsRemaining: Math.max(0, Number(row.credits_remaining) || 0),
+        creditsRemaining: Math.max(0, Number(row.credits_remaining ?? 0)),
       };
     }
   }
@@ -88,8 +88,8 @@ async function deductApiKeyCredits(apiKeyId: string, amount: number): Promise<bo
       .eq("id", apiKeyId)
       .single();
 
-    const remaining = Math.max(0, Number(current?.credits_remaining) || 0);
-    const used = Math.max(0, Number(current?.credits_used) || 0);
+    const remaining = Math.max(0, Number(current?.credits_remaining ?? 0));
+    const used = Math.max(0, Number(current?.credits_used ?? 0));
     if (remaining < debit) return false;
 
     const { data: updated } = await supabaseAdmin

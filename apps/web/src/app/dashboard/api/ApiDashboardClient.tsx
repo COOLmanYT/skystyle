@@ -237,7 +237,7 @@ export default function ApiDashboardClient() {
                       Status: <span aria-label={`API key status ${key.revoked ? "revoked" : "active"}`}>{key.revoked ? "Revoked" : "Active"}</span>
                     </p>
                     <p className="text-xs mt-0.5" style={{ color: "var(--foreground)", opacity: 0.45 }}>
-                      Credits: {Math.max(0, Number(key.credits_remaining) || 0)} remaining · {Math.max(0, Number(key.credits_used) || 0)} used
+                      Credits: {Math.max(0, Number(key.credits_remaining ?? 0))} remaining · {Math.max(0, Number(key.credits_used ?? 0))} used
                     </p>
                   </div>
                   {!key.revoked && (
