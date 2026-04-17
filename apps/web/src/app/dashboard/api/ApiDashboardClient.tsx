@@ -287,7 +287,7 @@ export default function ApiDashboardClient() {
                     {usage.requestsOverTime.map((point) => {
                       const height = maxChartValue > 0 ? Math.max((point.count / maxChartValue) * 100, point.count > 0 ? 6 : 2) : 2;
                       return (
-                        <div key={`${point.label}-${point.count}`} className="flex-1 rounded-sm" style={{ height: `${height}%`, background: "var(--accent)", opacity: 0.75 }} title={`${point.label}: ${point.count}`} />
+                        <div key={point.label} className="flex-1 rounded-sm" style={{ height: `${height}%`, background: "var(--accent)", opacity: 0.75 }} title={`${point.label}: ${point.count}`} />
                       );
                     })}
                   </div>

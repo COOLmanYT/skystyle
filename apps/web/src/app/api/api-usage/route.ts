@@ -18,12 +18,12 @@ function normalizeEndpoint(value: string): string {
 }
 
 function buildHourlyBuckets(nowMs: number): Array<{ startMs: number; label: string; count: number }> {
-  const startHour = new Date(nowMs - 23 * 60 * 60 * 1000);
-  startHour.setMinutes(0, 0, 0);
+  const bucketStartTime = new Date(nowMs - 23 * 60 * 60 * 1000);
+  bucketStartTime.setMinutes(0, 0, 0);
   const buckets: Array<{ startMs: number; label: string; count: number }> = [];
   for (let i = 0; i < 24; i += 1) {
-    const startMs = startHour.getTime() + i * 60 * 60 * 1000;
-    const label = new Date(startMs).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const startMs = bucketStartTime.getTime() + i * 60 * 60 * 1000;
+    const label = new Date(startMs).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
     buckets.push({ startMs, label, count: 0 });
   }
   return buckets;
