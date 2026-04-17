@@ -1,4 +1,4 @@
-import { randomBytes, scryptSync, timingSafeEqual } from "crypto";
+import { randomBytes, scrypt, scryptSync, timingSafeEqual } from "crypto";
 
 export const API_KEY_PREFIX = "sk_live_";
 export const API_KEY_PREVIEW_LENGTH = API_KEY_PREFIX.length + 4; // "sk_live_" + 4 random chars
@@ -29,11 +29,16 @@ export function hashApiKey(apiKey: string): string {
   return `${salt}:${hash}`;
 }
 
-export function verifyApiKey(apiKey: string, storedHash: string): boolean {
+export async function verifyApiKey(apiKey: string, storedHash: string): Promise<boolean> {
   const match = STORED_HASH_REGEX.exec(storedHash);
   // If the stored hash is malformed, reject immediately — no scrypt needed
   if (!match) return false;
   const [, salt, expectedHash] = match;
-  const computedHash = scryptSync(apiKey, salt, SCRYPT_KEYLEN, SCRYPT_OPTIONS).toString("hex");
+  const computedHash = await new Promise<string>((resolve, reject) => {
+    scrypt(apiKey, salt, SCRYPT_KEYLEN, SCRYPT_OPTIONS, (err, derivedKey) => {
+      if (err) reject(err);
+      else resolve(derivedKey.toString("hex"));
+    });
+  });
   return timingSafeEqual(Buffer.from(computedHash, "hex"), Buffer.from(expectedHash, "hex"));
 }

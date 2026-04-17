@@ -309,6 +309,15 @@ ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can read own api_keys"
   ON api_keys FOR SELECT USING ((select auth.uid()) = user_id);
 
+-- Index to make key_preview lookups fast (used on every API request)
+CREATE INDEX IF NOT EXISTS api_keys_key_preview_revoked_idx
+  ON api_keys (key_preview, revoked);
+
+-- RLS is row-level only; revoke key_hash from client roles so it stays server-only
+REVOKE SELECT ON TABLE api_keys FROM anon, authenticated;
+GRANT SELECT (id, user_id, key_preview, created_at, revoked)
+  ON api_keys TO authenticated;
+
 -- ------------------------------------------------------------
 -- 15. API Usage Logs (per-key request tracking for rate-limiting and analytics)
 -- ------------------------------------------------------------
@@ -325,7 +334,10 @@ CREATE TABLE IF NOT EXISTS api_usage_logs (
 CREATE INDEX IF NOT EXISTS idx_api_usage_logs_key_time
   ON api_usage_logs (api_key_id, timestamp DESC);
 
--- Service role has full access (used by API routes); no RLS needed (admin-only table)
+-- Service role has full access (used by API routes); deny all client roles by default
+ALTER TABLE api_usage_logs ENABLE ROW LEVEL SECURITY;
+-- No policies are created for api_usage_logs so client roles are denied by default.
+-- Service role access used by API routes remains unaffected.
 
 -- ------------------------------------------------------------
 -- 16. Changelog Posts (CMS — DB-driven, Markdown/Image)

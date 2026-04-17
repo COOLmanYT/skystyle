@@ -58,7 +58,7 @@ async function resolveApiKey(
   if (!candidates?.length) return null;
 
   for (const row of candidates) {
-    if (verifyApiKey(apiKey, row.key_hash as string)) {
+    if (await verifyApiKey(apiKey, row.key_hash as string)) {
       // The preview window (API_KEY_PREVIEW_LENGTH chars) makes collisions
       // vanishingly rare. verifyApiKey uses timingSafeEqual internally, so
       // timing cannot reveal whether a candidate matched.
@@ -73,10 +73,11 @@ async function resolveApiKey(
  * Counts rows in api_usage_logs with timestamp > (now - 60s).
  */
 async function checkRateLimit(apiKeyId: string): Promise<boolean> {
-  const limit = parseInt(
+  const parsed = parseInt(
     process.env.API_RATE_LIMIT_PER_MINUTE ?? String(DEFAULT_RATE_LIMIT),
     10
   );
+  const limit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RATE_LIMIT;
   const windowStart = new Date(Date.now() - 60 * 1000).toISOString();
 
   const { count } = await supabaseAdmin

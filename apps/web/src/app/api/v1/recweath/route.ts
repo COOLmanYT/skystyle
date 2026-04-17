@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
  * Response (200):
  *   outfit        string  Outfit recommendation text
  *   reasoning     string  Explanation linking weather to choices
- *   weather       object  Full weather snapshot (same shape as /api/v1/weather)
+ *   weather       object  Weather snapshot used to generate the recommendation
  *   model         string  AI model used
  *   generated_at  string  ISO-8601 UTC timestamp
  */

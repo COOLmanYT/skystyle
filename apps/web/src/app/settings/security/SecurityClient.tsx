@@ -178,27 +178,37 @@ export default function SecurityClient({ mfaEnabled: initialMfaEnabled, embedded
   async function createApiKey() {
     setLoadingApiKeys(true);
     setError(null);
-    const res = await fetch("/api/api-keys", { method: "POST" });
-    setLoadingApiKeys(false);
-    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "Failed to create API key."); return; }
-    const data = await res.json();
-    setNewApiKey(typeof data.apiKey === "string" ? data.apiKey : null);
-    await Promise.all([fetchApiKeys(), fetchLogs()]);
-    showToast("API key created.");
+    try {
+      const res = await fetch("/api/api-keys", { method: "POST" });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "Failed to create API key."); return; }
+      const data = await res.json();
+      setNewApiKey(typeof data.apiKey === "string" ? data.apiKey : null);
+      await Promise.all([fetchApiKeys(), fetchLogs()]);
+      showToast("API key created.");
+    } catch {
+      setError("Failed to create API key.");
+    } finally {
+      setLoadingApiKeys(false);
+    }
   }
 
   async function revokeApiKey(id: string) {
     setLoadingApiKeys(true);
     setError(null);
-    const res = await fetch("/api/api-keys", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setLoadingApiKeys(false);
-    if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "Failed to revoke API key."); return; }
-    await Promise.all([fetchApiKeys(), fetchLogs()]);
-    showToast("API key revoked.");
+    try {
+      const res = await fetch("/api/api-keys", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) { const d = await res.json().catch(() => ({})); setError(d.error ?? "Failed to revoke API key."); return; }
+      await Promise.all([fetchApiKeys(), fetchLogs()]);
+      showToast("API key revoked.");
+    } catch {
+      setError("Failed to revoke API key.");
+    } finally {
+      setLoadingApiKeys(false);
+    }
   }
 
   async function downloadCodes() {
