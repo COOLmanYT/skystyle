@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/v1/recweath
+ * POST /api/v1/recweather
  *
  * Combined endpoint — returns an AI outfit recommendation together with the
  * full weather data used to generate it.  Useful when a client needs both in
@@ -26,11 +26,8 @@ export const dynamic = "force-dynamic";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
 import { getWeather } from "@/lib/weather";
 import { getStyleRecommendation } from "@/lib/ai";
-import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
-import { getCredits, deductCredit, CreditRecord } from "@/lib/credits";
 import { withApiAuth, ApiKeyContext } from "@/lib/api-middleware";
 
 const LAT_MIN = -90;
@@ -45,20 +42,6 @@ interface RecWeathBody {
   gender?: unknown;
 }
 
-/** Return the next weekly reset date for a user's credits, or a fallback string. */
-async function getCreditsResetDate(userId: string): Promise<string> {
-  const { data } = await supabaseAdmin
-    .from("credits")
-    .select("last_reset_date")
-    .eq("user_id", userId)
-    .single();
-  if (!data) return "within 7 days";
-  const record = data as Pick<CreditRecord, "last_reset_date">;
-  const reset = new Date(record.last_reset_date);
-  reset.setDate(reset.getDate() + 7);
-  return reset.toISOString().split("T")[0];
-}
-
 function celsiusToFahrenheit(c: number): number {
   return Math.round((c * 9) / 5 + 32);
 }
@@ -69,10 +52,8 @@ function kmhToMph(kmh: number): number {
 
 async function handleRecWeath(
   req: NextRequest,
-  ctx: ApiKeyContext
+  _ctx: ApiKeyContext
 ): Promise<NextResponse> {
-  const { userId } = ctx;
-
   // 1. Parse and validate body
   let body: RecWeathBody;
   try {
@@ -106,39 +87,7 @@ async function handleRecWeath(
       ? body.gender.trim().slice(0, 30)
       : undefined;
 
-  // 2. Load user tier
-  const { data: profile } = await supabaseAdmin
-    .from("users")
-    .select("is_pro, is_dev")
-    .eq("id", userId)
-    .single();
-
-  const isPro = profile?.is_pro ?? false;
-  const isDev = profile?.is_dev ?? false;
-
-  // 3. Credit / daily-limit check
-  if (!isDev) {
-    if (isPro) {
-      const balance = await getCredits(userId);
-      if (balance <= 0) {
-        const resetDate = await getCreditsResetDate(userId);
-        return NextResponse.json(
-          { error: `Insufficient credits. Weekly credits reset on ${resetDate}.` },
-          { status: 402 }
-        );
-      }
-    } else {
-      const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro, isDev);
-      if (!allowed) {
-        return NextResponse.json(
-          { error: `Daily AI limit reached (${used}/${limit}). Upgrade to Pro for more.` },
-          { status: 429 }
-        );
-      }
-    }
-  }
-
-  // 4. Fetch weather
+  // 2. Fetch weather
   let weather;
   try {
     weather = await getWeather(lat, lon);
@@ -147,7 +96,7 @@ async function handleRecWeath(
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  // 5. Get AI recommendation
+  // 3. Get AI recommendation
   let recommendation;
   try {
     recommendation = await getStyleRecommendation({
@@ -157,23 +106,16 @@ async function handleRecWeath(
       gender,
       shareLocation: false,
       forceCloset: false,
-      isDev,
+      isDev: false,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed.";
-    return NextResponse.json({ error: message }, { status: 502 });
+    const response = NextResponse.json({ error: message }, { status: 502 });
+    response.headers.set("x-api-partial-success", "true");
+    return response;
   }
 
-  // 6. Deduct credit / increment usage
-  if (!isDev) {
-    if (isPro) {
-      await deductCredit(userId);
-    } else {
-      await incrementUsage(userId, "ai_uses", isPro, isDev);
-    }
-  }
-
-  // 7. Return recommendation + full weather snapshot
+  // 4. Return recommendation + full weather snapshot
   const isImperial = unit === "imperial";
   return NextResponse.json({
     outfit: recommendation.outfit,

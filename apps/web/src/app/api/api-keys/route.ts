@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncPublicUser } from "@/lib/sync-user";
 import { generateApiKey, hashApiKey } from "@/lib/api-keys";
+import { getInitialApiKeyCredits } from "@/lib/api-key-credits";
 import { logSecurityEvent } from "@/lib/security";
 
 function isUuid(value: string): boolean {
@@ -21,7 +22,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("api_keys")
-    .select("id, key_preview, created_at, revoked")
+    .select("id, key_preview, created_at, revoked, credits_remaining, credits_used")
     .eq("user_id", session.user.id)
     .order("created_at", { ascending: false });
 
@@ -42,6 +43,7 @@ export async function POST() {
 
   const { key, preview } = generateApiKey();
   const keyHash = hashApiKey(key);
+  const initialCredits = getInitialApiKeyCredits();
 
   const { data, error } = await supabaseAdmin
     .from("api_keys")
@@ -50,8 +52,10 @@ export async function POST() {
       key_hash: keyHash,
       key_preview: preview,
       revoked: false,
+      credits_remaining: initialCredits,
+      credits_used: 0,
     })
-    .select("id, key_preview, created_at, revoked")
+    .select("id, key_preview, created_at, revoked, credits_remaining, credits_used")
     .single();
 
   if (error) {

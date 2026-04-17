@@ -2,7 +2,7 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-# Current version: 2.10.0
+# Current version: 2.11.0
 
 This is for the changelog version number. Update this version number accordingly to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in `.github\copilot-instructions.md` as well.) 
 

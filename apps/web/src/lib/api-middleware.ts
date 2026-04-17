@@ -16,6 +16,7 @@ import { after } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { verifyApiKey, API_KEY_PREFIX, API_KEY_PREVIEW_LENGTH } from "@/lib/api-keys";
+import { getEndpointCreditCost, getHalfCreditCharge } from "@/lib/api-key-credits";
 
 /** Default rate limit when API_RATE_LIMIT_PER_MINUTE is not set. */
 const DEFAULT_RATE_LIMIT = 60;
@@ -44,14 +45,14 @@ export function extractBearerToken(req: NextRequest): string | null {
  */
 async function resolveApiKey(
   apiKey: string
-): Promise<{ id: string; userId: string } | null> {
+): Promise<{ id: string; userId: string; creditsRemaining: number } | null> {
   if (!apiKey.startsWith(API_KEY_PREFIX)) return null;
 
   const preview = apiKey.slice(0, API_KEY_PREVIEW_LENGTH);
 
   const { data: candidates } = await supabaseAdmin
     .from("api_keys")
-    .select("id, user_id, key_hash")
+    .select("id, user_id, key_hash, credits_remaining")
     .eq("key_preview", preview)
     .eq("revoked", false);
 
@@ -62,10 +63,51 @@ async function resolveApiKey(
       // The preview window (API_KEY_PREVIEW_LENGTH chars) makes collisions
       // vanishingly rare. verifyApiKey uses timingSafeEqual internally, so
       // timing cannot reveal whether a candidate matched.
-      return { id: row.id as string, userId: row.user_id as string };
+      return {
+        id: row.id as string,
+        userId: row.user_id as string,
+        creditsRemaining: Math.max(0, Number(row.credits_remaining) || 0),
+      };
     }
   }
   return null;
+}
+
+/**
+ * Deduct credits from a key with optimistic concurrency checks to avoid
+ * accidental double-deduction under concurrent requests.
+ */
+async function deductApiKeyCredits(apiKeyId: string, amount: number): Promise<boolean> {
+  if (!Number.isFinite(amount) || amount <= 0) return true;
+  const debit = Math.max(1, Math.floor(amount));
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const { data: current } = await supabaseAdmin
+      .from("api_keys")
+      .select("credits_remaining, credits_used")
+      .eq("id", apiKeyId)
+      .single();
+
+    const remaining = Math.max(0, Number(current?.credits_remaining) || 0);
+    const used = Math.max(0, Number(current?.credits_used) || 0);
+    if (remaining < debit) return false;
+
+    const { data: updated } = await supabaseAdmin
+      .from("api_keys")
+      .update({
+        credits_remaining: remaining - debit,
+        credits_used: used + debit,
+      })
+      .eq("id", apiKeyId)
+      .eq("credits_remaining", remaining)
+      .eq("credits_used", used)
+      .select("id")
+      .single();
+
+    if (updated?.id) return true;
+  }
+
+  return false;
 }
 
 /**
@@ -137,6 +179,7 @@ export function withApiAuth(handler: ApiHandler) {
   return async function (req: NextRequest): Promise<NextResponse> {
     const startedAt = Date.now();
     const endpoint = req.nextUrl.pathname;
+    const endpointCost = getEndpointCreditCost(endpoint);
 
     // 1. Extract bearer token — fail fast before any DB work
     const rawToken = extractBearerToken(req);
@@ -157,6 +200,11 @@ export function withApiAuth(handler: ApiHandler) {
         { error: "unauthorized", message: "Invalid or revoked API key." },
         { status: 401 }
       );
+    }
+
+    // 2b. Credit check before processing request
+    if (endpointCost > 0 && keyRecord.creditsRemaining < endpointCost) {
+      return NextResponse.json({ error: "insufficient_credits" }, { status: 403 });
     }
 
     // 3. Rate limit — checked before any heavy processing
@@ -189,6 +237,31 @@ export function withApiAuth(handler: ApiHandler) {
     }
 
     // 5. Log after response — non-blocking
+    if (endpointCost > 0) {
+      const explicitCharge = Number.parseInt(
+        response.headers.get("x-api-credit-charge") ?? "",
+        10
+      );
+      const shouldHalfCharge = response.headers.get("x-api-partial-success") === "true";
+      let charge = 0;
+      if (Number.isFinite(explicitCharge) && explicitCharge >= 0) {
+        charge = Math.min(endpointCost, explicitCharge);
+      } else if (response.ok) {
+        charge = endpointCost;
+      } else if (shouldHalfCharge) {
+        charge = getHalfCreditCharge(endpointCost);
+      }
+      if (charge > 0) {
+        after(async () => {
+          try {
+            await deductApiKeyCredits(keyRecord.id, charge);
+          } catch (err) {
+            console.warn("[api-middleware] Failed to deduct API key credits:", err);
+          }
+        });
+      }
+    }
+
     logApiUsage(keyRecord.id, endpoint, response.status, startedAt);
     return response;
   };

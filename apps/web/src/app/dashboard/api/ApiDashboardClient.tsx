@@ -10,6 +10,8 @@ interface ApiKey {
   key_preview: string;
   created_at: string;
   revoked: boolean;
+  credits_remaining?: number;
+  credits_used?: number;
 }
 
 interface UsagePoint {
@@ -23,7 +25,7 @@ interface UsagePayload {
   requestsOverTime: UsagePoint[];
 }
 
-const ENDPOINTS = ["/recommend", "/recweath", "/weather", "/closet"] as const;
+const ENDPOINTS = ["/recommend", "/recweather", "/weather", "/closet"] as const;
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
 const MIN_VISIBLE_NON_ZERO_BAR_PERCENT = 6;
 const MIN_BAR_PERCENT = 2;
@@ -230,6 +232,9 @@ export default function ApiDashboardClient() {
                     <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{key.key_preview}</p>
                     <p className="text-xs mt-0.5" style={{ color: "var(--foreground)", opacity: 0.45 }}>
                       Created {new Date(key.created_at).toLocaleString(undefined, DATE_TIME_OPTIONS)} · {key.revoked ? "Revoked" : "Active"}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--foreground)", opacity: 0.45 }}>
+                      Credits: {Math.max(0, Number(key.credits_remaining) || 0)} remaining · {Math.max(0, Number(key.credits_used) || 0)} used
                     </p>
                   </div>
                   {!key.revoked && (

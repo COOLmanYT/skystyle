@@ -4,22 +4,14 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncPublicUser } from "@/lib/sync-user";
+import { normalizeApiUsageEndpoint } from "@/lib/api-key-credits";
 
-const DASHBOARD_ENDPOINTS = ["/recommend", "/recweath", "/weather", "/closet"] as const;
+const DASHBOARD_ENDPOINTS = ["/recommend", "/recweather", "/weather", "/closet"] as const;
 type DashboardEndpoint = (typeof DASHBOARD_ENDPOINTS)[number];
 const LOOKBACK_HOURS = 24;
 const BUCKET_COUNT = 24;
 const FIRST_BUCKET_OFFSET_HOURS = LOOKBACK_HOURS - 1;
 const ONE_HOUR_MS = 60 * 60 * 1000;
-
-function normalizeEndpoint(value: string): string {
-  if (!value) return "";
-  if (value.startsWith("/api/v1/")) {
-    const last = value.split("/").filter(Boolean).pop();
-    return last ? `/${last}` : value;
-  }
-  return value;
-}
 
 function buildHourlyBuckets(nowMs: number): Array<{ startMs: number; label: string; count: number }> {
   const bucketStartTime = new Date(nowMs - FIRST_BUCKET_OFFSET_HOURS * ONE_HOUR_MS);
@@ -85,7 +77,7 @@ export async function GET() {
   const endpointCounts = { ...emptyCounts };
 
   for (const row of rows) {
-    const normalized = normalizeEndpoint(typeof row.endpoint === "string" ? row.endpoint : "");
+    const normalized = normalizeApiUsageEndpoint(typeof row.endpoint === "string" ? row.endpoint : "");
     if (normalized in endpointCounts) {
       const key = normalized as DashboardEndpoint;
       endpointCounts[key] += 1;

@@ -302,8 +302,13 @@ CREATE TABLE IF NOT EXISTS api_keys (
   key_hash    text        NOT NULL,
   key_preview text        NOT NULL,
   created_at  timestamptz NOT NULL DEFAULT now(),
-  revoked     boolean     NOT NULL DEFAULT false
+  revoked     boolean     NOT NULL DEFAULT false,
+  credits_remaining integer NOT NULL DEFAULT 100,
+  credits_used integer NOT NULL DEFAULT 0
 );
+
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS credits_remaining integer NOT NULL DEFAULT 100;
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS credits_used integer NOT NULL DEFAULT 0;
 
 ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can read own api_keys"
@@ -315,7 +320,7 @@ CREATE INDEX IF NOT EXISTS api_keys_key_preview_revoked_idx
 
 -- RLS is row-level only; revoke key_hash from client roles so it stays server-only
 REVOKE SELECT ON TABLE api_keys FROM anon, authenticated;
-GRANT SELECT (id, user_id, key_preview, created_at, revoked)
+GRANT SELECT (id, user_id, key_preview, created_at, revoked, credits_remaining, credits_used)
   ON api_keys TO authenticated;
 
 -- ------------------------------------------------------------
