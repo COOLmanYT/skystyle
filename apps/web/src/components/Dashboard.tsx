@@ -9,9 +9,9 @@ import FeedbackModal from "./FeedbackModal";
 import ChangelogModal, { type ChangelogModalEntry } from "./ChangelogModal";
 import { handleSignOut } from "@/app/actions";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import Checkbox from "@/components/Checkbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import HamburgerNav from "@/components/HamburgerNav";
 
 /** Returns true if version string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -146,8 +146,6 @@ export default function Dashboard({
   const [devChatLoading, setDevChatLoading] = useState(false);
   const [devChatError, setDevChatError] = useState<string | null>(null);
   const [devChatResult, setDevChatResult] = useState<{ outfit: string; reasoning: string; rawOutput?: string } | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [homeSubmenuOpen, setHomeSubmenuOpen] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [changelogUnread, setChangelogUnread] = useState(false);
   // Login changelog popup (showOnNextLogin entries)
@@ -163,7 +161,6 @@ export default function Dashboard({
   // BYOK enhancements — provider selector + client-side custom prompt (Pro/Dev)
   const [byokProvider, setByokProvider] = useState<"openai" | "gemini">("openai");
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
-  const router = useRouter();
 
   // Session diagnostics (dev-only by default, optionally enabled for all users)
   const [diagLastAiStatus, setDiagLastAiStatus] = useState<"success" | "error" | null>(null);
@@ -807,208 +804,25 @@ export default function Dashboard({
           }}
         />
       )}
-      {/* ── Top Bar ── */}
-      <nav className="sticky-nav px-4 py-3" aria-label="Dashboard navigation" style={{ borderBottom: "1px solid var(--card-border)" }}>
-        <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="p-2 rounded-xl btn-interact"
-              style={{ color: "var(--foreground)" }}
-              aria-label="Toggle menu"
-              aria-expanded={menuOpen}
-              aria-controls="dashboard-menu"
-            >
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                <line x1="3" y1="5" x2="17" y2="5" />
-                <line x1="3" y1="10" x2="17" y2="10" />
-                <line x1="3" y1="15" x2="17" y2="15" />
-              </svg>
-            </button>
-            <button
-              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="btn-interact cursor-pointer text-lg font-semibold"
-              style={{ color: "var(--foreground)" }}
-              aria-label="Scroll to top"
-            >
-              🌤️ Sky Style
-            </button>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm hidden sm:inline" style={{ color: "var(--foreground)", opacity: 0.6 }}>
-              Hello, {userName}!
-            </span>
-            <form action={handleSignOut}>
-              <button
-                type="submit"
-                className="rounded-full px-3 py-1 text-xs font-medium btn-interact"
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid var(--card-border)",
-                  color: "var(--foreground)",
-                }}
-              >
-                Sign Out
-              </button>
-            </form>
-          </div>
-        </div>
-      </nav>
-
-      {/* ── Hamburger Menu Overlay ── */}
-      {menuOpen && (
-        <>
-          <div
-            className="fixed inset-0 z-40"
-            style={{ background: "rgba(0,0,0,0.4)" }}
-            onClick={() => setMenuOpen(false)}
-            aria-hidden="true"
-          />
-          <div
-            id="dashboard-menu"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Navigation menu"
-            className="fixed top-0 left-0 h-full w-64 z-50 p-6 space-y-4 overflow-y-auto"
-            style={{ background: "var(--card)", borderRight: "1px solid var(--card-border)" }}
-            onKeyDown={(e) => { if (e.key === "Escape") setMenuOpen(false); }}
-          >
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-                <span aria-hidden="true">🌤️ </span>Sky Style
-              </span>
-              <button
-                onClick={() => setMenuOpen(false)}
-                className="p-1 rounded-lg btn-interact"
-                style={{ color: "var(--foreground)" }}
-                aria-label="Close menu"
-              >
-                ✕
-              </button>
-            </div>
-            <nav className="space-y-1" aria-label="Menu navigation">
-              {/* 🏠 Home (expandable submenu) */}
-              <div>
-                <button
-                  onClick={() => setHomeSubmenuOpen((v) => !v)}
-                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact flex items-center justify-between"
-                  style={{ color: "#fff", background: "#007AFF" }}
-                >
-                  <span>🏠 Home</span>
-                  <span style={{ opacity: 0.8, fontSize: 11 }}>
-                    {homeSubmenuOpen ? "▲" : "▼"}
-                  </span>
-                </button>
-                {homeSubmenuOpen && (
-                  <div className="pl-4 mt-1 space-y-0.5">
-                    <button
-                      onClick={() => { setMenuOpen(false); setHomeSubmenuOpen(false); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                      className="w-full text-left rounded-xl px-3 py-2 text-sm btn-interact"
-                      style={{ color: "var(--foreground)", opacity: 0.9 }}
-                    >
-                      Dashboard
-                    </button>
-                    <button
-                      onClick={() => { setMenuOpen(false); setHomeSubmenuOpen(false); router.push("/closet"); }}
-                      className="w-full text-left rounded-xl px-3 py-2 text-sm btn-interact"
-                      style={{ color: "var(--foreground)", opacity: 0.9 }}
-                    >
-                      👕 Closet
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {[
-                { label: "👤 Account", action: () => { setMenuOpen(false); router.push("/account"); }, active: false },
-                { label: "⚙️ Settings", action: () => { setMenuOpen(false); router.push("/settings"); }, active: false },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  onClick={item.action}
-                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
-                  style={{
-                    color: item.active ? "#fff" : "var(--foreground)",
-                    background: item.active ? "#007AFF" : "transparent",
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-              {isDev && (
-                <button
-                  onClick={() => { setMenuOpen(false); router.push("/dev"); }}
-                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  🛠️ Dev Dashboard
-                </button>
-              )}
-              <form action={handleSignOut}>
-                <button
-                  type="submit"
-                  className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
-                  style={{ color: "#ff3b30" }}
-                >
-                  🚪 Sign Out
-                </button>
-              </form>
-            </nav>
-            <hr style={{ borderColor: "var(--card-border)" }} />
-            <div className="space-y-1">
-              <Link
-                href="/changelog"
-                className="flex items-center gap-2 rounded-xl px-3 py-2 text-xs btn-interact"
-                style={{ color: "var(--foreground)", opacity: 0.6 }}
-                onClick={() => {
-                  setMenuOpen(false);
-                  setChangelogUnread(false);
-                  try { localStorage.setItem("skystyle_last_seen_changelog", "__dismiss__"); } catch { /* ignore */ }
-                }}
-              >
-                📋 Changelog
-                {changelogUnread && (
-                  <span
-                    style={{
-                      display: "inline-block",
-                      width: 7,
-                      height: 7,
-                      borderRadius: "50%",
-                      background: "#ff3b30",
-                      flexShrink: 0,
-                    }}
-                    aria-label="Unread changelog updates"
-                  />
-                )}
-              </Link>
-              <Link
-                href="/"
-                className="block rounded-xl px-3 py-2 text-xs btn-interact"
-                style={{ color: "var(--foreground)", opacity: 0.6 }}
-                onClick={() => setMenuOpen(false)}
-              >
-                ← Main Page
-              </Link>
-              <Link
-                href="/terms"
-                className="block rounded-xl px-3 py-2 text-xs btn-interact"
-                style={{ color: "var(--foreground)", opacity: 0.6 }}
-                onClick={() => setMenuOpen(false)}
-              >
-                Terms of Service
-              </Link>
-              <Link
-                href="/privacy"
-                className="block rounded-xl px-3 py-2 text-xs btn-interact"
-                style={{ color: "var(--foreground)", opacity: 0.6 }}
-                onClick={() => setMenuOpen(false)}
-              >
-                Privacy Policy
-              </Link>
-            </div>
-          </div>
-        </>
-      )}
+      {/* ── Top Bar (unified HamburgerNav) ── */}
+      <HamburgerNav
+        currentPage="dashboard"
+        userName={userName}
+        title="🌤️ Sky Style"
+        onTitleClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        signOutAction={handleSignOut}
+        isDev={isDev}
+        changelogUnread={changelogUnread}
+        onChangelogClick={() => {
+          setChangelogUnread(false);
+          try { localStorage.setItem("skystyle_last_seen_changelog", "__dismiss__"); } catch { /* ignore */ }
+        }}
+        rightContent={
+          <span className="text-sm hidden sm:inline" style={{ color: "var(--foreground)", opacity: 0.6 }}>
+            Hello, {userName}!
+          </span>
+        }
+      />
 
       {/* ── Main Content ── */}
       <main

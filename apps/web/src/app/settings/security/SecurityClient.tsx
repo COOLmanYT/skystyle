@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import Toggle from "@/components/Toggle";
 import HamburgerNav from "@/components/HamburgerNav";
+import { handleSignOut } from "@/app/actions";
 
 interface SecurityLog {
   id: string;
@@ -612,6 +613,7 @@ export default function SecurityClient({ mfaEnabled: initialMfaEnabled, embedded
       <HamburgerNav
         currentPage="settings"
         title="🛡️ Security"
+        signOutAction={handleSignOut}
         rightContent={
           <>
             <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>

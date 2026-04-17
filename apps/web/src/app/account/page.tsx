@@ -9,6 +9,7 @@ import AccountUpgradeButton from "@/components/AccountUpgradeButton";
 import HamburgerNav from "@/components/HamburgerNav";
 import SecurityClient from "@/app/settings/security/SecurityClient";
 import PrivacyHubClient from "@/app/settings/privacy/PrivacyHubClient";
+import { handleSignOut } from "@/app/actions";
 
 function getDevEmails(): Set<string> {
   const raw = process.env.DEV_EMAILS ?? "";
@@ -83,6 +84,8 @@ export default async function AccountPage() {
         userName={name}
         title="👤 Account"
         rightContent={rightContent}
+        signOutAction={handleSignOut}
+        isDev={canAccessDevDashboard}
       />
 
       {/* Content */}

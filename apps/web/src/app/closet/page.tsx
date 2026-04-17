@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import Link from "next/link";
 import HamburgerNav from "@/components/HamburgerNav";
 import ClosetHighlighter from "@/components/ClosetHighlighter";
+import { handleSignOut } from "@/app/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -29,13 +30,14 @@ export default async function ClosetPage({
     (session.user as unknown as Record<string, unknown>).plan === "demo";
 
   let items: string[] = [];
+  let isDev = false;
   if (!isDemo) {
-    const { data } = await supabaseAdmin
-      .from("closet")
-      .select("items")
-      .eq("user_id", userId)
-      .single();
-    items = data?.items ?? [];
+    const [closetResult, profileResult] = await Promise.all([
+      supabaseAdmin.from("closet").select("items").eq("user_id", userId).single(),
+      supabaseAdmin.from("users").select("is_dev").eq("id", userId).single(),
+    ]);
+    items = closetResult.data?.items ?? [];
+    isDev = profileResult.data?.is_dev ?? false;
   }
 
   const userName = session.user.name ?? session.user.email ?? undefined;
@@ -46,7 +48,7 @@ export default async function ClosetPage({
       className="min-h-screen flex flex-col"
       style={{ background: "var(--background)" }}
     >
-      <HamburgerNav currentPage="closet" userName={userName} title="👕 Closet" />
+      <HamburgerNav currentPage="closet" userName={userName} title="👕 Closet" signOutAction={handleSignOut} isDev={isDev} />
       <ClosetHighlighter highlight={highlight} />
 
       <div className="flex-1 flex flex-col items-center justify-start py-8 px-4">

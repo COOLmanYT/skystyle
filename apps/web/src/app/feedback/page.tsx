@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import FeedbackForm from "@/components/FeedbackForm";
 import HamburgerNav from "@/components/HamburgerNav";
+import { handleSignOut } from "@/app/actions";
 
 export const metadata: Metadata = {
   title: "Feedback — Sky Style",
@@ -59,7 +60,7 @@ export default async function FeedbackPage() {
       className="min-h-screen flex flex-col"
       style={{ background: "var(--background)" }}
     >
-      <HamburgerNav currentPage="feedback" userName={userName} title="💬 Feedback" />
+      <HamburgerNav currentPage="feedback" userName={userName} title="💬 Feedback" signOutAction={handleSignOut} isDev={isDev} />
 
       <div className="flex-1 px-4">
       <div className="w-full max-w-md mx-auto space-y-6 py-8">

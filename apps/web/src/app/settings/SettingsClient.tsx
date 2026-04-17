@@ -5,6 +5,7 @@ import Link from "next/link";
 import Toggle from "@/components/Toggle";
 import Checkbox from "@/components/Checkbox";
 import HamburgerNav from "@/components/HamburgerNav";
+import { handleSignOut } from "@/app/actions";
 
 const MAX_GENDER_LENGTH = 30;
 
@@ -182,6 +183,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
       <HamburgerNav
         currentPage="settings"
         title="⚙️ Settings"
+        signOutAction={handleSignOut}
         rightContent={
           <button
             onClick={handleSave}

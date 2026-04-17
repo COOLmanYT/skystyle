@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import HamburgerNav from "@/components/HamburgerNav";
+import { handleSignOut } from "@/app/actions";
 
 const EXPORT_COOLDOWN_MS = 12 * 60 * 60 * 1000; // 12 hours
 const EXPORT_COOLDOWN_KEY = "skystyle_export_cooldown_until";
@@ -307,6 +308,7 @@ export default function PrivacyHubClient({ isPendingDeletion: initialPending, is
       <HamburgerNav
         currentPage="settings"
         title="🔐 Privacy Hub"
+        signOutAction={handleSignOut}
         rightContent={
           <>
             <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
