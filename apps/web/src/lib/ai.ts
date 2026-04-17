@@ -300,10 +300,10 @@ async function callAI(
   if (useGeminiBYOK) {
     // BYOK with Gemini — use the user's own key
     const GEMINI_MODELS = [
-      "gemini-2.5-flash-lite",
       "gemini-2.5-flash",
-      "gemma-3-27b-it",
-      "gemma-3-12b-it",
+      "gemini-2.5-flash-lite",
+      "gemma-4-31b-it",
+      "gemma-4-26b-it",
     ];
     let geminiRaw: string | undefined;
     let geminiModelUsed: string | undefined;
@@ -350,10 +350,10 @@ async function callAI(
     modelUsed = modelName;
   } else if (process.env.GEMINI_API_KEY) {
     const GEMINI_MODELS = [
-      "gemini-2.5-flash-lite",
       "gemini-2.5-flash",
-      "gemma-3-27b-it",
-      "gemma-3-12b-it",
+      "gemini-2.5-flash-lite",
+      "gemma-4-31b-it",
+      "gemma-4-26b-it",
     ];
     let geminiRaw: string | undefined;
     let geminiModelUsed: string | undefined;

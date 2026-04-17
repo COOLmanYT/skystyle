@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 // Public paths that never require auth
-const PUBLIC_PATHS = ["/", "/login", "/api/auth", "/preview", "/api/demo", "/terms", "/privacy", "/changelog", "/api/v1"];
+const PUBLIC_PATHS = ["/", "/login", "/api/auth", "/preview", "/api/demo", "/terms", "/privacy", "/changelog", "/api/v1", "/docs"];
 
 /** Returns the set of emails permitted to access /dev routes. */
 function getDevEmails(): Set<string> {
