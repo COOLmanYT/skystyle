@@ -24,11 +24,55 @@ interface UsagePayload {
   totalRequests24h: number;
   endpointCounts: Record<string, number>;
   requestsOverTime: UsagePoint[];
+  errorRate: number | null;
+  avgResponseTimeMs: number | null;
 }
 
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
-const MIN_VISIBLE_NON_ZERO_BAR_PERCENT = 6;
-const MIN_BAR_PERCENT = 2;
+
+/** Inline SVG area + line chart for time-series data. */
+function LineChart({ data }: { data: UsagePoint[] }) {
+  if (data.length < 2) return null;
+  const W = 1000;
+  const H = 100;
+  const PAD = 6;
+  const maxVal = data.reduce((m, p) => Math.max(m, p.count), 0);
+  const toX = (i: number) => PAD + (i / (data.length - 1)) * (W - PAD * 2);
+  const toY = (v: number) =>
+    maxVal > 0 ? PAD + (1 - v / maxVal) * (H - PAD * 2) : H - PAD;
+  const pts = data.map((p, i) => `${toX(i).toFixed(1)},${toY(p.count).toFixed(1)}`);
+  const linePoints = pts.join(" ");
+  const bottomY = (H - PAD).toFixed(1);
+  const areaPoints = [
+    `${toX(0).toFixed(1)},${bottomY}`,
+    ...pts,
+    `${toX(data.length - 1).toFixed(1)},${bottomY}`,
+  ].join(" ");
+  return (
+    <svg
+      viewBox={`0 0 ${W} ${H}`}
+      preserveAspectRatio="none"
+      aria-hidden="true"
+      style={{ width: "100%", height: "80px", display: "block" }}
+    >
+      <defs>
+        <linearGradient id="lcAreaGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopOpacity={0.3} style={{ stopColor: "var(--accent)" }} />
+          <stop offset="100%" stopOpacity={0} style={{ stopColor: "var(--accent)" }} />
+        </linearGradient>
+      </defs>
+      <polygon points={areaPoints} fill="url(#lcAreaGrad)" />
+      <polyline
+        points={linePoints}
+        fill="none"
+        strokeWidth={3}
+        strokeLinejoin="round"
+        strokeLinecap="round"
+        style={{ stroke: "var(--accent)" }}
+      />
+    </svg>
+  );
+}
 
 export default function ApiDashboardClient() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -75,6 +119,8 @@ export default function ApiDashboardClient() {
         totalRequests24h: typeof data.totalRequests24h === "number" ? data.totalRequests24h : 0,
         endpointCounts: typeof data.endpointCounts === "object" && data.endpointCounts ? data.endpointCounts : {},
         requestsOverTime: Array.isArray(data.requestsOverTime) ? data.requestsOverTime : [],
+        errorRate: typeof data.errorRate === "number" ? data.errorRate : null,
+        avgResponseTimeMs: typeof data.avgResponseTimeMs === "number" ? data.avgResponseTimeMs : null,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load API usage.");
@@ -92,10 +138,18 @@ export default function ApiDashboardClient() {
     void refreshAll();
   }, [refreshAll]);
 
-  const maxChartValue = useMemo(() => {
-    if (!usage?.requestsOverTime?.length) return 0;
-    return usage.requestsOverTime.reduce((max, point) => Math.max(max, point.count), 0);
+  /** Endpoints sorted by call count descending for the bar chart. */
+  const sortedEndpoints = useMemo((): [string, number][] => {
+    if (!usage?.endpointCounts) return [];
+    return (API_DASHBOARD_ENDPOINTS as readonly string[])
+      .map((ep): [string, number] => [ep, usage.endpointCounts[ep] ?? 0])
+      .sort(([, a], [, b]) => b - a);
   }, [usage]);
+
+  const maxEndpointCount = useMemo(
+    () => (sortedEndpoints.length > 0 ? sortedEndpoints[0][1] : 0),
+    [sortedEndpoints]
+  );
 
   async function createApiKey() {
     setBusyAction(true);
@@ -166,6 +220,7 @@ export default function ApiDashboardClient() {
           </div>
         )}
 
+        {/* ── API Key Management ─────────────────────────────────────────── */}
         <section className="rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -256,65 +311,95 @@ export default function ApiDashboardClient() {
           )}
         </section>
 
-        <section className="rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+        {/* ── Analytics ──────────────────────────────────────────────────── */}
+        <section className="rounded-2xl p-6 space-y-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-              Usage Overview
+              Analytics
             </p>
             <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>
-              Last 24 hours
+              Last 24 hours across all your API keys
             </p>
           </div>
 
           {loadingUsage ? (
-            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Loading usage…</p>
+            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Loading analytics…</p>
           ) : !usage ? (
-            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>Usage data is unavailable right now.</p>
+            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>Analytics data is unavailable right now.</p>
           ) : (
             <>
-              <div className="rounded-xl p-3" style={{ background: "var(--background)" }}>
-                <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Total requests (24h)</p>
-                <p className="text-2xl font-semibold mt-1" style={{ color: "var(--foreground)" }}>{usage.totalRequests24h}</p>
+              {/* Stat cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-xl p-4" style={{ background: "var(--background)" }}>
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Total requests</p>
+                  <p className="text-2xl font-semibold mt-1" style={{ color: "var(--foreground)" }}>
+                    {usage.totalRequests24h}
+                  </p>
+                </div>
+                <div className="rounded-xl p-4" style={{ background: "var(--background)" }}>
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Error rate</p>
+                  <p
+                    className="text-2xl font-semibold mt-1"
+                    style={{ color: usage.errorRate != null && usage.errorRate > 10 ? "#ff3b30" : "var(--foreground)" }}
+                  >
+                    {usage.errorRate != null ? `${usage.errorRate}%` : "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl p-4" style={{ background: "var(--background)" }}>
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Avg response time</p>
+                  <p className="text-2xl font-semibold mt-1" style={{ color: "var(--foreground)" }}>
+                    {usage.avgResponseTimeMs != null ? `${usage.avgResponseTimeMs}ms` : "—"}
+                  </p>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {API_DASHBOARD_ENDPOINTS.map((endpoint) => (
-                  <div key={endpoint} className="rounded-xl p-3" style={{ background: "var(--background)" }}>
-                    <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>{endpoint}</p>
-                    <p className="text-lg font-semibold mt-0.5" style={{ color: "var(--foreground)" }}>
-                      {usage.endpointCounts[endpoint] ?? 0}
-                    </p>
-                  </div>
-                ))}
-              </div>
-
+              {/* Requests over time — SVG line chart */}
               {usage.requestsOverTime.length > 0 && (
-                <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--background)" }}>
+                <div className="rounded-xl p-4 space-y-2" style={{ background: "var(--background)" }}>
                   <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
                     Requests over time
                   </p>
-                  <div className="flex items-end gap-1 h-24" aria-label="Usage chart">
-                    {usage.requestsOverTime.map((point) => {
-                      const height = maxChartValue > 0
-                        ? Math.max((point.count / maxChartValue) * 100, point.count > 0 ? MIN_VISIBLE_NON_ZERO_BAR_PERCENT : MIN_BAR_PERCENT)
-                        : MIN_BAR_PERCENT;
-                      return (
-                        <div key={point.label} className="flex-1 rounded-sm" style={{ height: `${height}%`, background: "var(--accent)", opacity: 0.75 }} title={`${point.label}: ${point.count}`} />
-                      );
-                    })}
-                  </div>
+                  <LineChart data={usage.requestsOverTime} />
                   <div className="flex justify-between text-[10px]" style={{ color: "var(--foreground)", opacity: 0.4 }}>
                     <span>{usage.requestsOverTime[0]?.label ?? ""}</span>
+                    <span>{usage.requestsOverTime[Math.floor(usage.requestsOverTime.length / 2)]?.label ?? ""}</span>
                     <span>{usage.requestsOverTime[usage.requestsOverTime.length - 1]?.label ?? ""}</span>
                   </div>
                 </div>
               )}
 
-              {usage.totalRequests24h === 0 && (
-                <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-                  No API activity yet in the last 24 hours.
+              {/* Top endpoints — horizontal bar chart */}
+              <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--background)" }}>
+                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+                  Top endpoints
                 </p>
-              )}
+                {usage.totalRequests24h === 0 ? (
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+                    No API activity yet in the last 24 hours.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {sortedEndpoints.map(([endpoint, count]) => (
+                      <div key={endpoint} className="space-y-1.5">
+                        <div className="flex justify-between items-baseline">
+                          <p className="text-xs font-medium" style={{ color: "var(--foreground)", opacity: 0.8 }}>{endpoint}</p>
+                          <p className="text-xs font-semibold tabular-nums" style={{ color: "var(--foreground)" }}>{count}</p>
+                        </div>
+                        <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(127,127,127,0.15)" }}>
+                          <div
+                            className="h-full rounded-full"
+                            style={{
+                              width: `${maxEndpointCount > 0 ? Math.max((count / maxEndpointCount) * 100, count > 0 ? 3 : 0) : 0}%`,
+                              background: "var(--accent)",
+                              opacity: 0.85,
+                            }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </section>
@@ -332,3 +417,4 @@ export default function ApiDashboardClient() {
     </div>
   );
 }
+

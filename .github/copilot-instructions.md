@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions — Sky Style (what2wear)
 
-# Current version: 3.3.0
+# Current version: 3.4.0
 
 This is for the changelog version number. Update this version number accordingly to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in `AGENTS.md` as well.) 
 

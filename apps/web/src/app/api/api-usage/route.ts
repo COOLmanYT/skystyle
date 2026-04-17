@@ -59,12 +59,14 @@ export async function GET() {
       totalRequests24h: 0,
       endpointCounts: emptyCounts,
       requestsOverTime: buckets.map(({ label, count }) => ({ label, count })),
+      errorRate: null,
+      avgResponseTimeMs: null,
     });
   }
 
   const { data: usageRows, error: usageError } = await supabaseAdmin
     .from("api_usage_logs")
-    .select("endpoint, timestamp")
+    .select("endpoint, timestamp, status_code, response_time")
     .in("api_key_id", apiKeyIds)
     .gte("timestamp", sinceIso);
 
@@ -74,25 +76,42 @@ export async function GET() {
 
   const rows = usageRows ?? [];
   const endpointCounts = { ...emptyCounts };
+  let errorCount = 0;
+  let sumResponseTime = 0;
+  let responseTimeCount = 0;
 
   for (const row of rows) {
     const normalized = normalizeApiUsageEndpoint(typeof row.endpoint === "string" ? row.endpoint : "");
     if (normalized in endpointCounts) {
-      const key = normalized as DashboardEndpoint;
-      endpointCounts[key] += 1;
+      endpointCounts[normalized as DashboardEndpoint] += 1;
     }
 
     const timestampMs = typeof row.timestamp === "string" ? Date.parse(row.timestamp) : Number.NaN;
-    if (!Number.isFinite(timestampMs)) continue;
-    const bucketIndex = Math.floor((timestampMs - buckets[0].startMs) / ONE_HOUR_MS);
-    if (bucketIndex >= 0 && bucketIndex < buckets.length) {
-      buckets[bucketIndex].count += 1;
+    if (Number.isFinite(timestampMs)) {
+      const bucketIndex = Math.floor((timestampMs - buckets[0].startMs) / ONE_HOUR_MS);
+      if (bucketIndex >= 0 && bucketIndex < buckets.length) {
+        buckets[bucketIndex].count += 1;
+      }
+    }
+
+    const statusCode = typeof row.status_code === "number" ? row.status_code : 0;
+    if (statusCode >= 400) errorCount += 1;
+
+    const responseTime = typeof row.response_time === "number" ? row.response_time : null;
+    if (responseTime !== null && responseTime >= 0) {
+      sumResponseTime += responseTime;
+      responseTimeCount += 1;
     }
   }
+
+  const errorRate = rows.length > 0 ? Math.round((errorCount / rows.length) * 1000) / 10 : null;
+  const avgResponseTimeMs = responseTimeCount > 0 ? Math.round(sumResponseTime / responseTimeCount) : null;
 
   return NextResponse.json({
     totalRequests24h: rows.length,
     endpointCounts,
     requestsOverTime: buckets.map(({ label, count }) => ({ label, count })),
+    errorRate,
+    avgResponseTimeMs,
   });
 }
