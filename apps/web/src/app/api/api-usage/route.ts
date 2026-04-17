@@ -7,6 +7,10 @@ import { syncPublicUser } from "@/lib/sync-user";
 
 const DASHBOARD_ENDPOINTS = ["/recommend", "/recweath", "/weather", "/closet"] as const;
 type DashboardEndpoint = (typeof DASHBOARD_ENDPOINTS)[number];
+const LOOKBACK_HOURS = 24;
+const BUCKET_COUNT = 24;
+const FIRST_BUCKET_OFFSET_HOURS = LOOKBACK_HOURS - 1;
+const ONE_HOUR_MS = 60 * 60 * 1000;
 
 function normalizeEndpoint(value: string): string {
   if (!value) return "";
@@ -18,11 +22,11 @@ function normalizeEndpoint(value: string): string {
 }
 
 function buildHourlyBuckets(nowMs: number): Array<{ startMs: number; label: string; count: number }> {
-  const bucketStartTime = new Date(nowMs - 23 * 60 * 60 * 1000);
+  const bucketStartTime = new Date(nowMs - FIRST_BUCKET_OFFSET_HOURS * ONE_HOUR_MS);
   bucketStartTime.setMinutes(0, 0, 0);
   const buckets: Array<{ startMs: number; label: string; count: number }> = [];
-  for (let i = 0; i < 24; i += 1) {
-    const startMs = bucketStartTime.getTime() + i * 60 * 60 * 1000;
+  for (let i = 0; i < BUCKET_COUNT; i += 1) {
+    const startMs = bucketStartTime.getTime() + i * ONE_HOUR_MS;
     const label = new Date(startMs).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
     buckets.push({ startMs, label, count: 0 });
   }
@@ -56,7 +60,7 @@ export async function GET() {
   }, {} as Record<DashboardEndpoint, number>);
 
   const nowMs = Date.now();
-  const sinceIso = new Date(nowMs - 24 * 60 * 60 * 1000).toISOString();
+  const sinceIso = new Date(nowMs - LOOKBACK_HOURS * ONE_HOUR_MS).toISOString();
   const buckets = buildHourlyBuckets(nowMs);
 
   if (apiKeyIds.length === 0) {
@@ -89,7 +93,7 @@ export async function GET() {
 
     const timestampMs = typeof row.timestamp === "string" ? Date.parse(row.timestamp) : Number.NaN;
     if (!Number.isFinite(timestampMs)) continue;
-    const bucketIndex = Math.floor((timestampMs - buckets[0].startMs) / (60 * 60 * 1000));
+    const bucketIndex = Math.floor((timestampMs - buckets[0].startMs) / ONE_HOUR_MS);
     if (bucketIndex >= 0 && bucketIndex < buckets.length) {
       buckets[bucketIndex].count += 1;
     }

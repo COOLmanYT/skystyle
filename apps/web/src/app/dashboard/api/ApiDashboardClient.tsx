@@ -25,6 +25,8 @@ interface UsagePayload {
 
 const ENDPOINTS = ["/recommend", "/recweath", "/weather", "/closet"] as const;
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
+const MIN_VISIBLE_NON_ZERO_BAR_PERCENT = 6;
+const MIN_BAR_PERCENT = 2;
 
 export default function ApiDashboardClient() {
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -285,7 +287,9 @@ export default function ApiDashboardClient() {
                   </p>
                   <div className="flex items-end gap-1 h-24" aria-label="Usage chart">
                     {usage.requestsOverTime.map((point) => {
-                      const height = maxChartValue > 0 ? Math.max((point.count / maxChartValue) * 100, point.count > 0 ? 6 : 2) : 2;
+                      const height = maxChartValue > 0
+                        ? Math.max((point.count / maxChartValue) * 100, point.count > 0 ? MIN_VISIBLE_NON_ZERO_BAR_PERCENT : MIN_BAR_PERCENT)
+                        : MIN_BAR_PERCENT;
                       return (
                         <div key={point.label} className="flex-1 rounded-sm" style={{ height: `${height}%`, background: "var(--accent)", opacity: 0.75 }} title={`${point.label}: ${point.count}`} />
                       );
