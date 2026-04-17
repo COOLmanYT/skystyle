@@ -1,23 +1,26 @@
 export const dynamic = "force-dynamic";
 
 /**
- * POST /api/v1/recommend
+ * POST /api/v1/recweath
  *
- * Public API endpoint for outfit recommendations, authenticated via API key.
+ * Combined endpoint — returns an AI outfit recommendation together with the
+ * full weather data used to generate it.  Useful when a client needs both in
+ * a single round-trip.
+ * Authenticated via API key.
  *
  * Authentication:
  *   Authorization: Bearer sk_live_<token>
  *
  * Request body (JSON):
- *   lat           number  required  Latitude  (-90 to 90)
- *   lon           number  required  Longitude (-180 to 180)
- *   unit          string  optional  "metric" (default) | "imperial"
- *   gender        string  optional  Gender context for recommendations (max 30 chars)
+ *   lat     number  required  Latitude  (-90 to 90)
+ *   lon     number  required  Longitude (-180 to 180)
+ *   unit    string  optional  "metric" (default) | "imperial"
+ *   gender  string  optional  Gender context for recommendations (max 30 chars)
  *
  * Response (200):
  *   outfit        string  Outfit recommendation text
  *   reasoning     string  Explanation linking weather to choices
- *   weather       object  Key weather conditions used for the recommendation
+ *   weather       object  Full weather snapshot (same shape as /api/v1/weather)
  *   model         string  AI model used
  *   generated_at  string  ISO-8601 UTC timestamp
  */
@@ -35,14 +38,14 @@ const LAT_MAX = 90;
 const LON_MIN = -180;
 const LON_MAX = 180;
 
-interface RecommendBody {
+interface RecWeathBody {
   lat?: unknown;
   lon?: unknown;
   unit?: unknown;
   gender?: unknown;
 }
 
-/** Return the next weekly reset date (ISO date string) for a credit record, or a fallback. */
+/** Return the next weekly reset date for a user's credits, or a fallback string. */
 async function getCreditsResetDate(userId: string): Promise<string> {
   const { data } = await supabaseAdmin
     .from("credits")
@@ -64,14 +67,14 @@ function kmhToMph(kmh: number): number {
   return Math.round(kmh * 0.621371);
 }
 
-async function handleRecommend(
+async function handleRecWeath(
   req: NextRequest,
   ctx: ApiKeyContext
 ): Promise<NextResponse> {
   const { userId } = ctx;
 
-  // 1. Parse and validate request body
-  let body: RecommendBody;
+  // 1. Parse and validate body
+  let body: RecWeathBody;
   try {
     body = await req.json();
   } catch {
@@ -103,7 +106,7 @@ async function handleRecommend(
       ? body.gender.trim().slice(0, 30)
       : undefined;
 
-  // 2. Load user profile for rate-limit tier
+  // 2. Load user tier
   const { data: profile } = await supabaseAdmin
     .from("users")
     .select("is_pro, is_dev")
@@ -161,7 +164,7 @@ async function handleRecommend(
     return NextResponse.json({ error: message }, { status: 502 });
   }
 
-  // 6. Deduct credit / increment daily usage
+  // 6. Deduct credit / increment usage
   if (!isDev) {
     if (isPro) {
       await deductCredit(userId);
@@ -170,7 +173,7 @@ async function handleRecommend(
     }
   }
 
-  // 7. Return clean public response
+  // 7. Return recommendation + full weather snapshot
   const isImperial = unit === "imperial";
   return NextResponse.json({
     outfit: recommendation.outfit,
@@ -188,11 +191,11 @@ async function handleRecommend(
       uv_index: weather.uvIndex,
       is_day: weather.isDay,
       alerts: weather.alerts,
+      source: weather.source,
     },
     model: recommendation.modelUsed ?? "unknown",
     generated_at: new Date().toISOString(),
   });
 }
 
-export const POST = withApiAuth(handleRecommend);
-
+export const POST = withApiAuth(handleRecWeath);
