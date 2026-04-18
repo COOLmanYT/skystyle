@@ -2,6 +2,12 @@
   "functions": {
     "apps/web/src/app/api/style/route.ts": {
       "maxDuration": 30
+    },
+    "apps/web/src/app/api/v1/recommend/route.ts": {
+      "maxDuration": 30
+    },
+    "apps/web/src/app/api/v1/recweather/route.ts": {
+      "maxDuration": 30
     }
   }
 }

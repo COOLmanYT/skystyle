@@ -33,7 +33,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { getWeather } from "@/lib/weather";
-import { withApiAuth, ApiKeyContext } from "@/lib/api-middleware";
+import { withApiAuth, ApiKeyContext, apiOptionsHandler } from "@/lib/api-middleware";
 
 const LAT_MIN = -90;
 const LAT_MAX = 90;
@@ -114,3 +114,4 @@ async function handleWeather(
 }
 
 export const GET = withApiAuth(handleWeather);
+export const OPTIONS = apiOptionsHandler;

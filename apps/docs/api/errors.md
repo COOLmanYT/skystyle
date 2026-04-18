@@ -19,6 +19,23 @@ All error responses return JSON with a single `error` field:
 | `500 Internal Server Error` | Unexpected server-side error. |
 | `502 Bad Gateway` | The upstream weather provider or AI backend is unavailable. Retry after a short delay. |
 
+### Example: rate limited
+
+```json
+{
+  "error": "rate_limited",
+  "message": "Too many requests. Please slow down."
+}
+```
+
+When rate limited (`429`), the response also includes:
+
+```
+Retry-After: 60
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 0
+```
+
 ### Example: invalid coordinates
 
 ```json
@@ -38,6 +55,20 @@ All error responses return JSON with a single `error` field:
 ::: tip Retrying 502 errors
 502 errors are transient. Wait 2–5 seconds and retry. If they persist, check the Sky Style status page.
 :::
+
+---
+
+## Response headers
+
+Every v1 API response includes the following standard headers:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed per minute. |
+| `X-RateLimit-Remaining` | Requests remaining in the current 60-second window. |
+| `Retry-After` | Seconds to wait before retrying (only present on `429` responses). |
+| `Cache-Control` | Always `no-store` — API responses must not be cached. |
+| `Access-Control-Allow-Origin` | `*` — the API supports cross-origin requests from any origin. |
 
 ---
 

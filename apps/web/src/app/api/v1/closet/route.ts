@@ -17,7 +17,7 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
-import { withApiAuth, ApiKeyContext } from "@/lib/api-middleware";
+import { withApiAuth, ApiKeyContext, apiOptionsHandler } from "@/lib/api-middleware";
 
 async function handleCloset(
   _req: NextRequest,
@@ -43,3 +43,4 @@ async function handleCloset(
 }
 
 export const GET = withApiAuth(handleCloset);
+export const OPTIONS = apiOptionsHandler;

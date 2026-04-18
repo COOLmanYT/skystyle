@@ -11,6 +11,7 @@ export default defineConfig({
       { text: 'Home', link: '/' },
       { text: 'Platform Guide', link: '/markdown-examples' },
       { text: 'API Reference', link: '/api/' },
+      { text: 'Quickstart', link: '/api/quickstart' },
     ],
 
     sidebar: [
@@ -25,6 +26,7 @@ export default defineConfig({
         text: 'API Reference',
         items: [
           { text: 'Overview', link: '/api/' },
+          { text: 'Quickstart', link: '/api/quickstart' },
           { text: 'Authentication', link: '/api/authentication' },
           {
             text: 'Endpoints',
