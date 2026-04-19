@@ -40,15 +40,16 @@ Your response MUST be a JSON object with exactly two keys:
 
 Be specific (name garment types, colours, materials). Be friendly and concise. Output ONLY the raw JSON object with no preface or trailing text. Never include phrases like "Here is the JSON requested", "Here's the JSON", "Below is the JSON", or any similar lead-in.`;
 
-const JSON_LEAD_IN_REGEX =
-  /(?:^|\n)\s*(?:here(?:'s| is)|below is|this is|sure|certainly|okay|ok)\b[^\n{}]{0,120}\bjson\b[^\n{}]{0,120}(?::|-)?\s*/gi;
+const MAX_JSON_LEAD_IN_CHARS = 120;
+const JSON_LEAD_IN_PATTERN = `(?:^|\\n)\\s*(?:here(?:'s| is)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}(?::|-)?\\s*`;
+const JSON_LEAD_IN_TEST_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "i");
+const JSON_LEAD_IN_REPLACE_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "gi");
 
 function enforceStrictJsonOnly(raw: string): string {
-  if (!JSON_LEAD_IN_REGEX.test(raw)) return raw;
-  JSON_LEAD_IN_REGEX.lastIndex = 0;
+  if (!JSON_LEAD_IN_TEST_REGEX.test(raw)) return raw;
   const extractedJson = extractFirstJsonObject(raw);
   if (extractedJson) return extractedJson;
-  return raw.replace(JSON_LEAD_IN_REGEX, "").trim();
+  return raw.replace(JSON_LEAD_IN_REPLACE_REGEX, "").trim();
 }
 
 /** A single time-slot entry from the weather planning panel */
