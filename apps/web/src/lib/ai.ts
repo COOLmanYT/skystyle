@@ -41,15 +41,36 @@ Your response MUST be a JSON object with exactly two keys:
 Be specific (name garment types, colours, materials). Be friendly and concise. Output ONLY the raw JSON object with no preface or trailing text. Never include phrases like "Here is the JSON requested", "Here's the JSON", "Below is the JSON", or any similar lead-in.`;
 
 const MAX_JSON_LEAD_IN_CHARS = 120;
+// Matches assistant lead-in prose that references "json" before the actual payload.
 const JSON_LEAD_IN_PATTERN = `(?:^|\\n)\\s*(?:here(?:'s| is)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}(?::|-)?\\s*`;
 const JSON_LEAD_IN_TEST_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "i");
 const JSON_LEAD_IN_REPLACE_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "gi");
+const JSON_LEAD_IN_AT_START_REGEX = new RegExp(`^\\s*(?:${JSON_LEAD_IN_PATTERN}|(?:the\\s+)?json\\s+(?:you\\s+)?requested\\s*(?::|-)?\\s*)`, "i");
 
+/** Remove forbidden JSON lead-in phrasing from the start of a text field. */
+function stripForbiddenJsonLeadIn(value: string): string {
+  if (!value) return value;
+  return value.replace(JSON_LEAD_IN_AT_START_REGEX, "").trimStart();
+}
+
+/** Enforce JSON-only output by preferring the first JSON object over mixed prose+JSON content. */
 function enforceStrictJsonOnly(raw: string): string {
-  if (!JSON_LEAD_IN_TEST_REGEX.test(raw)) return raw;
-  const extractedJson = extractFirstJsonObject(raw);
+  const trimmed = raw.trim();
+  const extractedJson = extractFirstJsonObject(trimmed);
+  if (extractedJson && extractedJson.trim() !== trimmed) return extractedJson;
+  if (!JSON_LEAD_IN_TEST_REGEX.test(trimmed)) return trimmed;
   if (extractedJson) return extractedJson;
-  return raw.replace(JSON_LEAD_IN_REPLACE_REGEX, "").trim();
+  return trimmed.replace(JSON_LEAD_IN_REPLACE_REGEX, "").trim();
+}
+
+/** Apply lead-in sanitization across recommendation fields before returning to clients. */
+function sanitizeRecommendationFields(recommendation: StyleRecommendation): StyleRecommendation {
+  return {
+    ...recommendation,
+    outfit: stripForbiddenJsonLeadIn(recommendation.outfit),
+    reasoning: stripForbiddenJsonLeadIn(recommendation.reasoning),
+    ...(recommendation.rawOutput ? { rawOutput: enforceStrictJsonOnly(recommendation.rawOutput) } : {}),
+  };
 }
 
 /** A single time-slot entry from the weather planning panel */
@@ -512,29 +533,29 @@ async function callAI(
 
   const parsed = parseRecommendationFromRaw(raw);
   if (parsed) {
-    return {
+    return sanitizeRecommendationFields({
       outfit: parsed.outfit ?? "Unable to generate outfit recommendation.",
       reasoning: parsed.reasoning ?? "",
       modelUsed,
       ...(isDev ? { rawOutput: raw } : {}),
-    };
+    });
   }
 
   const partialOutfit = extractJsonField(raw, "outfit");
   const partialReasoning = extractJsonField(raw, "reasoning");
   if (partialOutfit || partialReasoning) {
-    return {
+    return sanitizeRecommendationFields({
       outfit: partialOutfit ?? "Unable to generate outfit recommendation.",
       reasoning: partialReasoning ?? "",
       modelUsed,
       ...(isDev ? { rawOutput: raw } : {}),
-    };
+    });
   }
 
-  return {
+  return sanitizeRecommendationFields({
     outfit: "Unable to generate outfit recommendation.",
     reasoning: raw.trim(),
     modelUsed,
     ...(isDev ? { rawOutput: raw } : {}),
-  };
+  });
 }
