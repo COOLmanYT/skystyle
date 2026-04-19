@@ -24,7 +24,7 @@ Sky Style uses a single monorepo with separate deployable apps.
 ## Deployment Targets
 
 - skystyle.app: Main product experience
-- docs.skystyle.app: Documentation and integration guides
+- skystyle-docs.vercel.app: Documentation and integration guides
 - api.skystyle.app: Future API endpoint base
 
 ## Environment Notes

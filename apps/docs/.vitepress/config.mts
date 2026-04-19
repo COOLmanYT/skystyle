@@ -51,7 +51,7 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Sky Style API docs — always in sync with skystyle.app/api/v1',
+      message: 'Sky Style Docs — always in sync with skystyle.app/api/v1',
       copyright: 'Copyright 2026 Sky Style'
     }
   }

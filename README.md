@@ -58,7 +58,7 @@ This repository is now organized as a single monorepo for multiple deployable pr
 
 Project targets:
 - `apps/web` -> `skystyle.app` (or current preview domain)
-- `apps/docs` -> `docs.skystyle.app`
+- `apps/docs` -> `https://skystyle-docs.vercel.app`
 - `apps/api` -> `api.skystyle.app` (future)
 
 ## Tech stack
