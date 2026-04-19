@@ -38,7 +38,18 @@ Your response MUST be a JSON object with exactly two keys:
   "outfit": a concise outfit recommendation (max 120 words)
   "reasoning": a brief explanation linking weather facts to clothing choices (max 160 words)
 
-Be specific (name garment types, colours, materials). Be friendly and concise. DO NOT output anything excluding the JSON object, such as "Here is the JSON you requested".`;
+Be specific (name garment types, colours, materials). Be friendly and concise. Output ONLY the raw JSON object with no preface or trailing text. Never include phrases like "Here is the JSON requested", "Here's the JSON", "Below is the JSON", or any similar lead-in.`;
+
+const JSON_LEAD_IN_REGEX =
+  /(?:^|\n)\s*(?:here(?:'s| is)|below is|this is|sure|certainly|okay|ok)\b[^\n{}]{0,120}\bjson\b[^\n{}]{0,120}(?::|-)?\s*/gi;
+
+function enforceStrictJsonOnly(raw: string): string {
+  if (!JSON_LEAD_IN_REGEX.test(raw)) return raw;
+  JSON_LEAD_IN_REGEX.lastIndex = 0;
+  const extractedJson = extractFirstJsonObject(raw);
+  if (extractedJson) return extractedJson;
+  return raw.replace(JSON_LEAD_IN_REGEX, "").trim();
+}
 
 /** A single time-slot entry from the weather planning panel */
 export interface PlanningSlot {
@@ -496,6 +507,7 @@ async function callAI(
 
   // Log full AI output for server-side debugging
   console.log("[ai] Full AI response:", raw);
+  raw = enforceStrictJsonOnly(raw);
 
   const parsed = parseRecommendationFromRaw(raw);
   if (parsed) {
