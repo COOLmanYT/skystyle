@@ -38,7 +38,45 @@ Your response MUST be a JSON object with exactly two keys:
   "outfit": a concise outfit recommendation (max 120 words)
   "reasoning": a brief explanation linking weather facts to clothing choices (max 160 words)
 
-Be specific (name garment types, colours, materials). Be friendly and concise. DO NOT output anything excluding the JSON object, such as "Here is the JSON you requested".`;
+Be specific (name garment types, colours, materials). Be friendly and concise. Output ONLY the raw JSON object with no preface or trailing text. Never include phrases like "Here is the JSON requested", "Here's the JSON", "Below is the JSON", or any similar lead-in.`;
+
+const MAX_JSON_LEAD_IN_CHARS = 120;
+// Matches assistant lead-in prose that references "json" before the actual payload.
+const JSON_LEAD_IN_PATTERN = `(?:^|\\n)\\s*(?:here(?:['’]s| is| are)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}(?::|-)?\\s*`;
+const JSON_LEAD_IN_TEST_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "i");
+const JSON_LEAD_IN_REPLACE_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "gi");
+const JSON_LEAD_IN_AT_START_REGEX = new RegExp(
+  `^\\s*(?:(?:here(?:['’]s| is| are)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}|(?:the\\s+)?json\\s+(?:you\\s+)?requested)\\s*(?::|-)?\\s*`,
+  "i"
+);
+
+/** Remove forbidden JSON lead-in phrasing from the start of a text field. */
+function stripForbiddenJsonLeadIn(value: string): string {
+  if (!value) return value;
+  return value.replace(JSON_LEAD_IN_AT_START_REGEX, "").trimStart();
+}
+
+/** Enforce JSON-only output by preferring the first JSON object over mixed prose+JSON content. */
+function enforceStrictJsonOnly(raw: string): string {
+  const trimmed = raw.trim();
+  const extractedJson = extractFirstParsableJsonObject(trimmed, true);
+  if (extractedJson && extractedJson.trim() !== trimmed) return extractedJson;
+  if (!JSON_LEAD_IN_TEST_REGEX.test(trimmed)) return trimmed;
+  if (extractedJson) return extractedJson;
+  const fallbackJson = extractFirstParsableJsonObject(trimmed);
+  if (fallbackJson) return fallbackJson;
+  return trimmed.replace(JSON_LEAD_IN_REPLACE_REGEX, "").trim();
+}
+
+/** Apply lead-in sanitization across recommendation fields before returning to clients. */
+function sanitizeRecommendationFields(recommendation: StyleRecommendation): StyleRecommendation {
+  return {
+    ...recommendation,
+    outfit: stripForbiddenJsonLeadIn(recommendation.outfit),
+    reasoning: stripForbiddenJsonLeadIn(recommendation.reasoning),
+    ...(recommendation.rawOutput ? { rawOutput: enforceStrictJsonOnly(recommendation.rawOutput) } : {}),
+  };
+}
 
 /** A single time-slot entry from the weather planning panel */
 export interface PlanningSlot {
@@ -188,6 +226,61 @@ function extractFirstJsonObject(text: string): string | null {
   return null;
 }
 
+function extractFirstParsableJsonObject(
+  text: string,
+  requireRecommendationFields = false
+): string | null {
+  let searchFrom = 0;
+  while (searchFrom < text.length) {
+    const start = text.indexOf("{", searchFrom);
+    if (start === -1) return null;
+    let depth = 0;
+    let inString = false;
+    let escaped = false;
+    let end = -1;
+    for (let i = start; i < text.length; i++) {
+      const char = text[i];
+      if (inString) {
+        if (escaped) escaped = false;
+        else if (char === "\\") escaped = true;
+        else if (char === '"') inString = false;
+        continue;
+      }
+      if (char === '"') {
+        inString = true;
+        continue;
+      }
+      if (char === "{") depth++;
+      if (char === "}") {
+        depth--;
+        if (depth === 0) {
+          end = i + 1;
+          break;
+        }
+      }
+    }
+    if (end === -1) return null;
+    const candidate = text.slice(start, end);
+    try {
+      const parsedUnknown = JSON.parse(candidate) as unknown;
+      if (!parsedUnknown || typeof parsedUnknown !== "object" || Array.isArray(parsedUnknown)) {
+        searchFrom = start + 1;
+        continue;
+      }
+      const parsed = parsedUnknown as Partial<StyleRecommendation>;
+      const hasRecommendationFields =
+        typeof parsed?.outfit === "string" || typeof parsed?.reasoning === "string";
+      if (!requireRecommendationFields || hasRecommendationFields) {
+        return candidate;
+      }
+    } catch {
+      // Try next balanced object.
+    }
+    searchFrom = start + 1;
+  }
+  return null;
+}
+
 function parseRecommendationFromRaw(raw: string): Partial<StyleRecommendation> | null {
   const tryParse = (candidate: string): Partial<StyleRecommendation> | null => {
     if (!candidate.trim()) return null;
@@ -204,6 +297,8 @@ function parseRecommendationFromRaw(raw: string): Partial<StyleRecommendation> |
 
   return (
     tryParse(withoutFence) ??
+    tryParse(extractFirstParsableJsonObject(withoutFence, true) ?? "") ??
+    tryParse(extractFirstParsableJsonObject(trimmed, true) ?? "") ??
     tryParse(extractFirstJsonObject(withoutFence) ?? "") ??
     tryParse(extractFirstJsonObject(trimmed) ?? "")
   );
@@ -496,32 +591,33 @@ async function callAI(
 
   // Log full AI output for server-side debugging
   console.log("[ai] Full AI response:", raw);
+  raw = enforceStrictJsonOnly(raw);
 
   const parsed = parseRecommendationFromRaw(raw);
   if (parsed) {
-    return {
+    return sanitizeRecommendationFields({
       outfit: parsed.outfit ?? "Unable to generate outfit recommendation.",
       reasoning: parsed.reasoning ?? "",
       modelUsed,
       ...(isDev ? { rawOutput: raw } : {}),
-    };
+    });
   }
 
   const partialOutfit = extractJsonField(raw, "outfit");
   const partialReasoning = extractJsonField(raw, "reasoning");
   if (partialOutfit || partialReasoning) {
-    return {
+    return sanitizeRecommendationFields({
       outfit: partialOutfit ?? "Unable to generate outfit recommendation.",
       reasoning: partialReasoning ?? "",
       modelUsed,
       ...(isDev ? { rawOutput: raw } : {}),
-    };
+    });
   }
 
-  return {
+  return sanitizeRecommendationFields({
     outfit: "Unable to generate outfit recommendation.",
     reasoning: raw.trim(),
     modelUsed,
     ...(isDev ? { rawOutput: raw } : {}),
-  };
+  });
 }
