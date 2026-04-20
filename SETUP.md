@@ -50,7 +50,7 @@ Before deploying, create accounts and obtain credentials for:
 
 For the main web app, configure the Vercel project **Root Directory** as `apps/web`.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/COOLmanYT/what2wear)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/COOLmanYT/skystyle)
 
 Or manually:
 

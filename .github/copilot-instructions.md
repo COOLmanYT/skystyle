@@ -1,4 +1,4 @@
-# GitHub Copilot Instructions — Sky Style (what2wear)
+# GitHub Copilot Instructions — Sky Style (skystyle)
 
 # Current version: 4.0.1
 

@@ -41,7 +41,7 @@ export async function GET(req: NextRequest) {
     res = await fetch(url.toString(), {
       headers: {
         // Nominatim requires a descriptive User-Agent
-        "User-Agent": "SkyStyle/1.0 (weather-outfit-stylist; github.com/COOLmanYT/what2wear)",
+        "User-Agent": "SkyStyle/1.0 (weather-outfit-stylist; github.com/COOLmanYT/skystyle)",
         "Accept-Language": "en",
       },
       next: { revalidate: 3600 }, // cache geocoding results for 1 hour

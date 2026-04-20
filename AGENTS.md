@@ -1,4 +1,4 @@
-# Agent Instructions — Sky Style (what2wear)
+# Agent Instructions — Sky Style (skystyle)
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 

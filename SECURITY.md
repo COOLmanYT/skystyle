@@ -17,7 +17,7 @@ Older commits or forks may not receive security updates.
 
 ### In scope
 
-* The source code in this repository (`COOLmanYT/what2wear`)
+* The source code in this repository (`COOLmanYT/skystyle`)
 * The production deployment of this project
 * Application logic implemented in this repository (including API routes, weather aggregation, and AI integrations)
 
@@ -53,7 +53,7 @@ Please include:
 
 You may also submit a report through GitHub:
 
-https://github.com/COOLmanYT/what2wear/security/advisories/new
+https://github.com/COOLmanYT/skystyle/security/advisories/new
 
 ---
 

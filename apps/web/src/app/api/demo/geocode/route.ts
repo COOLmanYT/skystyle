@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   try {
     res = await fetch(url.toString(), {
       headers: {
-        "User-Agent": "SkyStyle/1.0 (weather-outfit-stylist; github.com/COOLmanYT/what2wear)",
+        "User-Agent": "SkyStyle/1.0 (weather-outfit-stylist; github.com/COOLmanYT/skystyle)",
         "Accept-Language": "en",
       },
       next: { revalidate: 3600 },
