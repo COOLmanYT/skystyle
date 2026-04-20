@@ -12,15 +12,15 @@ function SimpleToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
       className="relative inline-flex items-center cursor-pointer focus:outline-none"
       aria-label="Simple Mode toggle"
     >
-              <a
-                href="https://github.com/COOLmanYT/skystyle/issues"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-                style={{ color: "var(--accent)" }}
-              >
-                open an issue
-              </a>{" "}
+      <span
+        className="block rounded-full transition-colors duration-200"
+        style={{
+          width: 44,
+          height: 26,
+          background: on ? "var(--accent)" : "var(--card-border)",
+          border: "2px solid transparent",
+          boxShadow: "inset 0 0 0 1px var(--card-border)",
+        }}
       >
         <span
           className="block rounded-full transition-transform duration-200"
@@ -137,7 +137,7 @@ export default function TermsClient() {
             <p>
               The entire codebase is{" "}
               <a
-                href="https://github.com/COOLmanYT/what2wear"
+                href="https://github.com/COOLmanYT/skystyle"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline"
@@ -355,7 +355,7 @@ export default function TermsClient() {
               if you violate these terms or abuse the service. On termination, you may request
               deletion of your data by{" "}
               <a
-                href="https://github.com/COOLmanYT/what2wear/issues"
+                href="https://github.com/COOLmanYT/skystyle/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline"
@@ -400,15 +400,15 @@ export default function TermsClient() {
                 github.com/COOLmanYT/skystyle
               </a>
               .
+            </p>
+          </section>
+
+          <section>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Contact</h2>
+            <p>
+              Questions? Open an issue on{" "}
               <a
-                href="https://github.com/COOLmanYT/skystyle"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline"
-                style={{ color: "var(--accent)" }}
-              >
-                github.com/COOLmanYT/skystyle
-              </a>
+                href="https://github.com/COOLmanYT/skystyle/issues"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline"
