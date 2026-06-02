@@ -4,6 +4,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Sky Style Docs",
   description: "Official docs for Sky Style weather-based outfit intelligence",
+  ignoreDeadLinks: true,
   themeConfig: {
     logo: '/images/settings.png',
     // https://vitepress.dev/reference/default-theme-config
@@ -12,6 +13,7 @@ export default defineConfig({
       { text: 'Platform Guide', link: '/markdown-examples' },
       { text: 'API Reference', link: '/api/' },
       { text: 'Quickstart', link: '/api/quickstart' },
+      { text: 'Development', link: '/development' },
     ],
 
     sidebar: [
@@ -38,6 +40,14 @@ export default defineConfig({
             ]
           },
           { text: 'Errors & Credits', link: '/api/errors' },
+        ]
+      },
+      {
+        text: 'Development',
+        items: [
+          { text: 'Overview', link: '/development' },
+          { text: 'Architecture', link: '/development/architecture' },
+          { text: 'Testing', link: '/development/testing' },
         ]
       }
     ],

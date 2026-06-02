@@ -2,10 +2,11 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/style
  *
- * Body: { lat: number; lon: number; userApiKey?: string }
+ * Body: { lat: number; lon: number; userApiKey?: string; modelId?: string }
  *
  * Returns an AI-generated outfit recommendation based on real-time weather data.
  * Auth-protected. Pro users have credits deducted. Free users get 5 AI uses/day.
+ * Supports model selection for Pro users and BYOK.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -13,7 +14,7 @@ import { auth } from "@/auth";
 import { DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getWeather, CustomSource, SourceMode, MAX_CUSTOM_SOURCES } from "@/lib/weather";
-import { getStyleRecommendation, getDevChatResponse, PlanningData } from "@/lib/ai";
+import { getStyleRecommendation, getDevChatResponse, PlanningData, ModelID, getModelById } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
     shareLocation?: boolean; forceCloset?: boolean; unitPreference?: string;
     devMessage?: string; sourceMode?: string; customSources?: CustomSource[];
     planningData?: unknown; clientCustomPrompt?: string; byokProvider?: string;
+    modelId?: string;
   };
   try {
     body = await req.json();
@@ -48,10 +50,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { lat, lon, userApiKey, gender, shareLocation, forceCloset, devMessage } = body;
+  const { lat, lon, userApiKey, gender, shareLocation, forceCloset, devMessage, modelId } = body;
+  
+  // Validate modelId if provided
+  if (modelId && !getModelById(modelId as ModelID)) {
+    return NextResponse.json({ error: "Invalid model ID" }, { status: 400 });
+  }
+  
   // Validate BYOK provider
-  const byokProvider: "openai" | "gemini" =
-    body.byokProvider === "gemini" ? "gemini" : "openai";
+  const byokProvider: "openai" | "gemini" | "mistral" =
+    body.byokProvider === "gemini" ? "gemini" : (body.byokProvider === "mistral" ? "mistral" : "openai");
   if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return NextResponse.json(
       { error: "lat must be between -90 and 90, lon between -180 and 180" },
@@ -220,6 +228,22 @@ export async function POST(req: NextRequest) {
   // 6. Get AI recommendation (use BYOK if provided and user is Pro/Dev)
   let recommendation;
   try {
+    // Check if user is trying to use a model switch (different from default)
+    const isModelSwitch = modelId && modelId !== getModelById(modelId as ModelID)?.id;
+    
+    // For free users, check model switch limit (2/week)
+    if (!isPro && !isDev && !isDemo && isModelSwitch) {
+      const { allowed, used, limit } = await canUseFeature(userId, "model_switches", isPro, isDev, isDemo);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: `Model switch limit reached (${used}/${limit}). Upgrade to Pro for unlimited model switching.` },
+          { status: 429 }
+        );
+      }
+      // Deduct model switch
+      await incrementUsage(userId, "model_switches", isPro, isDev, isDemo);
+    }
+    
     recommendation = await getStyleRecommendation({
       weather,
       closetItems,
@@ -234,6 +258,7 @@ export async function POST(req: NextRequest) {
       isDev,
       customContext: weather.customContext,
       planningData,
+      modelId: modelId as ModelID | undefined,
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";

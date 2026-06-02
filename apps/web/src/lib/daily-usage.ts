@@ -6,6 +6,7 @@
  * - follow_ups:   Free: 40/day, Pro: 400/day
  * - closet_uses:  Free: 4/day, Pro: unlimited
  * - source_picks: Free: 4/day, Pro: unlimited
+ * - model_switches: Free: 2/week, Pro: unlimited (for model switching feature)
  */
 
 import { supabaseAdmin } from "./supabase";
@@ -17,17 +18,18 @@ export interface DailyUsageRecord {
   follow_ups: number;
   closet_uses: number;
   source_picks: number;
+  model_switches: number;
 }
 
 const LIMITS = {
-  free: { ai_uses: 20, follow_ups: 40, closet_uses: 4, source_picks: 4 },
+  free: { ai_uses: 20, follow_ups: 40, closet_uses: 4, source_picks: 4, model_switches: 2 },
   // demo plan: 10× the standard free limits for preview-environment testing
-  demo: { ai_uses: 200, follow_ups: 400, closet_uses: 40, source_picks: 40 },
-  pro: { ai_uses: Infinity, follow_ups: 400, closet_uses: Infinity, source_picks: Infinity },
-  dev: { ai_uses: Infinity, follow_ups: Infinity, closet_uses: Infinity, source_picks: Infinity },
+  demo: { ai_uses: 200, follow_ups: 400, closet_uses: 40, source_picks: 40, model_switches: 20 },
+  pro: { ai_uses: Infinity, follow_ups: 400, closet_uses: Infinity, source_picks: Infinity, model_switches: Infinity },
+  dev: { ai_uses: Infinity, follow_ups: Infinity, closet_uses: Infinity, source_picks: Infinity, model_switches: Infinity },
 } as const;
 
-type UsageField = "ai_uses" | "follow_ups" | "closet_uses" | "source_picks";
+type UsageField = "ai_uses" | "follow_ups" | "closet_uses" | "source_picks" | "model_switches";
 
 function today(): string {
   return new Date().toISOString().split("T")[0];

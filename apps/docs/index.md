@@ -42,3 +42,9 @@ features:
 - [GET /closet](/api/closet)
 - [Errors & Credits](/api/errors)
 
+## Development
+
+- [Development guide](/development)
+- [Testing](/development/testing)
+- [Architecture](/development/architecture)
+

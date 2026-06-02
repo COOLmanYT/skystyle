@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS daily_usage (
   follow_ups          integer NOT NULL DEFAULT 0,
   closet_uses         integer NOT NULL DEFAULT 0,
   source_picks        integer NOT NULL DEFAULT 0,
+  model_switches      integer NOT NULL DEFAULT 0,
   UNIQUE (user_id, usage_date)
 );
 
@@ -408,6 +409,10 @@ CREATE TABLE IF NOT EXISTS changelog_posts (
 --    );
 --    CREATE INDEX IF NOT EXISTS idx_api_usage_logs_key_time
 --      ON api_usage_logs (api_key_id, timestamp DESC);
+--
+-- v4.0.0: Add model_switches column for model switching rate limiting:
+--
+--    ALTER TABLE daily_usage ADD COLUMN IF NOT EXISTS model_switches integer NOT NULL DEFAULT 0;
 --
 -- ============================================================
 
