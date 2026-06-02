@@ -16,7 +16,7 @@ import { Mistral } from "@mistralai/mistralai";
 import { WeatherData } from "./weather";
 
 // Model definitions and priorities
-const MODEL_PRIORITIES = {
+export const MODEL_PRIORITIES = {
   pro: [
     // OpenAI models
     { id: "gpt-4o", provider: "openai" as const, name: "GPT-4o" },
@@ -43,9 +43,9 @@ const MODEL_PRIORITIES = {
 } as const;
 
 // Extract model ID type from the priorities
-type ModelConfig = typeof MODEL_PRIORITIES.pro[number];
-type ModelProvider = ModelConfig["provider"];
-type ModelID = ModelConfig["id"];
+export type ModelConfig = typeof MODEL_PRIORITIES.pro[number];
+export type ModelProvider = ModelConfig["provider"];
+export type ModelID = ModelConfig["id"];
 
 // Available providers
 type AIProvider = "openai" | "gemini" | "mistral";
@@ -202,23 +202,15 @@ export interface StyleRecommendation {
 export function getAvailableModels(isPro: boolean, isDev: boolean, hasByok: boolean): ModelConfig[] {
   const tier = isDev ? "pro" : (isPro ? "pro" : "free");
   const models = MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES];
-  
-  // If user has BYOK, add BYOK options for all providers
-  if (hasByok) {
-    const byokModels: ModelConfig[] = [
-      { id: "byok-openai", provider: "openai", name: "BYOK - OpenAI" },
-      { id: "byok-gemini", provider: "gemini", name: "BYOK - Gemini" },
-      { id: "byok-mistral", provider: "mistral", name: "BYOK - Mistral" },
-    ];
-    return [...byokModels, ...models];
-  }
-  
+  void hasByok;
   return models;
 }
 
 /** Get all models (including unavailable ones) for display purposes */
 export function getAllModels(): ModelConfig[] {
-  return [...MODEL_PRIORITIES.pro, ...MODEL_PRIORITIES.free];
+  return [...MODEL_PRIORITIES.pro, ...MODEL_PRIORITIES.free].filter(
+    (model, index, all) => all.findIndex((candidate) => candidate.id === model.id) === index
+  );
 }
 
 /** Check if a model is available for a user's plan */
@@ -446,11 +438,6 @@ async function callAIWithModel(
   // BYOK takes precedence when user provides their own key
   if (userApiKey) {
     const provider = byokProvider || "openai";
-    const byokModel = getModelById(`byok-${provider}` as ModelID);
-    if (byokModel) {
-      return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, byokModel, maxTokens);
-    }
-    // Fallback to provider's default model
     const defaultModel = MODEL_PRIORITIES.pro.find(m => m.provider === provider) || MODEL_PRIORITIES.pro[0];
     return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, defaultModel, maxTokens);
   }
@@ -483,14 +470,7 @@ async function callSpecificModel(
   const provider = model.provider;
   const modelId = model.id;
 
-  // Handle BYOK models
-  if (modelId.startsWith("byok-")) {
-    const actualProvider = modelId.replace("byok-", "") as ModelProvider;
-    return callProvider(systemPrompt, userMessage, userApiKey, isDev, actualProvider, maxTokens, model.name);
-  }
-
-  // Handle regular models
-  return callProvider(systemPrompt, userMessage, userApiKey, isDev, provider, maxTokens, model.name);
+  return callProvider(systemPrompt, userMessage, userApiKey, isDev, provider, maxTokens, modelId);
 }
 
 /** Call a specific AI provider */
@@ -501,15 +481,15 @@ async function callProvider(
   isDev: boolean,
   provider: ModelProvider,
   maxTokens: number,
-  modelName: string
+  modelId: string
 ): Promise<{ raw: string; modelUsed: string }> {
   switch (provider) {
     case "openai":
-      return callOpenAI(systemPrompt, userMessage, userApiKey, maxTokens, modelName);
+      return callOpenAI(systemPrompt, userMessage, userApiKey, maxTokens, modelId);
     case "gemini":
-      return callGemini(systemPrompt, userMessage, userApiKey, maxTokens, modelName);
+      return callGemini(systemPrompt, userMessage, userApiKey, maxTokens, modelId);
     case "mistral":
-      return callMistral(systemPrompt, userMessage, userApiKey, maxTokens, modelName);
+      return callMistral(systemPrompt, userMessage, userApiKey, maxTokens, modelId);
     default:
       throw new Error(`Unknown provider: ${provider}`);
   }
@@ -521,11 +501,11 @@ async function callOpenAI(
   userMessage: string,
   userApiKey: string | undefined,
   maxTokens: number,
-  modelName: string
+  modelId: string
 ): Promise<{ raw: string; modelUsed: string }> {
   const openai = getOpenAI(userApiKey);
   const response = await openai.chat.completions.create({
-    model: modelName,
+    model: modelId,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -536,7 +516,7 @@ async function callOpenAI(
   });
   return {
     raw: response.choices[0]?.message?.content ?? "{}",
-    modelUsed: modelName,
+    modelUsed: modelId,
   };
 }
 
@@ -546,17 +526,17 @@ async function callGemini(
   userMessage: string,
   userApiKey: string | undefined,
   maxTokens: number,
-  modelName: string
+  modelId: string
 ): Promise<{ raw: string; modelUsed: string }> {
   const gemini = getGemini(userApiKey);
   const model = gemini.getGenerativeModel({
-    model: modelName,
+    model: modelId,
     generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
   });
   const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
   return {
     raw: result.response.text(),
-    modelUsed: modelName,
+    modelUsed: modelId,
   };
 }
 
@@ -566,11 +546,11 @@ async function callMistral(
   userMessage: string,
   userApiKey: string | undefined,
   maxTokens: number,
-  modelName: string
+  modelId: string
 ): Promise<{ raw: string; modelUsed: string }> {
   const mistral = getMistral(userApiKey);
   const response = await mistral.chat.complete({
-    model: modelName,
+    model: modelId,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
@@ -581,7 +561,7 @@ async function callMistral(
   });
   return {
     raw: response.choices[0]?.message?.content ?? "{}",
-    modelUsed: modelName,
+    modelUsed: modelId,
   };
 }
 

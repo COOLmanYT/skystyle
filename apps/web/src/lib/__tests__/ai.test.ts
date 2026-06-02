@@ -11,6 +11,7 @@ import {
   getModelById,
   MODEL_PRIORITIES,
 } from '../ai';
+import type { ModelID } from '../ai';
 
 import {
   mockModelConfigs,
@@ -71,24 +72,16 @@ describe('AI Module - Model Configuration', () => {
       expect(models).toEqual(MODEL_PRIORITIES.free);
     });
 
-    it('should include BYOK models when hasByok is true for pro users', () => {
+    it('should return pro models when hasByok is true for pro users', () => {
       const models = getAvailableModels(true, false, true);
       
-      // Should include BYOK models at the beginning
-      expect(models.length).toBe(MODEL_PRIORITIES.pro.length + 3); // 3 BYOK models
-      expect(models[0].id).toBe('byok-openai');
-      expect(models[1].id).toBe('byok-gemini');
-      expect(models[2].id).toBe('byok-mistral');
+      expect(models).toEqual(MODEL_PRIORITIES.pro);
     });
 
-    it('should include BYOK models when hasByok is true for free users', () => {
+    it('should return free models when hasByok is true for free users', () => {
       const models = getAvailableModels(false, false, true);
       
-      // Should include BYOK models at the beginning
-      expect(models.length).toBe(MODEL_PRIORITIES.free.length + 3); // 3 BYOK models
-      expect(models[0].id).toBe('byok-openai');
-      expect(models[1].id).toBe('byok-gemini');
-      expect(models[2].id).toBe('byok-mistral');
+      expect(models).toEqual(MODEL_PRIORITIES.free);
     });
   });
 
@@ -136,7 +129,7 @@ describe('AI Module - Model Configuration', () => {
     });
 
     it('should return false for non-existent models', () => {
-      expect(isModelAvailable('non-existent-model', true, false)).toBe(false);
+      expect(isModelAvailable('non-existent-model' as ModelID, true, false)).toBe(false);
     });
   });
 
@@ -180,12 +173,12 @@ describe('AI Module - Model Configuration', () => {
     });
 
     it('should return null for non-existent models', () => {
-      const model = getModelById('non-existent-model');
+      const model = getModelById('non-existent-model' as ModelID);
       expect(model).toBeNull();
     });
 
     it('should return null for BYOK models (not in regular priorities)', () => {
-      const model = getModelById('byok-openai');
+      const model = getModelById('byok-openai' as ModelID);
       expect(model).toBeNull();
     });
   });

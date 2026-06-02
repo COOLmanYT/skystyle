@@ -2,9 +2,9 @@
  * Mock data and utilities for SkyStyle tests
  */
 
-import { WeatherData, SourceWeatherData, HourlyForecast } from '@lib/weather';
-import { StyleRecommendation, ModelConfig, ModelID, ModelProvider } from '@lib/ai';
-import { DailyUsageRecord } from '@lib/daily-usage';
+import { WeatherData, SourceWeatherData, HourlyForecast } from '@/lib/weather';
+import { StyleRecommendation, ModelConfig, ModelID, ModelProvider } from '@/lib/ai';
+import { DailyUsageRecord } from '@/lib/daily-usage';
 
 // ============================================================================
 // Weather Mock Data

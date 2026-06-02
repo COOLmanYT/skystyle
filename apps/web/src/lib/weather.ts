@@ -801,7 +801,7 @@ export async function processCustomSources(
 // ---------------------------------------------------------------------------
 
 // Weather cache configuration
-const WEATHER_CACHE_TTL = {
+export const WEATHER_CACHE_TTL = {
   'OpenWeather': 900, // 15 minutes
   'BOM': 1800, // 30 minutes (free, less frequent updates)
   'Open-Meteo': 1800, // 30 minutes (free)
@@ -810,18 +810,22 @@ const WEATHER_CACHE_TTL = {
 } as const;
 
 // Simple in-memory cache for weather data
-const weatherCache = new Map<string, { data: WeatherData & { customContext?: string[] }; timestamp: number }>();
+export const weatherCache = new Map<string, { data: WeatherData & { customContext?: string[] }; timestamp: number }>();
 
 /**
  * Generate cache key from parameters
  */
-function generateCacheKey(lat: number, lon: number, customSourceUrl?: string, sourceMode?: SourceMode, customSources?: CustomSource[]): string {
+export function generateCacheKey(lat: number, lon: number, customSourceUrl?: string, sourceMode?: SourceMode, customSources?: CustomSource[]): string {
+  const customSourcesSignature = (customSources ?? [])
+    .map((source) => `${source.id}:${source.type}:${source.value}:${source.service ?? ""}`)
+    .sort()
+    .join(",");
   const keyParts = [
     lat.toFixed(4),
     lon.toFixed(4),
     customSourceUrl || '',
     sourceMode || 'builtin',
-    customSources?.length || 0,
+    customSourcesSignature,
   ];
   return keyParts.join('|');
 }
@@ -829,14 +833,14 @@ function generateCacheKey(lat: number, lon: number, customSourceUrl?: string, so
 /**
  * Get cached weather data if still valid
  */
-function getCachedWeather(key: string): (WeatherData & { customContext?: string[] }) | null {
+export function getCachedWeather(key: string): (WeatherData & { customContext?: string[] }) | null {
   const cached = weatherCache.get(key);
   if (!cached) return null;
   
   const ttl = WEATHER_CACHE_TTL[cached.data.source as keyof typeof WEATHER_CACHE_TTL] || 900;
   const age = Date.now() - cached.timestamp;
   
-  if (age < ttl * 1000) {
+  if (age <= ttl * 1000) {
     return cached.data;
   }
   

@@ -6,7 +6,7 @@
  * - follow_ups:   Free: 40/day, Pro: 400/day
  * - closet_uses:  Free: 4/day, Pro: unlimited
  * - source_picks: Free: 4/day, Pro: unlimited
- * - model_switches: Free: 2/week, Pro: unlimited (for model switching feature)
+ * - model_switches: Free: 2/day, Pro: unlimited (for model switching feature)
  */
 
 import { supabaseAdmin } from "./supabase";
@@ -21,7 +21,7 @@ export interface DailyUsageRecord {
   model_switches: number;
 }
 
-const LIMITS = {
+export const LIMITS = {
   free: { ai_uses: 20, follow_ups: 40, closet_uses: 4, source_picks: 4, model_switches: 2 },
   // demo plan: 10× the standard free limits for preview-environment testing
   demo: { ai_uses: 200, follow_ups: 400, closet_uses: 40, source_picks: 40, model_switches: 20 },
@@ -55,12 +55,16 @@ export async function getDailyUsage(userId: string): Promise<DailyUsageRecord> {
       follow_ups: 0,
       closet_uses: 0,
       source_picks: 0,
+      model_switches: 0,
     };
     await supabaseAdmin.from("daily_usage").upsert(record, { onConflict: "user_id,usage_date" });
     return record;
   }
 
-  return data as DailyUsageRecord;
+  return {
+    ...(data as DailyUsageRecord),
+    model_switches: (data as DailyUsageRecord).model_switches ?? 0,
+  };
 }
 
 /** Check if a user can use a specific feature today. */
@@ -114,5 +118,6 @@ export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: 
     followUps: { used: usage.follow_ups, limit: fmt(LIMITS[tier].follow_ups) },
     closet: { used: usage.closet_uses, limit: fmt(LIMITS[tier].closet_uses) },
     sourcePicks: { used: usage.source_picks, limit: fmt(LIMITS[tier].source_picks) },
+    model_switches: { used: usage.model_switches, limit: fmt(LIMITS[tier].model_switches) },
   };
 }

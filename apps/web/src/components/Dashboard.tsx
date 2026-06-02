@@ -163,6 +163,7 @@ export default function Dashboard({
   // BYOK enhancements — provider selector + client-side custom prompt (Pro/Dev)
   const [byokProvider, setByokProvider] = useState<"openai" | "gemini" | "mistral">("openai");
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
+  const [modelSwitchesRemaining, setModelSwitchesRemaining] = useState<number | null>(null);
   
   // Update model switches remaining when daily limits change
   useEffect(() => {
@@ -178,7 +179,6 @@ export default function Dashboard({
   const [selectedModel, setSelectedModel] = useState<ModelID | null>(null);
   const [regenerating, setRegenerating] = useState(false);
   const [regenerationError, setRegenerationError] = useState<string | null>(null);
-  const [modelSwitchesRemaining, setModelSwitchesRemaining] = useState<number | null>(null);
 
   // Session diagnostics (dev-only by default, optionally enabled for all users)
   const [diagLastAiStatus, setDiagLastAiStatus] = useState<"success" | "error" | null>(null);

@@ -7,6 +7,7 @@ import {
   generateCacheKey,
   getCachedWeather,
   WEATHER_CACHE_TTL,
+  weatherCache,
 } from '../weather';
 
 import {
@@ -14,21 +15,9 @@ import {
   mockSourceWeatherData,
 } from '../../__tests__/mocks';
 
-// Mock the weather cache for testing
-const mockWeatherCache = new Map<string, { data: any; timestamp: number }>();
-
-// Mock the weatherCache in the weather module
-jest.mock('../weather', () => {
-  const originalModule = jest.requireActual('../weather');
-  return {
-    ...originalModule,
-    weatherCache: mockWeatherCache,
-  };
-});
-
 describe('Weather Caching - Cache Key Generation', () => {
   beforeEach(() => {
-    mockWeatherCache.clear();
+    weatherCache.clear();
   });
 
   it('should generate unique cache keys for different coordinates', () => {
@@ -116,7 +105,7 @@ describe('Weather Caching - Cache Behavior', () => {
   const testDate = new Date('2024-01-15T12:00:00Z');
   
   beforeEach(() => {
-    mockWeatherCache.clear();
+    weatherCache.clear();
     jest.useFakeTimers();
     jest.setSystemTime(testDate);
   });
@@ -130,7 +119,7 @@ describe('Weather Caching - Cache Behavior', () => {
     const cachedData = { ...mockWeatherData, source: 'OpenWeather' };
     
     // Add data to cache
-    mockWeatherCache.set(cacheKey, { data: cachedData, timestamp: testDate.getTime() });
+    weatherCache.set(cacheKey, { data: cachedData, timestamp: testDate.getTime() });
     
     // Get cached data (should be within TTL)
     const result = getCachedWeather(cacheKey);
@@ -150,13 +139,13 @@ describe('Weather Caching - Cache Behavior', () => {
     const oldTimestamp = testDate.getTime() - (900 * 1000 + 1000); // 15 minutes + 1 second ago
     
     // Add expired data to cache
-    mockWeatherCache.set(cacheKey, { data: cachedData, timestamp: oldTimestamp });
+    weatherCache.set(cacheKey, { data: cachedData, timestamp: oldTimestamp });
     
     // Get cached data (should be expired)
     const result = getCachedWeather(cacheKey);
     
     expect(result).toBeNull();
-    expect(mockWeatherCache.has(cacheKey)).toBe(false); // Should be removed
+    expect(weatherCache.has(cacheKey)).toBe(false); // Should be removed
   });
 
   it('should return null and remove expired cache entry for BOM', () => {
@@ -165,13 +154,13 @@ describe('Weather Caching - Cache Behavior', () => {
     const oldTimestamp = testDate.getTime() - (1800 * 1000 + 1000); // 30 minutes + 1 second ago
     
     // Add expired data to cache
-    mockWeatherCache.set(cacheKey, { data: cachedData, timestamp: oldTimestamp });
+    weatherCache.set(cacheKey, { data: cachedData, timestamp: oldTimestamp });
     
     // Get cached data (should be expired)
     const result = getCachedWeather(cacheKey);
     
     expect(result).toBeNull();
-    expect(mockWeatherCache.has(cacheKey)).toBe(false); // Should be removed
+    expect(weatherCache.has(cacheKey)).toBe(false); // Should be removed
   });
 
   it('should return cached data if exactly at TTL boundary', () => {
@@ -180,7 +169,7 @@ describe('Weather Caching - Cache Behavior', () => {
     const boundaryTimestamp = testDate.getTime() - (900 * 1000); // Exactly 15 minutes ago
     
     // Add data at exact TTL boundary
-    mockWeatherCache.set(cacheKey, { data: cachedData, timestamp: boundaryTimestamp });
+    weatherCache.set(cacheKey, { data: cachedData, timestamp: boundaryTimestamp });
     
     // Get cached data (should still be valid)
     const result = getCachedWeather(cacheKey);
@@ -194,13 +183,13 @@ describe('Weather Caching - Cache Behavior', () => {
     const oldTimestamp = testDate.getTime() - (900 * 1000 + 1000); // 15 minutes + 1 second ago
     
     // Add expired data with unknown source
-    mockWeatherCache.set(cacheKey, { data: cachedData, timestamp: oldTimestamp });
+    weatherCache.set(cacheKey, { data: cachedData, timestamp: oldTimestamp });
     
     // Get cached data (should be expired with default TTL)
     const result = getCachedWeather(cacheKey);
     
     expect(result).toBeNull();
-    expect(mockWeatherCache.has(cacheKey)).toBe(false);
+    expect(weatherCache.has(cacheKey)).toBe(false);
   });
 
   it('should handle cache entries with missing source', () => {
@@ -209,7 +198,7 @@ describe('Weather Caching - Cache Behavior', () => {
     delete (cachedData as any).source;
     
     // Add data without source
-    mockWeatherCache.set(cacheKey, { data: cachedData, timestamp: testDate.getTime() });
+    weatherCache.set(cacheKey, { data: cachedData, timestamp: testDate.getTime() });
     
     // Get cached data (should use default TTL)
     const result = getCachedWeather(cacheKey);
@@ -261,7 +250,7 @@ describe('Weather Caching - Integration Scenarios', () => {
   const testDate = new Date('2024-01-15T12:00:00Z');
   
   beforeEach(() => {
-    mockWeatherCache.clear();
+    weatherCache.clear();
     jest.useFakeTimers();
     jest.setSystemTime(testDate);
   });
@@ -275,7 +264,7 @@ describe('Weather Caching - Integration Scenarios', () => {
     const weatherData = { ...mockWeatherData, source: 'OpenWeather' };
     
     // Simulate caching
-    mockWeatherCache.set(cacheKey, { data: weatherData, timestamp: testDate.getTime() });
+    weatherCache.set(cacheKey, { data: weatherData, timestamp: testDate.getTime() });
     
     // Retrieve from cache
     const cached = getCachedWeather(cacheKey);
@@ -291,8 +280,8 @@ describe('Weather Caching - Integration Scenarios', () => {
     const data2 = { ...mockWeatherData, source: 'BOM' };
     
     // Cache both entries
-    mockWeatherCache.set(key1, { data: data1, timestamp: testDate.getTime() });
-    mockWeatherCache.set(key2, { data: data2, timestamp: testDate.getTime() });
+    weatherCache.set(key1, { data: data1, timestamp: testDate.getTime() });
+    weatherCache.set(key2, { data: data2, timestamp: testDate.getTime() });
     
     // Retrieve both
     const cached1 = getCachedWeather(key1);
@@ -313,8 +302,8 @@ describe('Weather Caching - Integration Scenarios', () => {
     const oldTimestamp2 = testDate.getTime() - (900 * 1000 + 1000); // 15 min + 1 sec ago
     
     // Cache both with old timestamps
-    mockWeatherCache.set(key1, { data: data1, timestamp: oldTimestamp1 });
-    mockWeatherCache.set(key2, { data: data2, timestamp: oldTimestamp2 });
+    weatherCache.set(key1, { data: data1, timestamp: oldTimestamp1 });
+    weatherCache.set(key2, { data: data2, timestamp: oldTimestamp2 });
     
     // OpenWeather should be expired, BOM should still be valid
     const cached1 = getCachedWeather(key1);

@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getFollowUpRecommendation, ModelID, getModelById } from "@/lib/ai";
+import { getFollowUpRecommendation, ModelID, getDefaultModel, getModelById } from "@/lib/ai";
 import { canUseFeature, incrementUsage, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
 
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
   let recommendation;
   try {
     // Check if user is trying to use a model switch (different from default)
-    const isModelSwitch = modelId && modelId !== getModelById(modelId as ModelID)?.id;
+    const isModelSwitch = Boolean(modelId && modelId !== getDefaultModel(isPro, isDev).id);
     
     // For free users, check model switch limit (2/week)
     if (!isPro && !isDev && isModelSwitch) {

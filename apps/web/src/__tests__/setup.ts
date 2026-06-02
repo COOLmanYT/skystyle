@@ -40,7 +40,10 @@ jest.mock('next/headers', () => ({
 // Mock Next.js server functions
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: jest.fn((data, init) => ({ data, status: init?.status || 200 })),
+    json: jest.fn((data, init) => new Response(JSON.stringify(data), {
+      status: init?.status || 200,
+      headers: { 'content-type': 'application/json' },
+    })),
   },
   NextRequest: jest.fn(),
 }));
@@ -100,6 +103,6 @@ const localStorageMock = (() => {
   };
 })();
 
-Object.defineProperty(window, 'localStorage', {
+Object.defineProperty(globalThis, 'localStorage', {
   value: localStorageMock,
 });

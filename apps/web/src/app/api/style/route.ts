@@ -14,7 +14,7 @@ import { auth } from "@/auth";
 import { DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getWeather, CustomSource, SourceMode, MAX_CUSTOM_SOURCES } from "@/lib/weather";
-import { getStyleRecommendation, getDevChatResponse, PlanningData, ModelID, getModelById } from "@/lib/ai";
+import { getStyleRecommendation, getDevChatResponse, PlanningData, ModelID, getDefaultModel, getModelById } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
@@ -229,7 +229,7 @@ export async function POST(req: NextRequest) {
   let recommendation;
   try {
     // Check if user is trying to use a model switch (different from default)
-    const isModelSwitch = modelId && modelId !== getModelById(modelId as ModelID)?.id;
+    const isModelSwitch = Boolean(modelId && modelId !== getDefaultModel(isPro, isDev).id);
     
     // For free users, check model switch limit (2/week)
     if (!isPro && !isDev && !isDemo && isModelSwitch) {
