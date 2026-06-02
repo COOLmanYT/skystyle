@@ -12,7 +12,8 @@ import Link from "next/link";
 import Checkbox from "@/components/Checkbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HamburgerNav from "@/components/HamburgerNav";
-import { getAvailableModels, getAllModels, isModelAvailable, ModelConfig, ModelID } from "@/lib/ai";
+import { getAllModels, isModelAvailable, ModelID, type PlanningData } from "@/lib/ai";
+import type { DailyLimitsInfo } from "@/lib/daily-usage";
 
 /** Returns true if version string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -73,17 +74,9 @@ interface StyleResponse {
     isPro: boolean;
     unitPreference: "metric" | "imperial";
     creditsRemaining: number | null;
-    dailyLimits?: DailyLimits;
+    dailyLimits?: DailyLimitsInfo;
     modelUsed?: string;
   };
-}
-
-interface DailyLimits {
-  ai: { used: number; limit: number | null };
-  followUps: { used: number; limit: number | null };
-  closet: { used: number; limit: number | null };
-  sourcePicks: { used: number; limit: number | null };
-  model_switches: { used: number; limit: number | null };
 }
 
 const ACCURACY_COLOR: Record<string, string> = {
@@ -103,6 +96,27 @@ const SOURCE_LINKS: Record<string, string> = {
 
 const MAX_GENDER_LENGTH = 30;
 
+function readPlanningData(): PlanningData | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const raw = localStorage.getItem("skystyle_planning_panel");
+    if (!raw) return undefined;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.slots)) {
+      return undefined;
+    }
+
+    return {
+      slots: parsed.slots as PlanningData["slots"],
+      complexity: typeof parsed.complexity === "number" ? parsed.complexity : 0,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /** Returns true if the given option string matches the current gender state */
 function isGenderActive(option: string, gender: string): boolean {
   return (option === "Other" && gender === "N/A") || gender === option;
@@ -113,7 +127,7 @@ interface DashboardProps {
   isPro: boolean;
   isDev: boolean;
   initialCredits: number | null;
-  initialDailyLimits: DailyLimits | null;
+  initialDailyLimits: DailyLimitsInfo | null;
 }
 
 export default function Dashboard({
@@ -133,7 +147,7 @@ export default function Dashboard({
   // Chat Mode: conversation history (alternative to Replace Mode)
   const [followUpHistory, setFollowUpHistory] = useState<{ question: string; outfit: string; reasoning: string }[]>([]);
   const [followUpMode, setFollowUpMode] = useState<"replace" | "chat">("replace");
-  const [dailyLimits, setDailyLimits] = useState<DailyLimits | null>(initialDailyLimits);
+  const [dailyLimits, setDailyLimits] = useState<DailyLimitsInfo | null>(initialDailyLimits);
   const [gender, setGender] = useState<string>("N/A");
   const [customGender, setCustomGender] = useState("");
   const [userApiKey, setUserApiKey] = useState<string>("");
@@ -552,17 +566,7 @@ export default function Dashboard({
 
     const effectiveGender = gender === "Other - Manual" ? customGender.slice(0, MAX_GENDER_LENGTH) : gender;
 
-    // Read planning data from localStorage (managed by WeatherPlanningPanel)
-    let planningData: unknown = undefined;
-    try {
-      const raw = localStorage.getItem("skystyle_planning_panel");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object" && Array.isArray(parsed.slots)) {
-          planningData = { slots: parsed.slots, complexity: parsed.complexity ?? 0 };
-        }
-      }
-    } catch { /* ignore — planning data is optional */ }
+    const planningData = readPlanningData();
 
     // Both requests start immediately (parallel)
     const weatherPromise = fetch(`/api/weather?lat=${location.lat}&lon=${location.lon}`);
@@ -748,6 +752,7 @@ export default function Dashboard({
     setRegenerationError(null);
     
     try {
+      const planningData = readPlanningData();
       const res = await fetch("/api/style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -762,7 +767,7 @@ export default function Dashboard({
           customSources,
           ...(userApiKey ? { userApiKey, byokProvider } : {}),
           ...(clientCustomPrompt ? { clientCustomPrompt } : {}),
-          ...(result.weather.planningData ? { planningData: result.weather.planningData } : {}),
+          ...(planningData ? { planningData } : {}),
         }),
       });
       
@@ -803,6 +808,7 @@ export default function Dashboard({
     setShowModelSelector(false);
     
     try {
+      const planningData = readPlanningData();
       const res = await fetch("/api/style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -818,7 +824,7 @@ export default function Dashboard({
           modelId,
           ...(userApiKey ? { userApiKey, byokProvider } : {}),
           ...(clientCustomPrompt ? { clientCustomPrompt } : {}),
-          ...(result.weather.planningData ? { planningData: result.weather.planningData } : {}),
+          ...(planningData ? { planningData } : {}),
         }),
       });
       

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 import path from "path";
 
+const workspaceRoot = path.resolve(__dirname, "../..");
+
 const nextConfig: NextConfig = {
   // Enable React Compiler for automatic memoization
   reactCompiler: true,
@@ -22,10 +24,11 @@ const nextConfig: NextConfig = {
   
   // Output standalone for Docker deployments
   output: 'standalone',
+  outputFileTracingRoot: workspaceRoot,
   
   // Enable Turbopack caching
   turbopack: {
-    root: path.resolve(__dirname, '.'),
+    root: workspaceRoot,
   },
   
   async redirects() {

@@ -21,6 +21,19 @@ export interface DailyUsageRecord {
   model_switches: number;
 }
 
+export interface DailyLimitCounter {
+  used: number;
+  limit: number | null;
+}
+
+export interface DailyLimitsInfo {
+  ai: DailyLimitCounter;
+  followUps: DailyLimitCounter;
+  closet: DailyLimitCounter;
+  sourcePicks: DailyLimitCounter;
+  model_switches: DailyLimitCounter;
+}
+
 export const LIMITS = {
   free: { ai_uses: 20, follow_ups: 40, closet_uses: 4, source_picks: 4, model_switches: 2 },
   // demo plan: 10× the standard free limits for preview-environment testing
@@ -109,7 +122,7 @@ export async function incrementUsage(
  *  Infinite limits are returned as `null` so they survive JSON serialisation
  *  (`JSON.stringify(Infinity)` produces `null` silently).
  */
-export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: boolean = false, isDemo: boolean = false) {
+export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: boolean = false, isDemo: boolean = false): Promise<DailyLimitsInfo> {
   const usage = await getDailyUsage(userId);
   const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
   const fmt = (v: number): number | null => (v === Infinity ? null : v);

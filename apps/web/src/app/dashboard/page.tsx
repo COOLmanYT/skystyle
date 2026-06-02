@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Dashboard from "@/components/Dashboard";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getCredits } from "@/lib/credits";
-import { getDailyLimitsInfo } from "@/lib/daily-usage";
+import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 
 export default async function DashboardPage() {
@@ -17,12 +17,7 @@ export default async function DashboardPage() {
   let isDev = false;
   let pendingDeletion = false;
   let initialCredits: number | null = null;
-  let initialDailyLimits: {
-    ai: { used: number; limit: number | null };
-    followUps: { used: number; limit: number | null };
-    closet: { used: number; limit: number | null };
-    sourcePicks: { used: number; limit: number | null };
-  } | null = null;
+  let initialDailyLimits: DailyLimitsInfo | null = null;
 
   if (userId) {
     try {

@@ -3,7 +3,7 @@
  */
 
 import { WeatherData, SourceWeatherData, HourlyForecast } from '@/lib/weather';
-import { StyleRecommendation, ModelConfig, ModelID, ModelProvider } from '@/lib/ai';
+import { StyleRecommendation, ModelConfig } from '@/lib/ai';
 import { DailyUsageRecord } from '@/lib/daily-usage';
 
 // ============================================================================
@@ -156,7 +156,7 @@ export const mockDailyUsageRecordWithModelSwitches: DailyUsageRecord = {
 // API Response Mocks
 // ============================================================================
 
-export const mockSuccessResponse = (data: any, status: number = 200) => ({
+export const mockSuccessResponse = (data: unknown, status: number = 200) => ({
   ok: true,
   status,
   json: jest.fn().mockResolvedValue(data),
@@ -191,7 +191,7 @@ export const mockSupabaseAdmin = {
 // Utility Functions
 // ============================================================================
 
-export function createMockFetch(response: any, status: number = 200): jest.Mock {
+export function createMockFetch(response: unknown, status: number = 200): jest.Mock {
   return jest.fn().mockImplementation(() =>
     Promise.resolve({
       ok: status >= 200 && status < 300,
@@ -248,7 +248,7 @@ export function mockDate(now: Date) {
       static today() {
         return now.toISOString().split('T')[0];
       }
-    } as any;
+    } as unknown as DateConstructor;
   });
   
   afterEach(() => {
@@ -260,7 +260,7 @@ export function mockDate(now: Date) {
 // Test Helpers
 // ============================================================================
 
-export function expectToBeCalledWith(mock: jest.Mock, expected: any) {
+export function expectToBeCalledWith(mock: jest.Mock, expected: Record<string, unknown>) {
   expect(mock).toHaveBeenCalledWith(expect.objectContaining(expected));
 }
 
@@ -268,7 +268,7 @@ export function expectToBeCalledTimes(mock: jest.Mock, times: number) {
   expect(mock).toHaveBeenCalledTimes(times);
 }
 
-export function expectToThrowAsync(fn: () => Promise<any>, errorMessage?: string) {
+export function expectToThrowAsync(fn: () => Promise<unknown>, errorMessage?: string) {
   if (errorMessage) {
     return expect(fn()).rejects.toThrow(errorMessage);
   }

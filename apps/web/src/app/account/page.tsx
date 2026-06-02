@@ -2,7 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getCredits } from "@/lib/credits";
-import { getDailyLimitsInfo } from "@/lib/daily-usage";
+import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
 import AccountUpgradeButton from "@/components/AccountUpgradeButton";
@@ -14,13 +14,6 @@ import { handleSignOut } from "@/app/actions";
 function getDevEmails(): Set<string> {
   const raw = process.env.DEV_EMAILS ?? "";
   return new Set(raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean));
-}
-
-interface DailyLimits {
-  ai: { used: number; limit: number | null };
-  followUps: { used: number; limit: number | null };
-  closet: { used: number; limit: number | null };
-  sourcePicks: { used: number; limit: number | null };
 }
 
 export default async function AccountPage() {
@@ -37,7 +30,7 @@ export default async function AccountPage() {
   let mfaEnabled = false;
   let pendingDeletion = false;
   let initialCredits: number | null = null;
-  let dailyLimits: DailyLimits | null = null;
+  let dailyLimits: DailyLimitsInfo | null = null;
 
   if (userId) {
     try {

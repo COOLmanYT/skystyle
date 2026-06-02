@@ -43,12 +43,9 @@ export const MODEL_PRIORITIES = {
 } as const;
 
 // Extract model ID type from the priorities
-export type ModelConfig = typeof MODEL_PRIORITIES.pro[number];
+export type ModelConfig = (typeof MODEL_PRIORITIES)[keyof typeof MODEL_PRIORITIES][number];
 export type ModelProvider = ModelConfig["provider"];
 export type ModelID = ModelConfig["id"];
-
-// Available providers
-type AIProvider = "openai" | "gemini" | "mistral";
 
 // Singleton instances for server-side clients
 let _openai: OpenAI | null = null;
@@ -199,7 +196,7 @@ export interface StyleRecommendation {
 }
 
 /** Get available models for a user based on their plan */
-export function getAvailableModels(isPro: boolean, isDev: boolean, hasByok: boolean): ModelConfig[] {
+export function getAvailableModels(isPro: boolean, isDev: boolean, hasByok: boolean): readonly ModelConfig[] {
   const tier = isDev ? "pro" : (isPro ? "pro" : "free");
   const models = MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES];
   void hasByok;
@@ -414,6 +411,26 @@ function formatWind(kmh: number, unit: "metric" | "imperial"): string {
   return `${kmh} km/h`;
 }
 
+function normalizeMessageContent(content: unknown): string {
+  if (typeof content === "string") return content;
+
+  if (Array.isArray(content)) {
+    const text = content
+      .map((chunk) => {
+        if (chunk && typeof chunk === "object" && "text" in chunk) {
+          const value = (chunk as { text?: unknown }).text;
+          return typeof value === "string" ? value : "";
+        }
+        return "";
+      })
+      .join("");
+
+    return text || "{}";
+  }
+
+  return "{}";
+}
+
 /** Call AI with a specific model or use default priority */
 async function callAIWithModel(
   systemPrompt: string,
@@ -424,9 +441,6 @@ async function callAIWithModel(
   byokProvider: ModelProvider | undefined,
   maxTokens: number
 ): Promise<{ raw: string; modelUsed: string }> {
-  let raw: string;
-  let modelUsed: string;
-
   // If a specific model is requested, use it
   if (modelId) {
     const model = getModelById(modelId);
@@ -515,7 +529,7 @@ async function callOpenAI(
     temperature: 0.7,
   });
   return {
-    raw: response.choices[0]?.message?.content ?? "{}",
+    raw: normalizeMessageContent(response.choices[0]?.message?.content),
     modelUsed: modelId,
   };
 }
@@ -560,7 +574,7 @@ async function callMistral(
     temperature: 0.7,
   });
   return {
-    raw: response.choices[0]?.message?.content ?? "{}",
+    raw: normalizeMessageContent(response.choices[0]?.message?.content),
     modelUsed: modelId,
   };
 }
@@ -573,6 +587,7 @@ export async function getStyleRecommendation(
     userApiKey, byokProvider, gender, shareLocation, forceCloset, customContext, planningData,
     modelId,
   } = input;
+  const isDev = input.isDev === true;
   let closetWarning: string | undefined;
   if (forceCloset) {
     if (closetItems.length === 0) {
@@ -697,7 +712,7 @@ Please recommend an outfit.`;
   const maxTokens = MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350;
 
   const { raw, modelUsed } = await callAIWithModel(
-    systemPrompt, userMessage, userApiKey, input.isDev, modelId, byokProvider, maxTokens
+    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, maxTokens
   );
   
   const recommendation = parseRecommendationFromRaw(raw);
@@ -706,7 +721,8 @@ Please recommend an outfit.`;
       outfit: recommendation.outfit ?? "Unable to generate outfit recommendation.",
       reasoning: recommendation.reasoning ?? "",
       modelUsed,
-      ...(input.isDev ? { rawOutput: raw } : {}),
+      ...(closetWarning ? { closetWarning } : {}),
+      ...(isDev ? { rawOutput: raw } : {}),
     });
   }
 
@@ -717,7 +733,8 @@ Please recommend an outfit.`;
       outfit: partialOutfit ?? "Unable to generate outfit recommendation.",
       reasoning: partialReasoning ?? "",
       modelUsed,
-      ...(input.isDev ? { rawOutput: raw } : {}),
+      ...(closetWarning ? { closetWarning } : {}),
+      ...(isDev ? { rawOutput: raw } : {}),
     });
   }
 
@@ -725,7 +742,8 @@ Please recommend an outfit.`;
     outfit: "Unable to generate outfit recommendation.",
     reasoning: raw.trim(),
     modelUsed,
-    ...(input.isDev ? { rawOutput: raw } : {}),
+    ...(closetWarning ? { closetWarning } : {}),
+    ...(isDev ? { rawOutput: raw } : {}),
   });
 }
 
@@ -752,6 +770,7 @@ export async function getFollowUpRecommendation(
   input: FollowUpInput
 ): Promise<StyleRecommendation> {
   const { previousOutfit, previousReasoning, weather, followUpMessage, unitPreference, customSystemPrompt, userApiKey, modelId } = input;
+  const isDev = input.isDev === true;
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
   const userMessage = `Previous outfit recommendation:
@@ -767,7 +786,7 @@ User follow-up question: "${followUpMessage}"
 Please update the outfit recommendation based on the follow-up question. Respond with the same JSON format.`;
 
   const { raw, modelUsed } = await callAIWithModel(
-    systemPrompt, userMessage, userApiKey, input.isDev, modelId, undefined, 500
+    systemPrompt, userMessage, userApiKey, isDev, modelId, undefined, 500
   );
   
   const recommendation = parseRecommendationFromRaw(raw);
@@ -776,7 +795,7 @@ Please update the outfit recommendation based on the follow-up question. Respond
       outfit: recommendation.outfit ?? "Unable to generate outfit recommendation.",
       reasoning: recommendation.reasoning ?? "",
       modelUsed,
-      ...(input.isDev ? { rawOutput: raw } : {}),
+      ...(isDev ? { rawOutput: raw } : {}),
     });
   }
 
@@ -787,7 +806,7 @@ Please update the outfit recommendation based on the follow-up question. Respond
       outfit: partialOutfit ?? "Unable to generate outfit recommendation.",
       reasoning: partialReasoning ?? "",
       modelUsed,
-      ...(input.isDev ? { rawOutput: raw } : {}),
+      ...(isDev ? { rawOutput: raw } : {}),
     });
   }
 
@@ -795,9 +814,6 @@ Please update the outfit recommendation based on the follow-up question. Respond
     outfit: "Unable to generate outfit recommendation.",
     reasoning: raw.trim(),
     modelUsed,
-    ...(input.isDev ? { rawOutput: raw } : {}),
+    ...(isDev ? { rawOutput: raw } : {}),
   });
 }
-
-// Export types
-export type { ModelConfig, ModelProvider, ModelID };

@@ -14,6 +14,7 @@ import {
   mockWeatherData,
   mockSourceWeatherData,
 } from '../../__tests__/mocks';
+import type { WeatherData } from '../weather';
 
 describe('Weather Caching - Cache Key Generation', () => {
   beforeEach(() => {
@@ -179,7 +180,7 @@ describe('Weather Caching - Cache Behavior', () => {
 
   it('should use default TTL for unknown sources', () => {
     const cacheKey = 'test-key';
-    const cachedData = { ...mockWeatherData, source: 'UnknownSource' as any };
+    const cachedData = { ...mockWeatherData, source: 'UnknownSource' } as WeatherData & { source: string };
     const oldTimestamp = testDate.getTime() - (900 * 1000 + 1000); // 15 minutes + 1 second ago
     
     // Add expired data with unknown source
@@ -195,7 +196,7 @@ describe('Weather Caching - Cache Behavior', () => {
   it('should handle cache entries with missing source', () => {
     const cacheKey = 'test-key';
     const cachedData = { ...mockWeatherData };
-    delete (cachedData as any).source;
+    delete (cachedData as Partial<WeatherData>).source;
     
     // Add data without source
     weatherCache.set(cacheKey, { data: cachedData, timestamp: testDate.getTime() });

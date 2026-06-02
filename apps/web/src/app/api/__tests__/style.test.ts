@@ -73,7 +73,7 @@ jest.mock('@/lib/sync-user', () => ({
 }));
 
 // Helper to create mock NextRequest
-function createMockNextRequest(body: any): NextRequest {
+function createMockNextRequest(body: unknown): NextRequest {
   return {
     json: jest.fn().mockResolvedValue(body),
     headers: {

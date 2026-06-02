@@ -159,7 +159,7 @@ describe('Credits Module - getCredits', () => {
       static now() {
         return mockDate.getTime();
       }
-    } as any;
+    } as unknown as DateConstructor;
     
     const balance = await getCredits('test-user-id');
     
@@ -205,7 +205,7 @@ describe('Credits Module - getCredits', () => {
       static now() {
         return mockDate.getTime();
       }
-    } as any;
+    } as unknown as DateConstructor;
     
     const balance = await getCredits('test-user-id');
     
@@ -375,7 +375,7 @@ describe('Credits Module - Edge Cases', () => {
       static now() {
         return mockDate.getTime();
       }
-    } as any;
+    } as unknown as DateConstructor;
     
     const balance = await getCredits('test-user-id');
     
@@ -425,7 +425,7 @@ describe('Credits Module - Edge Cases', () => {
       static now() {
         return testDate.getTime();
       }
-    } as any;
+    } as unknown as DateConstructor;
     
     const balance = await getCredits('test-user-id');
     

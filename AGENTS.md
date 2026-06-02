@@ -2,9 +2,9 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-# Current version: 4.0.2
+## Current version: 4.0.3
 
-This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in AGENTS.md as well.) Remember, update the version number.
+This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 
 ## ⚠️ Mandatory: Update the Changelog in Supabase after every task
 
@@ -52,7 +52,7 @@ VALUES (
 ### Semver guide
 
 | Change type | Bump |
-|---|---|
+| --- | --- |
 | Bug fix / typo / style tweak | patch (e.g. 1.3.0 → 1.3.1) |
 | New feature / new page / new toggle | minor (e.g. 1.3.0 → 1.4.0) |
 | Breaking API / schema migration | major (e.g. 1.3.0 → 2.0.0) |
@@ -62,14 +62,13 @@ VALUES (
 - **DO NOT write to `changelog.json`** — the JSON changelog system is fully deprecated and removed.
 - **DO NOT use the JSON file as a fallback** — all changelog reads come from Supabase `changelog_posts`.
 - All completed tasks MUST output a Supabase SQL statement for the changelog.
-- At the end of a Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular chanhelog entry consisting of all changes made in the entire Agent Task. 
-- At the end of a Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular changelog entry consisting of all changes made in the entire Agent Task. 
+- At the end of a Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular chanhelog entry consisting of all changes made in the entire Agent Task.
+- At the end of a Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular changelog entry consisting of all changes made in the entire Agent Task.
 
 ---
 
-## Important!
-
-Make sure to tell the user if anything in the supabase folder was changed.
+> [!IMPORTANT]
+> Make sure to tell the user if anything in the supabase folder was changed.
 
 ## Key codebase facts
 
