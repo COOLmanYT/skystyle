@@ -12,6 +12,8 @@ import Link from "next/link";
 import Checkbox from "@/components/Checkbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HamburgerNav from "@/components/HamburgerNav";
+import { getAllModels, isModelAvailable, ModelID, type PlanningData } from "@/lib/ai";
+import type { DailyLimitsInfo } from "@/lib/daily-usage";
 
 /** Returns true if version string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -72,16 +74,9 @@ interface StyleResponse {
     isPro: boolean;
     unitPreference: "metric" | "imperial";
     creditsRemaining: number | null;
-    dailyLimits?: DailyLimits;
+    dailyLimits?: DailyLimitsInfo;
     modelUsed?: string;
   };
-}
-
-interface DailyLimits {
-  ai: { used: number; limit: number | null };
-  followUps: { used: number; limit: number | null };
-  closet: { used: number; limit: number | null };
-  sourcePicks: { used: number; limit: number | null };
 }
 
 const ACCURACY_COLOR: Record<string, string> = {
@@ -101,6 +96,27 @@ const SOURCE_LINKS: Record<string, string> = {
 
 const MAX_GENDER_LENGTH = 30;
 
+function readPlanningData(): PlanningData | undefined {
+  if (typeof window === "undefined") return undefined;
+
+  try {
+    const raw = localStorage.getItem("skystyle_planning_panel");
+    if (!raw) return undefined;
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.slots)) {
+      return undefined;
+    }
+
+    return {
+      slots: parsed.slots as PlanningData["slots"],
+      complexity: typeof parsed.complexity === "number" ? parsed.complexity : 0,
+    };
+  } catch {
+    return undefined;
+  }
+}
+
 /** Returns true if the given option string matches the current gender state */
 function isGenderActive(option: string, gender: string): boolean {
   return (option === "Other" && gender === "N/A") || gender === option;
@@ -111,7 +127,7 @@ interface DashboardProps {
   isPro: boolean;
   isDev: boolean;
   initialCredits: number | null;
-  initialDailyLimits: DailyLimits | null;
+  initialDailyLimits: DailyLimitsInfo | null;
 }
 
 export default function Dashboard({
@@ -131,7 +147,7 @@ export default function Dashboard({
   // Chat Mode: conversation history (alternative to Replace Mode)
   const [followUpHistory, setFollowUpHistory] = useState<{ question: string; outfit: string; reasoning: string }[]>([]);
   const [followUpMode, setFollowUpMode] = useState<"replace" | "chat">("replace");
-  const [dailyLimits, setDailyLimits] = useState<DailyLimits | null>(initialDailyLimits);
+  const [dailyLimits, setDailyLimits] = useState<DailyLimitsInfo | null>(initialDailyLimits);
   const [gender, setGender] = useState<string>("N/A");
   const [customGender, setCustomGender] = useState("");
   const [userApiKey, setUserApiKey] = useState<string>("");
@@ -159,8 +175,24 @@ export default function Dashboard({
   const [feedbackCategory, setFeedbackCategory] = useState<string | undefined>(undefined);
   const [simpleMode, setSimpleMode] = useState(true);
   // BYOK enhancements — provider selector + client-side custom prompt (Pro/Dev)
-  const [byokProvider, setByokProvider] = useState<"openai" | "gemini">("openai");
+  const [byokProvider, setByokProvider] = useState<"openai" | "gemini" | "mistral">("openai");
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
+  const [modelSwitchesRemaining, setModelSwitchesRemaining] = useState<number | null>(null);
+  
+  // Update model switches remaining when daily limits change
+  useEffect(() => {
+    if (dailyLimits?.model_switches) {
+      setModelSwitchesRemaining(
+        (dailyLimits.model_switches.limit ?? Infinity) - dailyLimits.model_switches.used
+      );
+    }
+  }, [dailyLimits]);
+  
+  // Model selection and regeneration
+  const [showModelSelector, setShowModelSelector] = useState(false);
+  const [selectedModel, setSelectedModel] = useState<ModelID | null>(null);
+  const [regenerating, setRegenerating] = useState(false);
+  const [regenerationError, setRegenerationError] = useState<string | null>(null);
 
   // Session diagnostics (dev-only by default, optionally enabled for all users)
   const [diagLastAiStatus, setDiagLastAiStatus] = useState<"success" | "error" | null>(null);
@@ -534,17 +566,7 @@ export default function Dashboard({
 
     const effectiveGender = gender === "Other - Manual" ? customGender.slice(0, MAX_GENDER_LENGTH) : gender;
 
-    // Read planning data from localStorage (managed by WeatherPlanningPanel)
-    let planningData: unknown = undefined;
-    try {
-      const raw = localStorage.getItem("skystyle_planning_panel");
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed === "object" && Array.isArray(parsed.slots)) {
-          planningData = { slots: parsed.slots, complexity: parsed.complexity ?? 0 };
-        }
-      }
-    } catch { /* ignore — planning data is optional */ }
+    const planningData = readPlanningData();
 
     // Both requests start immediately (parallel)
     const weatherPromise = fetch(`/api/weather?lat=${location.lat}&lon=${location.lon}`);
@@ -719,6 +741,119 @@ export default function Dashboard({
       setDevChatError("Network error — please try again.");
     } finally {
       setDevChatLoading(false);
+    }
+  }
+
+  /** Regenerate recommendation with the same model (Try Again) */
+  async function handleRegenerate() {
+    if (!result || !location || regenerating) return;
+    
+    setRegenerating(true);
+    setRegenerationError(null);
+    
+    try {
+      const planningData = readPlanningData();
+      const res = await fetch("/api/style", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: location.lat,
+          lon: location.lon,
+          gender: gender === "N/A" ? undefined : gender,
+          shareLocation,
+          forceCloset,
+          unitPreference: userUnitPreference,
+          sourceMode,
+          customSources,
+          ...(userApiKey ? { userApiKey, byokProvider } : {}),
+          ...(clientCustomPrompt ? { clientCustomPrompt } : {}),
+          ...(planningData ? { planningData } : {}),
+        }),
+      });
+      
+      if (!res.ok) {
+        let errorMessage = "Regeneration failed.";
+        try {
+          const data = await res.json();
+          errorMessage = data.error ?? errorMessage;
+        } catch { /* non-JSON */ }
+        setRegenerationError(errorMessage);
+        return;
+      }
+      
+      const data = await res.json() as StyleResponse;
+      setResult(data);
+      if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
+      
+      // Update model switches remaining
+      if (data.meta?.dailyLimits?.model_switches !== undefined) {
+        setModelSwitchesRemaining(
+          (data.meta.dailyLimits.model_switches.limit ?? Infinity) - 
+          data.meta.dailyLimits.model_switches.used
+        );
+      }
+    } catch {
+      setRegenerationError("Network error — please try again.");
+    } finally {
+      setRegenerating(false);
+    }
+  }
+
+  /** Regenerate recommendation with a different model */
+  async function handleRegenerateWithModel(modelId: ModelID) {
+    if (!result || !location || regenerating) return;
+    
+    setRegenerating(true);
+    setRegenerationError(null);
+    setShowModelSelector(false);
+    
+    try {
+      const planningData = readPlanningData();
+      const res = await fetch("/api/style", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          lat: location.lat,
+          lon: location.lon,
+          gender: gender === "N/A" ? undefined : gender,
+          shareLocation,
+          forceCloset,
+          unitPreference: userUnitPreference,
+          sourceMode,
+          customSources,
+          modelId,
+          ...(userApiKey ? { userApiKey, byokProvider } : {}),
+          ...(clientCustomPrompt ? { clientCustomPrompt } : {}),
+          ...(planningData ? { planningData } : {}),
+        }),
+      });
+      
+      if (!res.ok) {
+        let errorMessage = "Model switch failed.";
+        try {
+          const data = await res.json();
+          errorMessage = data.error ?? errorMessage;
+        } catch { /* non-JSON */ }
+        setRegenerationError(errorMessage);
+        return;
+      }
+      
+      const data = await res.json() as StyleResponse;
+      setResult(data);
+      setSelectedModel(modelId);
+      if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
+      
+      // Update model switches remaining
+      if (data.meta?.dailyLimits?.model_switches !== undefined) {
+        setModelSwitchesRemaining(
+          (data.meta.dailyLimits.model_switches.limit ?? Infinity) - 
+          data.meta.dailyLimits.model_switches.used
+        );
+      }
+    } catch {
+      setRegenerationError("Network error — please try again.");
+    } finally {
+      setRegenerating(false);
     }
   }
 
@@ -1344,6 +1479,141 @@ export default function Dashboard({
                         Was this helpful?
                       </button>
                     </div>
+                    
+                    {/* ── Regeneration Buttons ── */}
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleRegenerate}
+                        disabled={regenerating}
+                        className="flex-1 rounded-xl px-3 py-2 text-sm font-medium btn-interact disabled:opacity-40"
+                        style={{
+                          background: "var(--background)",
+                          color: "var(--foreground)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        {regenerating ? "…" : "🔄 Try Again"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowModelSelector(!showModelSelector)}
+                        disabled={regenerating}
+                        className="flex-1 rounded-xl px-3 py-2 text-sm font-medium btn-interact disabled:opacity-40"
+                        style={{
+                          background: "var(--background)",
+                          color: "var(--foreground)",
+                          border: "1px solid var(--card-border)",
+                        }}
+                      >
+                        🎯 Use Different Model
+                      </button>
+                    </div>
+                    
+                    {/* ── Model Selector Modal ── */}
+                    {showModelSelector && (
+                      <div
+                        className="fixed inset-0 z-50 flex items-center justify-center"
+                        style={{ background: "rgba(0, 0, 0, 0.5)" }}
+                        onClick={() => setShowModelSelector(false)}
+                      >
+                        <div
+                          className="rounded-2xl p-6 max-w-md w-full mx-4"
+                          style={{
+                            background: "var(--card)",
+                            border: "1px solid var(--card-border)",
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <h2
+                            className="text-lg font-semibold mb-4"
+                            style={{ color: "var(--foreground)" }}
+                          >
+                            Select AI Model
+                          </h2>
+                          
+                          <p className="text-sm mb-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
+                            {isPro || isDev 
+                              ? "Choose a different AI model for your recommendation." 
+                              : `Free users can switch models ${modelSwitchesRemaining !== null ? modelSwitchesRemaining : 2} more times this week.`
+                            }
+                          </p>
+                          
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {getAllModels().map((model) => {
+                              const isAvailable = isModelAvailable(model.id, isPro, isDev);
+                              const isByok = model.id.startsWith("byok-");
+                              const isSelected = selectedModel === model.id;
+                              
+                              return (
+                                <button
+                                  key={model.id}
+                                  type="button"
+                                  onClick={() => {
+                                    if (isAvailable) {
+                                      handleRegenerateWithModel(model.id);
+                                    } else if (isByok) {
+                                      // Show BYOK instructions or upgrade prompt
+                                      if (isPro || isDev) {
+                                        // For Pro/Dev without BYOK set up, show instructions
+                                        alert("To use BYOK, enter your API key in the BYOK section below.");
+                                      } else {
+                                        // For Free users, show upgrade prompt
+                                        setShowUpgradeModal(true);
+                                      }
+                                    } else {
+                                      // For unavailable non-BYOK models, show upgrade prompt
+                                      setShowUpgradeModal(true);
+                                    }
+                                  }}
+                                  disabled={regenerating}
+                                  className={`w-full text-left rounded-xl px-4 py-3 text-sm btn-interact flex items-center justify-between ${
+                                    isAvailable ? "opacity-100" : "opacity-50 cursor-not-allowed"
+                                  }`}
+                                  style={{
+                                    background: isSelected 
+                                      ? "var(--accent)" 
+                                      : "var(--background)",
+                                    color: isSelected 
+                                      ? "#fff" 
+                                      : "var(--foreground)",
+                                    border: "1px solid var(--card-border)",
+                                  }}
+                                >
+                                  <span>{model.name}</span>
+                                  {isAvailable ? (
+                                    <span>✓</span>
+                                  ) : isByok ? (
+                                    <span style={{ opacity: 0.5 }}>🔑</span>
+                                  ) : (
+                                    <span style={{ opacity: 0.5 }}>🔒</span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          
+                          <div className="flex justify-end gap-2 mt-4">
+                            <button
+                              type="button"
+                              onClick={() => setShowModelSelector(false)}
+                              className="rounded-xl px-4 py-2 text-sm btn-interact"
+                              style={{
+                                background: "var(--background)",
+                                color: "var(--foreground)",
+                                border: "1px solid var(--card-border)",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {regenerationError && (
+                      <p role="alert" className="text-xs text-red-500 mt-2">{regenerationError}</p>
+                    )}
                   </WeatherEffectCard>
 
                   {/* ── Follow-Up Input ── */}
@@ -2180,7 +2450,7 @@ export default function Dashboard({
                     AI provider for your key
                   </p>
                   <div className="flex gap-2">
-                    {(["openai", "gemini"] as const).map((prov) => (
+                    {(["openai", "gemini", "mistral"] as const).map((prov) => (
                       <button
                         key={prov}
                         type="button"
@@ -2195,7 +2465,7 @@ export default function Dashboard({
                           border: "1px solid var(--card-border)",
                         }}
                       >
-                        {prov === "openai" ? "🤖 OpenAI" : "✨ Gemini"}
+                        {prov === "openai" ? "🤖 OpenAI" : prov === "gemini" ? "✨ Gemini" : "🦄 Mistral"}
                       </button>
                     ))}
                   </div>
@@ -2204,7 +2474,9 @@ export default function Dashboard({
                 <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.55 }}>
                   {byokProvider === "openai"
                     ? "Provide your OpenAI API key (sk-…)."
-                    : "Provide your Google Gemini API key."}{" "}
+                    : byokProvider === "gemini"
+                      ? "Provide your Google Gemini API key."
+                      : "Provide your Mistral AI API key."}{" "}
                   Stored locally on your device only — never sent to Sky Style servers.
                 </p>
                 <input
@@ -2215,7 +2487,7 @@ export default function Dashboard({
                     setUserApiKey(val);
                     try { localStorage.setItem("skystyle_byok_key", val); } catch { /* ignore */ }
                   }}
-                  placeholder={byokProvider === "openai" ? "sk-… (optional)" : "AI… (optional)"}
+                  placeholder={byokProvider === "openai" ? "sk-… (optional)" : byokProvider === "gemini" ? "AI… (optional)" : "mx-… (optional)"}
                   autoComplete="off"
                   className="w-full rounded-xl px-3 py-2 text-xs outline-none"
                   style={{

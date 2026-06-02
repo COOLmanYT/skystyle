@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getFollowUpRecommendation } from "@/lib/ai";
+import { getFollowUpRecommendation, ModelID, getDefaultModel, getModelById } from "@/lib/ai";
 import { canUseFeature, incrementUsage, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
 
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
     previousReasoning?: string;
     weather?: Record<string, unknown>;
     userApiKey?: string;
+    modelId?: string;
   };
   try {
     body = await req.json();
@@ -40,7 +41,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
 
-  const { message, previousOutfit, previousReasoning, weather, userApiKey } = body;
+  const { message, previousOutfit, previousReasoning, weather, userApiKey, modelId } = body;
+  
+  // Validate modelId if provided
+  if (modelId && !getModelById(modelId as ModelID)) {
+    return NextResponse.json({ error: "Invalid model ID" }, { status: 400 });
+  }
 
   if (!message || typeof message !== "string" || message.trim().length === 0) {
     return NextResponse.json({ error: "message is required" }, { status: 400 });
@@ -82,6 +88,22 @@ export async function POST(req: NextRequest) {
 
   let recommendation;
   try {
+    // Check if user is trying to use a model switch (different from default)
+    const isModelSwitch = Boolean(modelId && modelId !== getDefaultModel(isPro, isDev).id);
+    
+    // For free users, check model switch limit (2/week)
+    if (!isPro && !isDev && isModelSwitch) {
+      const { allowed, used, limit } = await canUseFeature(userId, "model_switches", isPro, isDev);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: `Model switch limit reached (${used}/${limit}). Upgrade to Pro for unlimited model switching.` },
+          { status: 429 }
+        );
+      }
+      // Deduct model switch
+      await incrementUsage(userId, "model_switches", isPro, isDev);
+    }
+    
     recommendation = await getFollowUpRecommendation({
       previousOutfit: String(previousOutfit),
       previousReasoning: String(previousReasoning ?? ""),
@@ -92,6 +114,7 @@ export async function POST(req: NextRequest) {
       customSystemPrompt,
       userApiKey: (isPro || isDev) ? userApiKey : undefined,
       isDev,
+      modelId: modelId as ModelID | undefined,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "AI request failed";

@@ -1,16 +1,57 @@
 /**
  * AI styling logic.
  * Builds a prompt from weather data + closet items, then calls the configured AI API.
- * Supports OpenAI (OPENAI_API_KEY) and Google Gemini (GEMINI_API_KEY).
- * OpenAI is preferred when both keys are present.
+ * Supports OpenAI (OPENAI_API_KEY), Google Gemini (GEMINI_API_KEY), and Mistral AI (MISTRAL_API_KEY).
+ * OpenAI is preferred when multiple keys are present.
  * Supports BYOK (Bring Your Own Key) for Pro users.
+ * 
+ * Model Priority:
+ * Pro: OpenAI -> Gemini -> Mistral Large -> Gemma -> Mistral Small -> Ministral
+ * Free: Gemini -> Mistral Small -> Gemma -> Ministral
  */
 
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { Mistral } from "@mistralai/mistralai";
 import { WeatherData } from "./weather";
 
+// Model definitions and priorities
+export const MODEL_PRIORITIES = {
+  pro: [
+    // OpenAI models
+    { id: "gpt-4o", provider: "openai" as const, name: "GPT-4o" },
+    { id: "gpt-4o-mini", provider: "openai" as const, name: "GPT-4o Mini" },
+    // Gemini models
+    { id: "gemini-2.5-flash", provider: "gemini" as const, name: "Gemini 2.5 Flash" },
+    { id: "gemini-2.5-flash-lite", provider: "gemini" as const, name: "Gemini 2.5 Flash Lite" },
+    { id: "gemma-4-31b-it", provider: "gemini" as const, name: "Gemma 4 31B" },
+    { id: "gemma-4-26b-it", provider: "gemini" as const, name: "Gemma 4 26B" },
+    // Mistral models
+    { id: "mistral-large-latest", provider: "mistral" as const, name: "Mistral Large" },
+    { id: "mistral-small-latest", provider: "mistral" as const, name: "Mistral Small" },
+    { id: "ministral-8b-latest", provider: "mistral" as const, name: "Ministral 8B" },
+  ],
+  free: [
+    // Gemini models (free tier available)
+    { id: "gemini-2.5-flash", provider: "gemini" as const, name: "Gemini 2.5 Flash" },
+    { id: "gemini-2.5-flash-lite", provider: "gemini" as const, name: "Gemini 2.5 Flash Lite" },
+    // Mistral models (free tier available)
+    { id: "mistral-small-latest", provider: "mistral" as const, name: "Mistral Small" },
+    { id: "ministral-8b-latest", provider: "mistral" as const, name: "Ministral 8B" },
+    { id: "gemma-4-26b-it", provider: "gemini" as const, name: "Gemma 4 26B" },
+  ],
+} as const;
+
+// Extract model ID type from the priorities
+export type ModelConfig = (typeof MODEL_PRIORITIES)[keyof typeof MODEL_PRIORITIES][number];
+export type ModelProvider = ModelConfig["provider"];
+export type ModelID = ModelConfig["id"];
+
+// Singleton instances for server-side clients
 let _openai: OpenAI | null = null;
+let _gemini: GoogleGenerativeAI | null = null;
+let _mistral: Mistral | null = null;
+
 function getOpenAI(apiKey?: string): OpenAI {
   if (apiKey) return new OpenAI({ apiKey });
   if (!_openai) {
@@ -21,7 +62,6 @@ function getOpenAI(apiKey?: string): OpenAI {
   return _openai;
 }
 
-let _gemini: GoogleGenerativeAI | null = null;
 function getGemini(apiKey?: string): GoogleGenerativeAI {
   if (apiKey) return new GoogleGenerativeAI(apiKey);
   if (!_gemini) {
@@ -30,6 +70,16 @@ function getGemini(apiKey?: string): GoogleGenerativeAI {
     _gemini = new GoogleGenerativeAI(key);
   }
   return _gemini;
+}
+
+function getMistral(apiKey?: string): Mistral {
+  if (apiKey) return new Mistral({ apiKey });
+  if (!_mistral) {
+    const key = process.env.MISTRAL_API_KEY;
+    if (!key) throw new Error("MISTRAL_API_KEY is not set");
+    _mistral = new Mistral({ apiKey: key });
+  }
+  return _mistral;
 }
 
 const DEFAULT_SYSTEM_PROMPT = `You are Sky Style — an expert personal stylist and meteorologist.
@@ -42,11 +92,11 @@ Be specific (name garment types, colours, materials). Be friendly and concise. O
 
 const MAX_JSON_LEAD_IN_CHARS = 120;
 // Matches assistant lead-in prose that references "json" before the actual payload.
-const JSON_LEAD_IN_PATTERN = `(?:^|\\n)\\s*(?:here(?:['’]s| is| are)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}(?::|-)?\\s*`;
+const JSON_LEAD_IN_PATTERN = `(?:^|\\n)\\s*(?:here(?:[''’]s| is| are)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}(?::|-)?\\s*`;
 const JSON_LEAD_IN_TEST_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "i");
 const JSON_LEAD_IN_REPLACE_REGEX = new RegExp(JSON_LEAD_IN_PATTERN, "gi");
 const JSON_LEAD_IN_AT_START_REGEX = new RegExp(
-  `^\\s*(?:(?:here(?:['’]s| is| are)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}|(?:the\\s+)?json\\s+(?:you\\s+)?requested)\\s*(?::|-)?\\s*`,
+  `^\\s*(?:(?:here(?:[''’]s| is| are)|below is|this is|sure|certainly|okay|ok)\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}\\bjson\\b[^\\n{}]{0,${MAX_JSON_LEAD_IN_CHARS}}|(?:the\\s+)?json\\s+(?:you\\s+)?requested)\\s*(?::|-)?\\s*`,
   "i"
 );
 
@@ -102,8 +152,8 @@ export interface StyleInput {
   userApiKey?: string;
   /** Pro/Dev client-side custom prompt (localStorage only, never persisted server-side) */
   clientCustomPrompt?: string;
-  /** Which provider to use for the BYOK key ("openai" | "gemini", defaults to "openai") */
-  byokProvider?: "openai" | "gemini";
+  /** Which provider to use for the BYOK key ("openai" | "gemini" | "mistral", defaults to "openai") */
+  byokProvider?: ModelProvider;
   /** Gender context for recommendations (e.g. "Male", "Female", "N/A", or custom text) */
   gender?: string;
   /** Whether the user consented to share their location with the AI */
@@ -116,6 +166,8 @@ export interface StyleInput {
   customContext?: string[];
   /** Weather planning data from the planning panel */
   planningData?: PlanningData;
+  /** Specific model to use (for model switching feature) */
+  modelId?: ModelID;
 }
 
 export interface FollowUpInput {
@@ -128,6 +180,8 @@ export interface FollowUpInput {
   userApiKey?: string;
   /** Dev mode: include raw AI output in response */
   isDev?: boolean;
+  /** Specific model to use (for model switching feature) */
+  modelId?: ModelID;
 }
 
 export interface StyleRecommendation {
@@ -139,6 +193,43 @@ export interface StyleRecommendation {
   closetWarning?: string;
   /** AI model used for this response */
   modelUsed?: string;
+}
+
+/** Get available models for a user based on their plan */
+export function getAvailableModels(isPro: boolean, isDev: boolean, hasByok: boolean): readonly ModelConfig[] {
+  const tier = isDev ? "pro" : (isPro ? "pro" : "free");
+  const models = MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES];
+  void hasByok;
+  return models;
+}
+
+/** Get all models (including unavailable ones) for display purposes */
+export function getAllModels(): ModelConfig[] {
+  return [...MODEL_PRIORITIES.pro, ...MODEL_PRIORITIES.free].filter(
+    (model, index, all) => all.findIndex((candidate) => candidate.id === model.id) === index
+  );
+}
+
+/** Check if a model is available for a user's plan */
+export function isModelAvailable(modelId: ModelID, isPro: boolean, isDev: boolean): boolean {
+  const tier = isDev ? "pro" : (isPro ? "pro" : "free");
+  const availableModels = MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES];
+  return availableModels.some(m => m.id === modelId);
+}
+
+/** Get the default model for a user's plan */
+export function getDefaultModel(isPro: boolean, isDev: boolean): ModelConfig {
+  const tier = isDev ? "pro" : (isPro ? "pro" : "free");
+  return MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES][0];
+}
+
+/** Get model by ID */
+export function getModelById(modelId: ModelID): ModelConfig | null {
+  for (const tier of ["pro", "free"] as const) {
+    const model = MODEL_PRIORITIES[tier].find(m => m.id === modelId);
+    if (model) return model;
+  }
+  return null;
 }
 
 function decodeJsonLikeString(value: string): string {
@@ -320,13 +411,183 @@ function formatWind(kmh: number, unit: "metric" | "imperial"): string {
   return `${kmh} km/h`;
 }
 
+function normalizeMessageContent(content: unknown): string {
+  if (typeof content === "string") return content;
+
+  if (Array.isArray(content)) {
+    const text = content
+      .map((chunk) => {
+        if (chunk && typeof chunk === "object" && "text" in chunk) {
+          const value = (chunk as { text?: unknown }).text;
+          return typeof value === "string" ? value : "";
+        }
+        return "";
+      })
+      .join("");
+
+    return text || "{}";
+  }
+
+  return "{}";
+}
+
+/** Call AI with a specific model or use default priority */
+async function callAIWithModel(
+  systemPrompt: string,
+  userMessage: string,
+  userApiKey: string | undefined,
+  isDev: boolean,
+  modelId: ModelID | undefined,
+  byokProvider: ModelProvider | undefined,
+  maxTokens: number
+): Promise<{ raw: string; modelUsed: string }> {
+  // If a specific model is requested, use it
+  if (modelId) {
+    const model = getModelById(modelId);
+    if (model) {
+      return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, model, maxTokens);
+    }
+  }
+
+  // BYOK takes precedence when user provides their own key
+  if (userApiKey) {
+    const provider = byokProvider || "openai";
+    const defaultModel = MODEL_PRIORITIES.pro.find(m => m.provider === provider) || MODEL_PRIORITIES.pro[0];
+    return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, defaultModel, maxTokens);
+  }
+
+  // Try server keys in priority order
+  for (const tier of ["pro", "free"] as const) {
+    for (const model of MODEL_PRIORITIES[tier]) {
+      try {
+        const result = await callSpecificModel(systemPrompt, userMessage, undefined, isDev, model, maxTokens);
+        return result;
+      } catch (err) {
+        console.warn(`[ai] Model ${model.id} failed:`, err instanceof Error ? err.message : err);
+        // Continue to next model
+      }
+    }
+  }
+
+  throw new Error("No AI API key configured. Set OPENAI_API_KEY, GEMINI_API_KEY, or MISTRAL_API_KEY.");
+}
+
+/** Call a specific AI model */
+async function callSpecificModel(
+  systemPrompt: string,
+  userMessage: string,
+  userApiKey: string | undefined,
+  isDev: boolean,
+  model: ModelConfig,
+  maxTokens: number
+): Promise<{ raw: string; modelUsed: string }> {
+  const provider = model.provider;
+  const modelId = model.id;
+
+  return callProvider(systemPrompt, userMessage, userApiKey, isDev, provider, maxTokens, modelId);
+}
+
+/** Call a specific AI provider */
+async function callProvider(
+  systemPrompt: string,
+  userMessage: string,
+  userApiKey: string | undefined,
+  isDev: boolean,
+  provider: ModelProvider,
+  maxTokens: number,
+  modelId: string
+): Promise<{ raw: string; modelUsed: string }> {
+  switch (provider) {
+    case "openai":
+      return callOpenAI(systemPrompt, userMessage, userApiKey, maxTokens, modelId);
+    case "gemini":
+      return callGemini(systemPrompt, userMessage, userApiKey, maxTokens, modelId);
+    case "mistral":
+      return callMistral(systemPrompt, userMessage, userApiKey, maxTokens, modelId);
+    default:
+      throw new Error(`Unknown provider: ${provider}`);
+  }
+}
+
+/** Call OpenAI API */
+async function callOpenAI(
+  systemPrompt: string,
+  userMessage: string,
+  userApiKey: string | undefined,
+  maxTokens: number,
+  modelId: string
+): Promise<{ raw: string; modelUsed: string }> {
+  const openai = getOpenAI(userApiKey);
+  const response = await openai.chat.completions.create({
+    model: modelId,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: maxTokens,
+    temperature: 0.7,
+  });
+  return {
+    raw: normalizeMessageContent(response.choices[0]?.message?.content),
+    modelUsed: modelId,
+  };
+}
+
+/** Call Google Gemini API */
+async function callGemini(
+  systemPrompt: string,
+  userMessage: string,
+  userApiKey: string | undefined,
+  maxTokens: number,
+  modelId: string
+): Promise<{ raw: string; modelUsed: string }> {
+  const gemini = getGemini(userApiKey);
+  const model = gemini.getGenerativeModel({
+    model: modelId,
+    generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
+  });
+  const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
+  return {
+    raw: result.response.text(),
+    modelUsed: modelId,
+  };
+}
+
+/** Call Mistral AI API */
+async function callMistral(
+  systemPrompt: string,
+  userMessage: string,
+  userApiKey: string | undefined,
+  maxTokens: number,
+  modelId: string
+): Promise<{ raw: string; modelUsed: string }> {
+  const mistral = getMistral(userApiKey);
+  const response = await mistral.chat.complete({
+    model: modelId,
+    messages: [
+      { role: "system", content: systemPrompt },
+      { role: "user", content: userMessage },
+    ],
+    responseFormat: { type: "json_object" },
+    maxTokens: maxTokens,
+    temperature: 0.7,
+  });
+  return {
+    raw: normalizeMessageContent(response.choices[0]?.message?.content),
+    modelUsed: modelId,
+  };
+}
+
 export async function getStyleRecommendation(
   input: StyleInput
 ): Promise<StyleRecommendation> {
   const {
     weather, closetItems, unitPreference, customSystemPrompt, clientCustomPrompt,
     userApiKey, byokProvider, gender, shareLocation, forceCloset, customContext, planningData,
+    modelId,
   } = input;
+  const isDev = input.isDev === true;
   let closetWarning: string | undefined;
   if (forceCloset) {
     if (closetItems.length === 0) {
@@ -450,23 +711,66 @@ Please recommend an outfit.`;
   const MAX_TOKENS_BY_COMPLEXITY: Record<number, number> = { 0: 200, 1: 350, 2: 500, 3: 900 };
   const maxTokens = MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350;
 
-  const recommendation = await callAI(systemPrompt, userMessage, userApiKey, input.isDev, byokProvider, maxTokens);
-  return closetWarning ? { ...recommendation, closetWarning } : recommendation;
+  const { raw, modelUsed } = await callAIWithModel(
+    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, maxTokens
+  );
+  
+  const recommendation = parseRecommendationFromRaw(raw);
+  if (recommendation) {
+    return sanitizeRecommendationFields({
+      outfit: recommendation.outfit ?? "Unable to generate outfit recommendation.",
+      reasoning: recommendation.reasoning ?? "",
+      modelUsed,
+      ...(closetWarning ? { closetWarning } : {}),
+      ...(isDev ? { rawOutput: raw } : {}),
+    });
+  }
+
+  const partialOutfit = extractJsonField(raw, "outfit");
+  const partialReasoning = extractJsonField(raw, "reasoning");
+  if (partialOutfit || partialReasoning) {
+    return sanitizeRecommendationFields({
+      outfit: partialOutfit ?? "Unable to generate outfit recommendation.",
+      reasoning: partialReasoning ?? "",
+      modelUsed,
+      ...(closetWarning ? { closetWarning } : {}),
+      ...(isDev ? { rawOutput: raw } : {}),
+    });
+  }
+
+  return sanitizeRecommendationFields({
+    outfit: "Unable to generate outfit recommendation.",
+    reasoning: raw.trim(),
+    modelUsed,
+    ...(closetWarning ? { closetWarning } : {}),
+    ...(isDev ? { rawOutput: raw } : {}),
+  });
 }
 
 /** Dev mode: send a freeform message to the AI without weather context */
 export async function getDevChatResponse(
   message: string,
-  userApiKey?: string
+  userApiKey?: string,
+  modelId?: ModelID
 ): Promise<StyleRecommendation> {
-  return callAI(DEFAULT_SYSTEM_PROMPT, message, userApiKey, true);
+  const { raw, modelUsed } = await callAIWithModel(
+    DEFAULT_SYSTEM_PROMPT, message, userApiKey, true, modelId, undefined, 500
+  );
+  const recommendation = parseRecommendationFromRaw(raw);
+  return sanitizeRecommendationFields({
+    outfit: recommendation?.outfit ?? raw.trim(),
+    reasoning: recommendation?.reasoning ?? "",
+    modelUsed,
+    rawOutput: raw,
+  });
 }
 
 /** Follow-up: modify an existing recommendation based on user input */
 export async function getFollowUpRecommendation(
   input: FollowUpInput
 ): Promise<StyleRecommendation> {
-  const { previousOutfit, previousReasoning, weather, followUpMessage, unitPreference, customSystemPrompt, userApiKey } = input;
+  const { previousOutfit, previousReasoning, weather, followUpMessage, unitPreference, customSystemPrompt, userApiKey, modelId } = input;
+  const isDev = input.isDev === true;
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
 
   const userMessage = `Previous outfit recommendation:
@@ -481,123 +785,15 @@ User follow-up question: "${followUpMessage}"
 
 Please update the outfit recommendation based on the follow-up question. Respond with the same JSON format.`;
 
-  return callAI(systemPrompt, userMessage, userApiKey, input.isDev);
-}
-
-async function callAI(
-  systemPrompt: string,
-  userMessage: string,
-  userApiKey?: string,
-  isDev: boolean = false,
-  byokProvider: "openai" | "gemini" = "openai",
-  maxTokens: number = 500
-): Promise<StyleRecommendation> {
-  let raw: string;
-  let modelUsed: string;
-
-  // Route BYOK key to the correct provider; server keys use the default priority order
-  const useGeminiBYOK = userApiKey && byokProvider === "gemini";
-
-  if (useGeminiBYOK) {
-    // BYOK with Gemini — use the user's own key
-    const GEMINI_MODELS = [
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite",
-      "gemma-4-31b-it",
-      "gemma-4-26b-it",
-    ];
-    let geminiRaw: string | undefined;
-    let geminiModelUsed: string | undefined;
-    const triedModels: string[] = [];
-    for (const modelName of GEMINI_MODELS) {
-      triedModels.push(modelName);
-      try {
-        const model = getGemini(userApiKey).getGenerativeModel({
-          model: modelName,
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
-        });
-        const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
-        geminiRaw = result.response.text();
-        geminiModelUsed = modelName;
-        break;
-      } catch (err) {
-        console.warn(
-          `[ai] Gemini BYOK model "${modelName}" failed:`,
-          err instanceof Error ? err.message : err
-        );
-      }
-    }
-    if (geminiRaw === undefined) {
-      throw new Error(`All Gemini BYOK models failed. Tried: ${triedModels.join(", ")}`);
-    }
-    if (!geminiModelUsed) {
-      throw new Error("Gemini BYOK model resolved without model metadata.");
-    }
-    raw = geminiRaw;
-    modelUsed = geminiModelUsed;
-  } else if (!useGeminiBYOK && (userApiKey || process.env.OPENAI_API_KEY)) {
-    const modelName = "gpt-4o";
-    const response = await getOpenAI(userApiKey).chat.completions.create({
-      model: modelName,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userMessage },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: maxTokens,
-      temperature: 0.7,
-    });
-    raw = response.choices[0]?.message?.content ?? "{}";
-    modelUsed = modelName;
-  } else if (process.env.GEMINI_API_KEY) {
-    const GEMINI_MODELS = [
-      "gemini-2.5-flash",
-      "gemini-2.5-flash-lite",
-      "gemma-4-31b-it",
-      "gemma-4-26b-it",
-    ];
-    let geminiRaw: string | undefined;
-    let geminiModelUsed: string | undefined;
-    const triedModels: string[] = [];
-    for (const modelName of GEMINI_MODELS) {
-      triedModels.push(modelName);
-      try {
-        const model = getGemini().getGenerativeModel({
-          model: modelName,
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
-        });
-        const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
-        geminiRaw = result.response.text();
-        geminiModelUsed = modelName;
-        break;
-      } catch (err) {
-        console.warn(
-          `[ai] Gemini model "${modelName}" failed:`,
-          err instanceof Error ? err.message : err
-        );
-      }
-    }
-    if (geminiRaw === undefined) {
-      throw new Error(`All Gemini models failed. Tried: ${triedModels.join(", ")}`);
-    }
-    if (!geminiModelUsed) {
-      throw new Error("Gemini model resolved without model metadata.");
-    }
-    raw = geminiRaw;
-    modelUsed = geminiModelUsed;
-  } else {
-    throw new Error("No AI API key configured. Set OPENAI_API_KEY or GEMINI_API_KEY.");
-  }
-
-  // Log full AI output for server-side debugging
-  console.log("[ai] Full AI response:", raw);
-  raw = enforceStrictJsonOnly(raw);
-
-  const parsed = parseRecommendationFromRaw(raw);
-  if (parsed) {
+  const { raw, modelUsed } = await callAIWithModel(
+    systemPrompt, userMessage, userApiKey, isDev, modelId, undefined, 500
+  );
+  
+  const recommendation = parseRecommendationFromRaw(raw);
+  if (recommendation) {
     return sanitizeRecommendationFields({
-      outfit: parsed.outfit ?? "Unable to generate outfit recommendation.",
-      reasoning: parsed.reasoning ?? "",
+      outfit: recommendation.outfit ?? "Unable to generate outfit recommendation.",
+      reasoning: recommendation.reasoning ?? "",
       modelUsed,
       ...(isDev ? { rawOutput: raw } : {}),
     });

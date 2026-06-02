@@ -800,6 +800,55 @@ export async function processCustomSources(
 // Public entry point
 // ---------------------------------------------------------------------------
 
+// Weather cache configuration
+export const WEATHER_CACHE_TTL = {
+  'OpenWeather': 900, // 15 minutes
+  'BOM': 1800, // 30 minutes (free, less frequent updates)
+  'Open-Meteo': 1800, // 30 minutes (free)
+  'Custom': 600, // 10 minutes
+  'Multi': 900, // 15 minutes
+} as const;
+
+// Simple in-memory cache for weather data
+export const weatherCache = new Map<string, { data: WeatherData & { customContext?: string[] }; timestamp: number }>();
+
+/**
+ * Generate cache key from parameters
+ */
+export function generateCacheKey(lat: number, lon: number, customSourceUrl?: string, sourceMode?: SourceMode, customSources?: CustomSource[]): string {
+  const customSourcesSignature = (customSources ?? [])
+    .map((source) => `${source.id}:${source.type}:${source.value}:${source.service ?? ""}`)
+    .sort()
+    .join(",");
+  const keyParts = [
+    lat.toFixed(4),
+    lon.toFixed(4),
+    customSourceUrl || '',
+    sourceMode || 'builtin',
+    customSourcesSignature,
+  ];
+  return keyParts.join('|');
+}
+
+/**
+ * Get cached weather data if still valid
+ */
+export function getCachedWeather(key: string): (WeatherData & { customContext?: string[] }) | null {
+  const cached = weatherCache.get(key);
+  if (!cached) return null;
+  
+  const ttl = WEATHER_CACHE_TTL[cached.data.source as keyof typeof WEATHER_CACHE_TTL] || 900;
+  const age = Date.now() - cached.timestamp;
+  
+  if (age <= ttl * 1000) {
+    return cached.data;
+  }
+  
+  // Cache expired, remove it
+  weatherCache.delete(key);
+  return null;
+}
+
 export async function getWeather(
   lat: number,
   lon: number,
@@ -807,6 +856,16 @@ export async function getWeather(
   sourceMode: SourceMode = "builtin",
   customSources: CustomSource[] = []
 ): Promise<WeatherData & { customContext?: string[] }> {
+  // Generate cache key
+  const cacheKey = generateCacheKey(lat, lon, customSourceUrl, sourceMode, customSources);
+  
+  // Check cache first
+  const cached = getCachedWeather(cacheKey);
+  if (cached) {
+    return cached;
+  }
+  
+  // Not in cache or expired, fetch fresh data
   // Legacy: single custom source URL (Pro feature)
   if (customSourceUrl && sourceMode === "builtin") {
     return fetchCustomSource(customSourceUrl, lon);
@@ -837,7 +896,9 @@ export async function getWeather(
       hourly: extraWeatherSources[0].hourly,
     };
     const result = averageSources(extraWeatherSources, primary);
-    return { ...result, customContext: extraContext.length > 0 ? extraContext : undefined };
+    const cachedResult = { ...result, customContext: extraContext.length > 0 ? extraContext : undefined };
+    weatherCache.set(cacheKey, { data: cachedResult, timestamp: Date.now() });
+    return cachedResult;
   }
 
   // Fetch from multiple sources in parallel for better accuracy
@@ -939,7 +1000,12 @@ export async function getWeather(
   }
 
   const averaged = averageSources(validSources, primary);
-  return { ...averaged, customContext: extraContext.length > 0 ? extraContext : undefined };
+  const result = { ...averaged, customContext: extraContext.length > 0 ? extraContext : undefined };
+  
+  // Cache the result
+  weatherCache.set(cacheKey, { data: result, timestamp: Date.now() });
+  
+  return result;
 }
 
 // ---------------------------------------------------------------------------

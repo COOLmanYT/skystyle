@@ -8,13 +8,16 @@
     "start": "next start",
     "lint": "eslint --config eslint.config.mjs src next.config.ts"
   },
+  "sideEffects": false,
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.1",
     "@google/generative-ai": "^0.24.1",
+    "@mistralai/mistralai": "^1.0.0",
     "@simplewebauthn/browser": "^9.0.1",
     "@simplewebauthn/server": "^9.0.3",
     "@supabase/supabase-js": "^2.97.0",
     "@vercel/analytics": "^1.6.1",
+    "babel-plugin-react-compiler": "^1.0.0",
     "bcryptjs": "^3.0.3",
     "next": "16.2.3",
     "next-auth": "^5.0.0-beta.30",
