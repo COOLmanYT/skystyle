@@ -100,10 +100,28 @@ const JSON_LEAD_IN_AT_START_REGEX = new RegExp(
   "i"
 );
 
+function normalizeRecommendationText(value: unknown): string {
+  if (typeof value === "string") {
+    return value
+      .replace(/\\r?\\n/g, "\n")
+      .replace(/(^|\n)(#{1,4})(?![\s#])(?=\S)/g, "$1$2 ");
+  }
+  if (Array.isArray(value)) {
+    return value.map(normalizeRecommendationText).filter(Boolean).join("\n");
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value)
+      .map(([key, item]) => `## ${key.replace(/[-_]+/g, " ")}\n${normalizeRecommendationText(item)}`)
+      .join("\n\n");
+  }
+  return "";
+}
+
 /** Remove forbidden JSON lead-in phrasing from the start of a text field. */
-function stripForbiddenJsonLeadIn(value: string): string {
-  if (!value) return value;
-  return value.replace(JSON_LEAD_IN_AT_START_REGEX, "").trimStart();
+function stripForbiddenJsonLeadIn(value: unknown): string {
+  const text = normalizeRecommendationText(value);
+  if (!text) return text;
+  return text.replace(JSON_LEAD_IN_AT_START_REGEX, "").trimStart();
 }
 
 /** Enforce JSON-only output by preferring the first JSON object over mixed prose+JSON content. */

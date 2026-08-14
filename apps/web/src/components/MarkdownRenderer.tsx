@@ -356,7 +356,9 @@ export default function MarkdownRenderer({
 }: Props) {
   if (!content) return null;
 
-  const lines = content.split("\n");
+  // Some model providers return Markdown newlines double-escaped ("\\n").
+  // Normalize both forms so headings such as "## Top" are parsed as blocks.
+  const lines = content.replace(/\\r?\\n/g, "\n").replace(/\r\n?/g, "\n").split("\n");
   const elements: React.ReactNode[] = [];
   let i = 0;
 
