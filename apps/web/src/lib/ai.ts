@@ -232,6 +232,19 @@ export function getModelById(modelId: ModelID): ModelConfig | null {
   return null;
 }
 
+/** Retry a provider response that hit its output limit with enough room to finish its JSON. */
+function getRetryTokenBudget(maxTokens: number): number {
+  return Math.max(maxTokens * 2, 1_800);
+}
+
+function geminiResponseWasTruncated(response: {
+  candidates?: Array<{ finishReason?: string }>;
+}): boolean {
+  return response.candidates?.some(
+    (candidate) => candidate.finishReason === "MAX_TOKENS"
+  ) ?? false;
+}
+
 function decodeJsonLikeString(value: string): string {
   const decodedParts: string[] = [];
   for (let i = 0; i < value.length; i++) {
@@ -518,16 +531,21 @@ async function callOpenAI(
   modelId: string
 ): Promise<{ raw: string; modelUsed: string }> {
   const openai = getOpenAI(userApiKey);
-  const response = await openai.chat.completions.create({
+  const createResponse = (outputTokens: number) => openai.chat.completions.create({
     model: modelId,
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userMessage },
     ],
     response_format: { type: "json_object" },
-    max_tokens: maxTokens,
+    max_tokens: outputTokens,
     temperature: 0.7,
   });
+  let response = await createResponse(maxTokens);
+  if (response.choices[0]?.finish_reason === "length") {
+    console.warn(`[ai] OpenAI response reached its ${maxTokens}-token limit; retrying with more room.`);
+    response = await createResponse(getRetryTokenBudget(maxTokens));
+  }
   return {
     raw: normalizeMessageContent(response.choices[0]?.message?.content),
     modelUsed: modelId,
@@ -543,11 +561,18 @@ async function callGemini(
   modelId: string
 ): Promise<{ raw: string; modelUsed: string }> {
   const gemini = getGemini(userApiKey);
-  const model = gemini.getGenerativeModel({
-    model: modelId,
-    generationConfig: { responseMimeType: "application/json", maxOutputTokens: maxTokens },
-  });
-  const result = await model.generateContent(`${systemPrompt}\n\n${userMessage}`);
+  const createResponse = (outputTokens: number) => {
+    const model = gemini.getGenerativeModel({
+      model: modelId,
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: outputTokens },
+    });
+    return model.generateContent(`${systemPrompt}\n\n${userMessage}`);
+  };
+  let result = await createResponse(maxTokens);
+  if (geminiResponseWasTruncated(result.response)) {
+    console.warn(`[ai] Gemini response reached its ${maxTokens}-token limit; retrying with more room.`);
+    result = await createResponse(getRetryTokenBudget(maxTokens));
+  }
   return {
     raw: result.response.text(),
     modelUsed: modelId,
@@ -707,8 +732,10 @@ ${complexityInstruction}
 
 Please recommend an outfit.`;
 
-  // Token budget scales with complexity: Simple=200, Simple+=350, Advanced=500, Pro=900
-  const MAX_TOKENS_BY_COMPLEXITY: Record<number, number> = { 0: 200, 1: 350, 2: 500, 3: 900 };
+  // Token budget scales with complexity. Pro permits up to 300 words in each
+  // JSON field, so 900 tokens can cut the response off before it closes the
+  // JSON object. Leave enough room for the full recommendation and Markdown.
+  const MAX_TOKENS_BY_COMPLEXITY: Record<number, number> = { 0: 300, 1: 600, 2: 1_000, 3: 1_800 };
   const maxTokens = MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350;
 
   const { raw, modelUsed } = await callAIWithModel(
