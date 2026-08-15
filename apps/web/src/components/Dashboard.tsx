@@ -2637,7 +2637,7 @@ export default function Dashboard({
             Privacy
           </Link>
           {" · "}
-          <a href="https://skystyle-docs.vercel.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>
+          <a href="https://docs.skystyle.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>
             Docs
           </a>
           {" · "}

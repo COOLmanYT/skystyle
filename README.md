@@ -58,7 +58,7 @@ This repository is now organized as a single monorepo for multiple deployable pr
 
 Project targets:
 - `apps/web` -> `skystyle.app` (or current preview domain)
-- `apps/docs` -> `https://docs.skystyle.app` (after domain attachment)
+- `apps/docs` -> `https://docs.skystyle.app`
 - `apps/api` -> `api.skystyle.app` (future)
 
 ## Tech stack

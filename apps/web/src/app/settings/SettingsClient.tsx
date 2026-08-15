@@ -642,7 +642,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
           <Link href="/settings/security" className="underline hover:opacity-70">Security</Link>
           <Link href="/settings/privacy" className="underline hover:opacity-70">Privacy Hub</Link>
           <Link href="/account" className="underline hover:opacity-70">Account</Link>
-          <a href="https://skystyle-docs.vercel.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70">Docs</a>
+          <a href="https://docs.skystyle.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70">Docs</a>
           <a href="https://status.skystyle.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70">Status</a>
         </div>
       </div>
