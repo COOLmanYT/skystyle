@@ -23,7 +23,18 @@ export default defineConfig({
         text: 'Sky Style Docs',
         items: [
           { text: 'Overview', link: '/' },
-          { text: 'Web App Guide', link: '/web-app' },
+        ]
+      },
+      {
+        text: 'Web App Guide',
+        items: [
+          { text: 'Overview', link: '/web-app' },
+          { text: 'Dashboard & Closet', link: '/web-app/dashboard' },
+          { text: 'Settings', link: '/web-app/settings' },
+          { text: 'Security & Privacy', link: '/web-app/security-and-privacy' },
+          { text: 'Automatic Recommendations', link: '/web-app/automatic-recommendations' },
+          { text: 'API Dashboard', link: '/web-app/api-dashboard' },
+          { text: 'Account & Support', link: '/web-app/account-and-support' },
         ]
       },
       {
