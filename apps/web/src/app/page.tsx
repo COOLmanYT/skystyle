@@ -853,6 +853,23 @@ export default function Home() {
 
       </main>
 
+      <section className="px-6 pb-2 text-center" aria-label="Sky Style service status">
+        <p className="mb-2 text-xs" style={{ color: "var(--foreground)", opacity: 0.55 }}>
+          Service status
+        </p>
+        <div className="flex justify-center">
+          <iframe
+            title="COOLman service status"
+            src="https://status.coolmanyt.com/embed-status/0a610de5/dark-md"
+            width="230"
+            height="61"
+            frameBorder="0"
+            scrolling="no"
+            style={{ border: "none" }}
+          />
+        </div>
+      </section>
+
       {/* Footer */}
       <footer
         className="px-6 py-6 text-center text-xs space-y-2"
@@ -934,7 +951,7 @@ export default function Home() {
           {" · "}
           <a href="https://docs.skystyle.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Docs</a>
           {" · "}
-          <a href="https://status.skystyle.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Status</a>
+          <a href="https://status.coolmanyt.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Status</a>
         </p>
       </footer>
     </div>

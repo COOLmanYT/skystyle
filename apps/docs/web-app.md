@@ -30,4 +30,4 @@ API credit purchases are not live yet; the app's donation prompt is intentionall
 
 ## Help and service status
 
-Use the app Inbox or Feedback page for account help. API users should consult the [API error guide](/api/errors) and the project status page linked from the app.
+Use the app Inbox or Feedback page for account help. API users should consult the [API error guide](/api/errors) and the [COOLman service status page](https://status.coolmanyt.com/) for service and downtime information. Monitoring integrations can use its [status summary JSON](https://status.coolmanyt.com/summary.json).

@@ -364,7 +364,7 @@ export default function HamburgerNav({
                 Privacy Policy
               </Link>
               <a href="https://docs.skystyle.app" target="_blank" rel="noopener noreferrer" className="block rounded-xl px-3 py-2 text-xs btn-interact" style={{ color: "var(--foreground)", opacity: 0.6 }}>Docs ↗</a>
-              <a href="https://status.skystyle.app" target="_blank" rel="noopener noreferrer" className="block rounded-xl px-3 py-2 text-xs btn-interact" style={{ color: "var(--foreground)", opacity: 0.6 }}>System status ↗</a>
+              <a href="https://status.coolmanyt.com/" target="_blank" rel="noopener noreferrer" className="block rounded-xl px-3 py-2 text-xs btn-interact" style={{ color: "var(--foreground)", opacity: 0.6 }}>System status ↗</a>
             </div>
           </div>
         </>
