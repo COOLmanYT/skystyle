@@ -12,7 +12,6 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Web App Guide', link: '/web-app' },
-      { text: 'Platform Guide', link: '/markdown-examples' },
       { text: 'API Reference', link: '/api/' },
       { text: 'Quickstart', link: '/api/quickstart' },
       { text: 'Development', link: '/development' },
@@ -25,7 +24,6 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/' },
           { text: 'Web App Guide', link: '/web-app' },
-          { text: 'Platform Guide', link: '/markdown-examples' },
         ]
       },
       {

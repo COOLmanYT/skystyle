@@ -42,12 +42,10 @@ npm install
 npm run dev
 ```
 
-For docs only:
+For docs only, run from the repository root:
 
 ```bash
-cd apps/docs
-npm install
-npm run dev
+npm run docs:dev
 ```
 
 ## Operational Tips

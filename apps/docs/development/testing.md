@@ -8,6 +8,8 @@ All test dependencies are included in the project. No additional setup is requir
 
 ## Running Tests
 
+Run from the repository root:
+
 ```bash
 # Run all tests once
 npm test
@@ -45,18 +47,20 @@ apps/web/src/
 
 ## Test Coverage
 
-| Module | Tests | Coverage |
-|--------|-------|----------|
-| AI Module | 20+ | ~90% |
-| API Keys | 25+ | ~100% |
-| Credits | 20+ | ~95% |
-| Weather | 30+ | ~95% |
-| Weather Cache | 25+ | ~100% |
-| Daily Usage | 20+ | ~90% |
-| Style API | 25+ | ~85% |
-| Followup API | 30+ | ~85% |
+Coverage varies as tests are added; generate a current report with `npm run test:coverage`.
 
-**Total: 170+ unit tests**
+| Module | Coverage |
+|--------|----------|
+| AI Module | ~90% |
+| API Keys | ~100% |
+| Credits | ~95% |
+| Weather | ~95% |
+| Weather Cache | ~100% |
+| Daily Usage | ~90% |
+| Style API | ~85% |
+| Followup API | ~85% |
+
+Values are approximate and intended as a guide, not a contract.
 
 ## Mocking
 
