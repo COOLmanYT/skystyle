@@ -100,7 +100,7 @@ export async function runAutomaticRecommendationSchedule(
 
   try {
     const [controlResult, settingsResult, closetResult, profileResult] = await Promise.all([
-      supabaseAdmin.from("user_access_controls").select("app_blocked").eq("user_id", schedule.user_id).maybeSingle(),
+      supabaseAdmin.from("user_access_controls").select("*").eq("user_id", schedule.user_id).maybeSingle(),
       supabaseAdmin.from("settings").select("custom_system_prompt").eq("user_id", schedule.user_id).maybeSingle(),
       supabaseAdmin.from("closet").select("items").eq("user_id", schedule.user_id).maybeSingle(),
       supabaseAdmin.from("users").select("is_dev").eq("id", schedule.user_id).maybeSingle(),
@@ -108,7 +108,7 @@ export async function runAutomaticRecommendationSchedule(
     for (const result of [controlResult, settingsResult, closetResult, profileResult]) {
       if (result.error) throw result.error;
     }
-    if (controlResult.data?.app_blocked) throw new Error("Automatic recommendations are disabled for this account.");
+    if (controlResult.data?.banned_at || (controlResult.data?.app_blocked && (!controlResult.data?.app_blocked_until || Date.parse(controlResult.data.app_blocked_until) > Date.now()))) throw new Error("Automatic recommendations are disabled for this account.");
 
     const weather: WeatherData = await getWeather(schedule.latitude, schedule.longitude);
     const recommendation: StyleRecommendation = await getStyleRecommendation({

@@ -1,12 +1,13 @@
 import Link from "next/link";
 
-type Section = "overview" | "api" | "users" | "feedback";
+type Section = "overview" | "api" | "users" | "feedback" | "bans";
 
 const items: Array<{ id: Section; href: string; label: string }> = [
   { id: "overview", href: "/dev/operations", label: "Overview" },
   { id: "api", href: "/dev/operations/api-activity", label: "API Activity" },
   { id: "users", href: "/dev/operations/users", label: "Users" },
   { id: "feedback", href: "/dev/operations/feedback", label: "Feedback" },
+  { id: "bans", href: "/dev/operations/bans", label: "Ban management" },
 ];
 
 export default function DevOperationsNav({ current }: { current: Section }) {

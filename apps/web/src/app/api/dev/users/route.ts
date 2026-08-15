@@ -31,15 +31,17 @@ export async function GET() {
     userRows = (legacyUsersResult.data ?? []).map((user) => ({ ...user, created_at: null, pending_deletion: false }));
     usersError = legacyUsersResult.error;
   }
-  const [controlsResult, usageResult, creditsResult, apiKeysResult, feedbackResult, deletionResult] = await Promise.all([
+  const [controlsResult, usageResult, creditsResult, apiKeysResult, feedbackResult, deletionResult, loginResult, apiActivityResult] = await Promise.all([
     supabaseAdmin.from("user_access_controls").select("*"),
-    supabaseAdmin.from("daily_usage").select("user_id, ai_uses, follow_ups, usage_date").limit(10_000),
+    supabaseAdmin.from("daily_usage").select("user_id, ai_uses, follow_ups, usage_date").order("usage_date", { ascending: false }).limit(10_000),
     supabaseAdmin.from("credits").select("user_id, current_balance"),
-    supabaseAdmin.from("api_keys").select("user_id, revoked, credits_remaining"),
+    supabaseAdmin.from("api_keys").select("id, user_id, revoked, credits_remaining"),
     supabaseAdmin.from("feedback").select("user_id"),
     supabaseAdmin.from("deletion_requests").select("user_id, status"),
+    supabaseAdmin.from("security_logs").select("user_id, created_at").ilike("event_type", "%login%").order("created_at", { ascending: false }).limit(10_000),
+    supabaseAdmin.from("api_usage_logs").select("api_key_id, timestamp").order("timestamp", { ascending: false }).limit(10_000),
   ]);
-  for (const result of [controlsResult, usageResult, creditsResult, apiKeysResult, feedbackResult, deletionResult]) {
+  for (const result of [controlsResult, usageResult, creditsResult, apiKeysResult, feedbackResult, deletionResult, loginResult, apiActivityResult]) {
     if (result.error) return NextResponse.json({ error: result.error.message }, { status: 500 });
   }
   if (usersError) return NextResponse.json({ error: usersError.message }, { status: 500 });
@@ -48,12 +50,22 @@ export async function GET() {
   const controls = new Map((controlsResult.data ?? []).map((row) => [row.user_id, row]));
   const todayUsage = new Map((usageResult.data ?? []).filter((row) => row.usage_date === today).map((row) => [row.user_id, row]));
   const totalUsage = new Map<string, number>();
+  const lastAiUse = new Map<string, string>();
   for (const row of usageResult.data ?? []) totalUsage.set(row.user_id, (totalUsage.get(row.user_id) ?? 0) + Number(row.ai_uses ?? 0));
+  for (const row of usageResult.data ?? []) if (!lastAiUse.has(row.user_id) && Number(row.ai_uses ?? 0) > 0) lastAiUse.set(row.user_id, row.usage_date);
   const credits = new Map((creditsResult.data ?? []).map((row) => [row.user_id, row.current_balance]));
   const feedbackCount = new Map<string, number>();
   for (const row of feedbackResult.data ?? []) feedbackCount.set(row.user_id, (feedbackCount.get(row.user_id) ?? 0) + 1);
   const pendingDeletion = new Set((deletionResult.data ?? []).filter((row) => row.status === "pending").map((row) => row.user_id));
   const apiKeys = apiKeysResult.data ?? [];
+  const keyIdToUser = new Map(apiKeys.map((key) => [key.id, key.user_id]));
+  const lastApiUse = new Map<string, string>();
+  for (const row of apiActivityResult.data ?? []) {
+    const owner = keyIdToUser.get(row.api_key_id);
+    if (owner && !lastApiUse.has(owner)) lastApiUse.set(owner, row.timestamp);
+  }
+  const lastLogin = new Map<string, string>();
+  for (const row of loginResult.data ?? []) if (!lastLogin.has(row.user_id)) lastLogin.set(row.user_id, row.created_at);
 
   return NextResponse.json(userRows.map((user) => ({
     ...user,
@@ -62,6 +74,9 @@ export async function GET() {
     pendingDeletion: user.pending_deletion || pendingDeletion.has(user.id),
     feedbackCount: feedbackCount.get(user.id) ?? 0,
     totalAiUses: totalUsage.get(user.id) ?? 0,
+    lastLoggedIn: lastLogin.get(user.id) ?? null,
+    lastApiUse: lastApiUse.get(user.id) ?? null,
+    lastAiUse: lastAiUse.get(user.id) ?? null,
     controls: controls.get(user.id) ?? null,
     usage: todayUsage.get(user.id) ?? null,
     credits: credits.get(user.id) ?? 0,
@@ -77,13 +92,20 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, unknown> = { user_id: body.userId, updated_by: session.user.id, updated_at: new Date().toISOString() };
   if (typeof body.appBlocked === "boolean") updates.app_blocked = body.appBlocked;
   if (typeof body.apiBlocked === "boolean") updates.api_blocked = body.apiBlocked;
+  if (typeof body.appBlockedUntil === "string" && !Number.isNaN(Date.parse(body.appBlockedUntil))) { updates.app_blocked = true; updates.app_blocked_until = body.appBlockedUntil; }
+  if (typeof body.apiBlockedUntil === "string" && !Number.isNaN(Date.parse(body.apiBlockedUntil))) { updates.api_blocked = true; updates.api_blocked_until = body.apiBlockedUntil; }
+  if (body.clearAppBlock === true) { updates.app_blocked = false; updates.app_blocked_until = null; }
+  if (body.clearApiBlock === true) { updates.api_blocked = false; updates.api_blocked_until = null; }
+  if (typeof body.banned === "boolean") { updates.banned_at = body.banned ? new Date().toISOString() : null; updates.ban_reason = body.banned && typeof body.banReason === "string" ? body.banReason.slice(0, 500) : null; }
   if (typeof body.appDailyAiLimit === "number" && Number.isInteger(body.appDailyAiLimit) && body.appDailyAiLimit >= 0) updates.app_daily_ai_limit = body.appDailyAiLimit;
   if (typeof body.apiRateLimitPerMin === "number" && Number.isInteger(body.apiRateLimitPerMin) && body.apiRateLimitPerMin >= 0) updates.api_rate_limit_per_min = body.apiRateLimitPerMin;
   if (typeof body.reason === "string") updates.reason = body.reason.slice(0, 500);
   const { error: controlError } = await supabaseAdmin.from("user_access_controls").upsert(updates, { onConflict: "user_id" });
   if (controlError) return NextResponse.json({ error: controlError.message }, { status: 500 });
 
-  const giftCredits = typeof body.giftAppCredits === "number" && Number.isInteger(body.giftAppCredits) ? body.giftAppCredits : 0;
+  const giftCredits = typeof body.appCreditDelta === "number" && Number.isInteger(body.appCreditDelta)
+    ? body.appCreditDelta
+    : typeof body.giftAppCredits === "number" && Number.isInteger(body.giftAppCredits) ? body.giftAppCredits : 0;
   if (giftCredits !== 0) {
     const { data: credit, error: creditReadError } = await supabaseAdmin.from("credits").select("current_balance").eq("user_id", body.userId).maybeSingle();
     if (creditReadError) return NextResponse.json({ error: creditReadError.message }, { status: 500 });
@@ -91,8 +113,26 @@ export async function PATCH(req: NextRequest) {
     const { error: creditError } = await supabaseAdmin.from("credits").upsert({ user_id: body.userId, current_balance: balance, last_reset_date: new Date().toISOString().slice(0, 10) }, { onConflict: "user_id" });
     if (creditError) return NextResponse.json({ error: creditError.message }, { status: 500 });
   }
+  const moneyCreditDelta = typeof body.moneyCreditDelta === "number" && Number.isInteger(body.moneyCreditDelta) ? body.moneyCreditDelta : 0;
+  if (moneyCreditDelta !== 0) {
+    const { data: wallet, error: walletError } = await supabaseAdmin.from("credit_wallets").select("money_credit_cents").eq("user_id", body.userId).maybeSingle();
+    if (walletError) return NextResponse.json({ error: walletError.message }, { status: 500 });
+    const { error } = await supabaseAdmin.from("credit_wallets").upsert({ user_id: body.userId, money_credit_cents: Math.max(0, Number(wallet?.money_credit_cents ?? 0) + moneyCreditDelta), updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  const apiCreditDelta = typeof body.apiCreditDelta === "number" && Number.isInteger(body.apiCreditDelta) ? body.apiCreditDelta : 0;
+  if (apiCreditDelta !== 0 && typeof body.apiKeyId === "string") {
+    const { data: key, error: keyError } = await supabaseAdmin.from("api_keys").select("id, credits_remaining").eq("id", body.apiKeyId).eq("user_id", body.userId).maybeSingle();
+    if (keyError || !key) return NextResponse.json({ error: "API key not found." }, { status: 404 });
+    const { error } = await supabaseAdmin.from("api_keys").update({ credits_remaining: Math.max(0, Number(key.credits_remaining ?? 0) + apiCreditDelta) }).eq("id", key.id).eq("user_id", body.userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  if (typeof body.plan === "string" && ["free", "pro"].includes(body.plan)) {
+    const { error } = await supabaseAdmin.from("users").update({ is_pro: body.plan === "pro" }).eq("id", body.userId);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
   try {
-    await audit(session.user.id, body.userId, "user_access_updated", { ...updates, giftCredits });
+    await audit(session.user.id, body.userId, "user_access_updated", { ...updates, giftCredits, moneyCreditDelta, apiCreditDelta, apiKeyId: body.apiKeyId ?? null, plan: body.plan ?? null });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Failed to audit admin action." }, { status: 500 });
   }

@@ -4,6 +4,10 @@
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS pending_deletion boolean NOT NULL DEFAULT false;
 ALTER TABLE public.feedback ADD COLUMN IF NOT EXISTS source text NOT NULL DEFAULT 'Web app';
+ALTER TABLE public.user_access_controls ADD COLUMN IF NOT EXISTS app_blocked_until timestamptz;
+ALTER TABLE public.user_access_controls ADD COLUMN IF NOT EXISTS api_blocked_until timestamptz;
+ALTER TABLE public.user_access_controls ADD COLUMN IF NOT EXISTS banned_at timestamptz;
+ALTER TABLE public.user_access_controls ADD COLUMN IF NOT EXISTS ban_reason text;
 
 CREATE INDEX IF NOT EXISTS idx_feedback_user_created_at ON public.feedback (user_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON public.users (created_at DESC);

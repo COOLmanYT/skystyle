@@ -379,7 +379,7 @@ export function withApiAuth(handler: ApiHandler) {
 
     const { data: accessControl, error: accessControlError } = await supabaseAdmin
       .from("user_access_controls")
-      .select("api_blocked, api_rate_limit_per_min")
+      .select("*")
       .eq("user_id", keyRecord.userId)
       .maybeSingle();
     if (accessControlError) {
@@ -388,7 +388,8 @@ export function withApiAuth(handler: ApiHandler) {
       queueUsageLog(keyRecord.id, res);
       return res;
     }
-    if (!isDev && accessControl?.api_blocked) {
+    const apiBlocked = accessControl?.banned_at || (accessControl?.api_blocked && (!accessControl.api_blocked_until || Date.parse(accessControl.api_blocked_until) > Date.now()));
+    if (!isDev && apiBlocked) {
       const res = NextResponse.json({ error: "api_access_blocked", message: "API access has been disabled for this account." }, { status: 403 });
       applyStandardHeaders(res);
       queueUsageLog(keyRecord.id, res);
