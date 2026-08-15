@@ -58,6 +58,12 @@ Tests cover all major modules and API routes:
 
 - **Web app**: skystyle.app (Vercel)
 - **Docs**: docs.skystyle.app (Vercel)
+
+## Automatic recommendation scheduler
+
+The exact-time automatic recommendation worker is scheduled by **Supabase Cron**, not Vercel Cron. This keeps the worker compatible with Vercel Hobby, which only permits one cron invocation each day.
+
+Enable the **pg_cron** and **pg_net** extensions from Supabase Dashboard, add the same `CRON_SECRET` used by the web deployment to Vault as `skystyle_automatic_recommendations_cron_secret`, then run [`supabase/automatic-recommendations-cron.sql`](https://github.com/COOLmanYT/skystyle/blob/main/supabase/automatic-recommendations-cron.sql) in the Supabase SQL Editor. The job invokes the secure Vercel route each minute and can be monitored in `cron.job_run_details`.
 - **Database**: Supabase
 
 ## Contributing
