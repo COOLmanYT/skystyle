@@ -18,6 +18,18 @@ function cleanLabel(value: unknown, max: number): string | null {
   return trimmed || null;
 }
 
+function hasMissingMetadataColumn(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  const message = error.message ?? "";
+  return (
+    (error.code === "42703" || error.code === "PGRST204") &&
+    (message.includes("nickname") || message.includes("folder"))
+  );
+}
+
+const API_KEY_COLUMNS = "id, key_preview, created_at, revoked, credits_remaining, credits_used, nickname, folder";
+const LEGACY_API_KEY_COLUMNS = "id, key_preview, created_at, revoked, credits_remaining, credits_used";
+
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -26,13 +38,26 @@ export async function GET() {
 
   await syncPublicUser(session);
 
-  const { data, error } = await supabaseAdmin
+  let { data, error } = await supabaseAdmin
     .from("api_keys")
-    .select("id, key_preview, created_at, revoked, credits_remaining, credits_used, nickname, folder")
+    .select(API_KEY_COLUMNS)
     .eq("user_id", session.user.id)
     .order("created_at", { ascending: false });
 
+  // Existing deployments from before v5 do not yet have key labels. Keep the
+  // dashboard usable until the idempotent schema migration has been applied.
+  if (hasMissingMetadataColumn(error)) {
+    const legacyResult = await supabaseAdmin
+      .from("api_keys")
+      .select(LEGACY_API_KEY_COLUMNS)
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false });
+    data = (legacyResult.data ?? []).map((key) => ({ ...key, nickname: null, folder: null }));
+    error = legacyResult.error;
+  }
+
   if (error) {
+    console.error("[api-keys] Failed to load API keys:", error.code, error.message);
     return NextResponse.json({ error: "Failed to load API keys" }, { status: 500 });
   }
 
@@ -59,22 +84,35 @@ export async function POST(req: NextRequest) {
   const keyHash = hashApiKey(key);
   const initialCredits = getInitialApiKeyCredits();
 
-  const { data, error } = await supabaseAdmin
+  const insertPayload = {
+    user_id: session.user.id,
+    key_hash: keyHash,
+    key_preview: preview,
+    revoked: false,
+    credits_remaining: initialCredits,
+    credits_used: 0,
+    nickname: cleanLabel(body.nickname, 80),
+    folder: cleanLabel(body.folder, 80),
+  };
+  let { data, error } = await supabaseAdmin
     .from("api_keys")
-    .insert({
-      user_id: session.user.id,
-      key_hash: keyHash,
-      key_preview: preview,
-      revoked: false,
-      credits_remaining: initialCredits,
-      credits_used: 0,
-      nickname: cleanLabel(body.nickname, 80),
-      folder: cleanLabel(body.folder, 80),
-    })
-    .select("id, key_preview, created_at, revoked, credits_remaining, credits_used, nickname, folder")
+    .insert(insertPayload)
+    .select(API_KEY_COLUMNS)
     .single();
 
-  if (error) {
+  if (hasMissingMetadataColumn(error)) {
+    const { nickname: _nickname, folder: _folder, ...legacyPayload } = insertPayload;
+    const legacyResult = await supabaseAdmin
+      .from("api_keys")
+      .insert(legacyPayload)
+      .select(LEGACY_API_KEY_COLUMNS)
+      .single();
+    data = legacyResult.data ? { ...legacyResult.data, nickname: null, folder: null } : null;
+    error = legacyResult.error;
+  }
+
+  if (error || !data) {
+    console.error("[api-keys] Failed to create API key:", error?.code, error?.message);
     return NextResponse.json({ error: "Failed to create API key" }, { status: 500 });
   }
 
