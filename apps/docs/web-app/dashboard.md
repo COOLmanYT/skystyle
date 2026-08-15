@@ -47,6 +47,29 @@ Switch modes in [Settings → Dashboard behaviour](./settings#dashboard-behaviou
 Follow-ups are limited per day based on your plan (Free: 40/day, Pro: 400/day). When you hit the limit, the dashboard shows your usage and the limit resets at midnight UTC.
 :::
 
+## Weather Planning panel
+
+The Weather Planning panel on the dashboard lets you control how a recommendation is generated:
+
+- **Recommendation mode** — Simple, Simple+, Advanced, or Pro (see [Recommendation modes](#recommendation-modes) above).
+- **Source picker** (Pro) — choose which built-in weather source to use for this recommendation. Free users get 4 source picks/day; Pro is unlimited. See [How It Works → Weather sources](./how-it-works#weather-sources).
+- **Hourly forecast** — when the selected source provides it, an hourly breakdown (time, temperature, description, rain chance, wind speed) is shown so you can plan around changing conditions.
+- **Accuracy** — for BOM (Australia) data, the panel shows the accuracy score based on distance to the nearest station (see [Accuracy score](./how-it-works#accuracy-score)).
+
+The panel's default state (always open, closed, or disabled) is configurable in [Settings → Dashboard behaviour](./settings#dashboard-behaviour).
+
+## Model switching
+
+You can change which AI model generates your recommendation. **Model switches are a separate daily counter** from AI uses:
+
+| Plan | Model switches |
+| --- | --- |
+| Free | 2/day |
+| Pro | Unlimited |
+| Dev | Unlimited |
+
+Switching counts even if the previous model was unavailable. See [How It Works → AI models](./how-it-works#ai-models) for the full model priority list.
+
 ## Bring Your Own Key (Pro & Dev)
 
 Pro and Dev users can supply their own AI provider key so recommendations are billed to their own account.

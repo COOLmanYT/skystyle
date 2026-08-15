@@ -28,7 +28,7 @@ Switch between **metric** (°C, km/h) and **imperial** (°F, mph). Saved to your
 
 ## Preferences {#preferences}
 
-- **Share my location with AI** — include your location in the AI prompt for more relevant recommendations.
+- **Share my location with AI** — include your location in the AI prompt for more relevant recommendations. When off, Sky Style still fetches weather for your coordinates but does not include your location text in the prompt sent to the AI. This setting is stored locally only.
 - **Weather only** — show weather data without generating an AI outfit recommendation.
 - **Simple Mode default on Terms & Privacy pages** — show plain-English summaries.
 

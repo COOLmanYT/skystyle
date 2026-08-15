@@ -13,12 +13,27 @@ New here? Try the [no-login Live Demo](https://skystyle.app/#demo) first to see 
 
 ## Guides
 
-- **[Dashboard & Closet](./dashboard)** — recommendation modes, follow-up questions, Bring Your Own Key, and your wardrobe.
+**Start here:**
+
+- **[Getting Started](./getting-started)** — a step-by-step walkthrough from sign-up to your first refined recommendation.
+- **[How It Works](./how-it-works)** — the end-to-end flow, weather sources, AI models, accuracy scoring, and usage limits.
+
+**Feature reference:**
+
+- **[Dashboard & Closet](./dashboard)** — recommendation modes, weather planning panel, model switching, follow-up questions, BYOK, and your wardrobe.
 - **[Settings](./settings)** — profile, units, appearance, preferences, dashboard behaviour, layout & spacing, and tutorials.
 - **[Security & Privacy](./security-and-privacy)** — 2FA, passkeys, API keys, security log, data export, and account deletion.
 - **[Automatic Recommendations](./automatic-recommendations)** — schedule exact-time outfit recommendations with a manual location.
 - **[API Dashboard](./api-dashboard)** — manage API keys, allocate credits, and view per-key balances.
 - **[Account & Support](./account-and-support)** — the account hub, plans, feedback, inbox, changelog, and service status.
+
+**Advanced:**
+
+- **[Custom Weather Sources](./custom-weather-sources)** — (Pro) add your own HTTPS weather sources with SSRF-safe validation.
+
+**Need help?**
+
+- **[FAQ & Troubleshooting](./faq)** — common questions, error explanations, and fixes.
 
 ## Credits
 
