@@ -12,6 +12,21 @@ const BUCKET_COUNT = 24;
 const FIRST_BUCKET_OFFSET_HOURS = LOOKBACK_HOURS - 1;
 const ONE_HOUR_MS = 60 * 60 * 1000;
 
+function toAnalyticsRequest(row: Record<string, unknown>) {
+  return {
+    id: typeof row.id === "string" ? row.id : crypto.randomUUID(),
+    endpoint: typeof row.endpoint === "string" ? row.endpoint : "unknown",
+    timestamp: typeof row.timestamp === "string" ? row.timestamp : null,
+    statusCode: typeof row.status_code === "number" ? row.status_code : 0,
+    responseTime: typeof row.response_time === "number" ? row.response_time : null,
+    requestMethod: typeof row.request_method === "string" ? row.request_method : "GET",
+    requestInput: row.request_input ?? null,
+    responseOutput: row.response_output ?? null,
+    errorCode: typeof row.error_code === "string" ? row.error_code : null,
+    errorMessage: typeof row.error_message === "string" ? row.error_message : null,
+  };
+}
+
 function buildHourlyBuckets(nowMs: number): Array<{ startMs: number; label: string; count: number }> {
   const bucketStartTime = new Date(nowMs - FIRST_BUCKET_OFFSET_HOURS * ONE_HOUR_MS);
   bucketStartTime.setMinutes(0, 0, 0);
@@ -61,12 +76,13 @@ export async function GET() {
       requestsOverTime: buckets.map(({ label, count }) => ({ label, count })),
       errorRate: null,
       avgResponseTimeMs: null,
+      requests: [],
     });
   }
 
   const { data: usageRows, error: usageError } = await supabaseAdmin
     .from("api_usage_logs")
-    .select("endpoint, timestamp, status_code, response_time")
+    .select("id, endpoint, timestamp, status_code, response_time, request_method, request_input, response_output, error_code, error_message")
     .in("api_key_id", apiKeyIds)
     .gte("timestamp", sinceIso);
 
@@ -115,5 +131,12 @@ export async function GET() {
     requestsOverTime: buckets.map(({ label, count }) => ({ label, count })),
     errorRate,
     avgResponseTimeMs,
+    requests: rows
+      .sort((a, b) => {
+        const aTime = typeof a.timestamp === "string" ? Date.parse(a.timestamp) : 0;
+        const bTime = typeof b.timestamp === "string" ? Date.parse(b.timestamp) : 0;
+        return bTime - aTime;
+      })
+      .map((row) => toAnalyticsRequest(row as unknown as Record<string, unknown>)),
   });
 }

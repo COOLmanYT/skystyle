@@ -20,15 +20,38 @@ interface UsagePoint {
   count: number;
 }
 
+interface ApiRequest {
+  id: string;
+  endpoint: string;
+  timestamp: string | null;
+  statusCode: number;
+  responseTime: number | null;
+  requestMethod: string;
+  requestInput: unknown;
+  responseOutput: unknown;
+  errorCode: string | null;
+  errorMessage: string | null;
+}
+
 interface UsagePayload {
   totalRequests24h: number;
   endpointCounts: Record<string, number>;
   requestsOverTime: UsagePoint[];
   errorRate: number | null;
   avgResponseTimeMs: number | null;
+  requests: ApiRequest[];
 }
 
 const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
+
+function formatAnalyticsValue(value: unknown): string {
+  if (value === null || value === undefined) return "—";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
 
 /** Inline SVG area + line chart for time-series data. */
 function LineChart({ data }: { data: UsagePoint[] }) {
@@ -121,6 +144,7 @@ export default function ApiDashboardClient() {
         requestsOverTime: Array.isArray(data.requestsOverTime) ? data.requestsOverTime : [],
         errorRate: typeof data.errorRate === "number" ? data.errorRate : null,
         avgResponseTimeMs: typeof data.avgResponseTimeMs === "number" ? data.avgResponseTimeMs : null,
+        requests: Array.isArray(data.requests) ? data.requests as ApiRequest[] : [],
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load API usage.");
@@ -397,6 +421,49 @@ export default function ApiDashboardClient() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="rounded-xl p-4 space-y-3" style={{ background: "var(--background)" }}>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+                    Request activity
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.5 }}>
+                    Every request in the last 24 hours for your API keys. Credentials are redacted.
+                  </p>
+                </div>
+                {usage.requests.length === 0 ? (
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>No request activity yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {usage.requests.map((request) => {
+                      const isError = request.statusCode >= 400;
+                      const time = request.timestamp ? new Date(request.timestamp).toLocaleString(undefined, DATE_TIME_OPTIONS) : "Unknown time";
+                      return (
+                        <details key={request.id} className="rounded-lg px-3 py-2" style={{ border: "1px solid var(--card-border)" }}>
+                          <summary className="cursor-pointer flex flex-wrap items-center gap-x-2 gap-y-1 text-xs" style={{ color: "var(--foreground)" }}>
+                            <span className="font-semibold" style={{ color: isError ? "#ff3b30" : "#34c759" }}>{request.statusCode || "—"}</span>
+                            <span>{request.requestMethod} {request.endpoint}</span>
+                            <span style={{ opacity: 0.45 }}>{time}</span>
+                            {request.responseTime != null && <span style={{ opacity: 0.45 }}>{request.responseTime}ms</span>}
+                            {request.errorCode && <span style={{ color: "#ff3b30" }}>{request.errorCode}</span>}
+                          </summary>
+                          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 pt-3">
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ opacity: 0.45 }}>Input</p>
+                              <pre className="text-[11px] overflow-x-auto whitespace-pre-wrap break-words rounded-md p-2" style={{ background: "var(--card)", color: "var(--foreground)" }}>{formatAnalyticsValue(request.requestInput)}</pre>
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-semibold uppercase tracking-wider mb-1" style={{ opacity: 0.45 }}>Output</p>
+                              <pre className="text-[11px] overflow-x-auto whitespace-pre-wrap break-words rounded-md p-2" style={{ background: "var(--card)", color: "var(--foreground)" }}>{formatAnalyticsValue(request.responseOutput)}</pre>
+                              {request.errorMessage && <p className="text-xs mt-2" style={{ color: "#ff3b30" }}>{request.errorMessage}</p>}
+                            </div>
+                          </div>
+                        </details>
+                      );
+                    })}
                   </div>
                 )}
               </div>

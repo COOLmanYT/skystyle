@@ -2,7 +2,7 @@
 
 AI-powered outfit recommendations based on hyper-local weather data. Never overdress or underdress again.
 
-Current live site (WIP / proof of concept): **https://what2wear-two.vercel.app**
+Planned production domain: **https://skystyle.app**
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Support_Me!-Buy%20Me%20A%20Coffee-yellow)](https://buymeacoffee.com/coolmanyt)
 

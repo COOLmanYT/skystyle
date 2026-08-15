@@ -23,6 +23,9 @@ import { getEndpointCreditCost, getHalfCreditCharge } from "@/lib/api-key-credit
 /** Default rate limit when API_RATE_LIMIT_PER_MINUTE is not set. */
 const DEFAULT_RATE_LIMIT = 60;
 const MAX_CREDIT_DEDUCTION_RETRIES = 3;
+const MAX_ANALYTICS_VALUE_LENGTH = 8_000;
+const MAX_ANALYTICS_COLLECTION_LENGTH = 50;
+const SENSITIVE_ANALYTICS_FIELD = /(?:api[-_]?key|authorization|password|secret|token|credential)/i;
 
 export interface ApiKeyContext {
   /** Primary key of the matching row in api_keys. */
@@ -149,6 +152,74 @@ interface RateLimitResult {
   limit: number;
 }
 
+type AnalyticsPayload = Record<string, unknown>;
+
+function truncateAnalyticsString(value: string): string {
+  return value.length > MAX_ANALYTICS_VALUE_LENGTH
+    ? `${value.slice(0, MAX_ANALYTICS_VALUE_LENGTH)}…[truncated]`
+    : value;
+}
+
+/** Preserve useful diagnostics without ever storing credentials in analytics. */
+function sanitizeAnalyticsValue(value: unknown, key?: string, depth = 0): unknown {
+  if (key && SENSITIVE_ANALYTICS_FIELD.test(key)) return "[redacted]";
+  if (typeof value === "string") return truncateAnalyticsString(value);
+  if (typeof value === "number" || typeof value === "boolean" || value === null) return value;
+  if (depth >= 5) return "[max depth reached]";
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, MAX_ANALYTICS_COLLECTION_LENGTH)
+      .map((item) => sanitizeAnalyticsValue(item, undefined, depth + 1));
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .slice(0, MAX_ANALYTICS_COLLECTION_LENGTH)
+        .map(([entryKey, entryValue]) => [entryKey, sanitizeAnalyticsValue(entryValue, entryKey, depth + 1)])
+    );
+  }
+  return String(value);
+}
+
+async function captureRequestInput(req: NextRequest): Promise<AnalyticsPayload> {
+  const query = Object.fromEntries(req.nextUrl.searchParams.entries());
+  const input: AnalyticsPayload = { query: sanitizeAnalyticsValue(query) };
+  const contentType = req.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) return input;
+
+  try {
+    const text = await req.clone().text();
+    input.body = text ? sanitizeAnalyticsValue(JSON.parse(text)) : null;
+  } catch {
+    input.body = "[unreadable JSON body]";
+  }
+  return input;
+}
+
+async function captureResponseDetails(response: NextResponse): Promise<AnalyticsPayload> {
+  try {
+    const text = await response.clone().text();
+    if (!text) return {};
+    const contentType = response.headers.get("content-type") ?? "";
+    const output = contentType.includes("application/json")
+      ? sanitizeAnalyticsValue(JSON.parse(text))
+      : { text: truncateAnalyticsString(text) };
+    const error = output && typeof output === "object" && !Array.isArray(output)
+      ? (output as Record<string, unknown>).error
+      : undefined;
+    const message = output && typeof output === "object" && !Array.isArray(output)
+      ? (output as Record<string, unknown>).message
+      : undefined;
+    return {
+      output,
+      ...(typeof error === "string" ? { errorCode: error } : {}),
+      ...(typeof message === "string" ? { errorMessage: message } : {}),
+    };
+  } catch {
+    return { output: "[response body unavailable]" };
+  }
+}
+
 /**
  * Check whether the API key has stayed within its per-minute rate limit.
  * Returns the limit, current usage, and whether the request is allowed.
@@ -178,21 +249,34 @@ async function checkRateLimit(apiKeyId: string): Promise<RateLimitResult> {
  * latency to the API response.
  */
 function logApiUsage(
-  apiKeyId: string,
+  apiKeyId: string | undefined,
   endpoint: string,
   statusCode: number,
-  startedAt: number
+  startedAt: number,
+  requestInput: AnalyticsPayload,
+  requestMethod: string,
+  response: NextResponse
 ): void {
   const responseTime = Date.now() - startedAt;
+  // Clone immediately, while the response body is still available; consume it
+  // later in after() so analytics never delay the API response.
+  const responseDetails = captureResponseDetails(response);
   after(async () => {
     try {
-      await supabaseAdmin.from("api_usage_logs").insert({
+      const details = await responseDetails;
+      const { error } = await supabaseAdmin.from("api_usage_logs").insert({
         api_key_id: apiKeyId,
         endpoint,
         timestamp: new Date().toISOString(),
         response_time: responseTime,
         status_code: statusCode,
+        request_method: requestMethod,
+        request_input: requestInput,
+        response_output: details.output ?? null,
+        error_code: details.errorCode ?? null,
+        error_message: details.errorMessage ?? null,
       });
+      if (error) throw error;
     } catch (err) {
       console.warn("[api-middleware] Failed to write usage log:", err);
     }
@@ -223,6 +307,10 @@ export function withApiAuth(handler: ApiHandler) {
     const startedAt = Date.now();
     const endpoint = req.nextUrl.pathname;
     const endpointCost = getEndpointCreditCost(endpoint);
+    const requestInput = await captureRequestInput(req);
+    const queueUsageLog = (apiKeyId: string | undefined, response: NextResponse) => {
+      logApiUsage(apiKeyId, endpoint, response.status, startedAt, requestInput, req.method, response);
+    };
 
     // 1. Extract bearer token — fail fast before any DB work
     const rawToken = extractBearerToken(req);
@@ -235,17 +323,31 @@ export function withApiAuth(handler: ApiHandler) {
         { status: 401 }
       );
       applyStandardHeaders(res);
+      queueUsageLog(undefined, res);
       return res;
     }
 
     // 2. Resolve key → (id, user_id)
-    const keyRecord = await resolveApiKey(rawToken);
+    let keyRecord: Awaited<ReturnType<typeof resolveApiKey>>;
+    try {
+      keyRecord = await resolveApiKey(rawToken);
+    } catch (err) {
+      console.error("[api-middleware] API key lookup failed:", err);
+      const res = NextResponse.json(
+        { error: "internal_error", message: "Unable to validate the API key." },
+        { status: 500 }
+      );
+      applyStandardHeaders(res);
+      queueUsageLog(undefined, res);
+      return res;
+    }
     if (!keyRecord) {
       const res = NextResponse.json(
         { error: "unauthorized", message: "Invalid or revoked API key." },
         { status: 401 }
       );
       applyStandardHeaders(res);
+      queueUsageLog(undefined, res);
       return res;
     }
 
@@ -253,13 +355,25 @@ export function withApiAuth(handler: ApiHandler) {
     if (endpointCost > 0 && keyRecord.creditsRemaining < endpointCost) {
       const res = NextResponse.json({ error: "insufficient_credits" }, { status: 403 });
       applyStandardHeaders(res);
+      queueUsageLog(keyRecord.id, res);
       return res;
     }
 
     // 3. Rate limit — checked before any heavy processing
-    const rateLimit = await checkRateLimit(keyRecord.id);
+    let rateLimit: RateLimitResult;
+    try {
+      rateLimit = await checkRateLimit(keyRecord.id);
+    } catch (err) {
+      console.error("[api-middleware] Rate-limit lookup failed:", err);
+      const res = NextResponse.json(
+        { error: "internal_error", message: "Unable to check the API rate limit." },
+        { status: 500 }
+      );
+      applyStandardHeaders(res);
+      queueUsageLog(keyRecord.id, res);
+      return res;
+    }
     if (!rateLimit.allowed) {
-      logApiUsage(keyRecord.id, endpoint, 429, startedAt);
       const res = NextResponse.json(
         { error: "rate_limited", message: "Too many requests. Please slow down." },
         { status: 429 }
@@ -268,6 +382,7 @@ export function withApiAuth(handler: ApiHandler) {
       res.headers.set("Retry-After", "60");
       res.headers.set("X-RateLimit-Limit", String(rateLimit.limit));
       res.headers.set("X-RateLimit-Remaining", "0");
+      queueUsageLog(keyRecord.id, res);
       return res;
     }
 
@@ -283,12 +398,12 @@ export function withApiAuth(handler: ApiHandler) {
       response = await handler(req, ctx);
     } catch (err) {
       console.error("[api-middleware] Unhandled handler error:", err);
-      logApiUsage(keyRecord.id, endpoint, 500, startedAt);
       const res = NextResponse.json(
         { error: "internal_error", message: "An unexpected error occurred." },
         { status: 500 }
       );
       applyStandardHeaders(res);
+      queueUsageLog(keyRecord.id, res);
       return res;
     }
 
@@ -323,7 +438,7 @@ export function withApiAuth(handler: ApiHandler) {
       }
     }
 
-    logApiUsage(keyRecord.id, endpoint, response.status, startedAt);
+    queueUsageLog(keyRecord.id, response);
     return response;
   };
 }

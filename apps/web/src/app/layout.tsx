@@ -4,9 +4,11 @@ import "./globals.css";
 import ThemeController from "@/components/ThemeController";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://skystyle.app"),
   title: "Sky Style — AI Weather Stylist",
   description:
     "Hyper-local weather data meets AI-powered outfit recommendations. Dress perfectly for the day.",
+  alternates: { canonical: "/" },
 };
 
 export default function RootLayout({

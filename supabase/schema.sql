@@ -328,11 +328,16 @@ GRANT SELECT (id, user_id, key_preview, created_at, revoked, credits_remaining, 
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS api_usage_logs (
   id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  api_key_id    uuid        NOT NULL REFERENCES api_keys(id) ON DELETE CASCADE,
+  api_key_id    uuid        REFERENCES api_keys(id) ON DELETE CASCADE,
   endpoint      text        NOT NULL,
   timestamp     timestamptz NOT NULL DEFAULT now(),
   response_time integer,          -- milliseconds; NULL until response completes
-  status_code   integer     NOT NULL
+  status_code   integer     NOT NULL,
+  request_method text       NOT NULL DEFAULT 'GET',
+  request_input jsonb,
+  response_output jsonb,
+  error_code    text,
+  error_message text
 );
 
 -- Index for fast per-key time-window lookups (rate-limit check + analytics)
@@ -413,6 +418,16 @@ CREATE TABLE IF NOT EXISTS changelog_posts (
 -- v4.0.0: Add model_switches column for model switching rate limiting:
 --
 --    ALTER TABLE daily_usage ADD COLUMN IF NOT EXISTS model_switches integer NOT NULL DEFAULT 0;
+--
+-- v4.0.4: Record complete API request diagnostics, including unauthenticated failures.
+--
+--    ALTER TABLE api_usage_logs ALTER COLUMN api_key_id DROP NOT NULL;
+--    ALTER TABLE api_usage_logs
+--      ADD COLUMN IF NOT EXISTS request_method text NOT NULL DEFAULT 'GET',
+--      ADD COLUMN IF NOT EXISTS request_input jsonb,
+--      ADD COLUMN IF NOT EXISTS response_output jsonb,
+--      ADD COLUMN IF NOT EXISTS error_code text,
+--      ADD COLUMN IF NOT EXISTS error_message text;
 --
 -- ============================================================
 
