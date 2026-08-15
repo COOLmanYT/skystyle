@@ -57,7 +57,7 @@ Tests cover all major modules and API routes:
 ## Deployment
 
 - **Web app**: skystyle.app (Vercel)
-- **Docs**: skystyle-docs.vercel.app (Vercel)
+- **Docs**: docs.skystyle.app (Vercel, after domain attachment)
 - **Database**: Supabase
 
 ## Contributing

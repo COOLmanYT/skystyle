@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
-import { getCredits } from "@/lib/credits";
+import { getCredits, getMoneyCreditCents } from "@/lib/credits";
 import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
@@ -30,6 +30,8 @@ export default async function AccountPage() {
   let mfaEnabled = false;
   let pendingDeletion = false;
   let initialCredits: number | null = null;
+  let moneyCreditCents = 0;
+  let apiCredits = 0;
   let dailyLimits: DailyLimitsInfo | null = null;
 
   if (userId) {
@@ -45,6 +47,9 @@ export default async function AccountPage() {
       if (isPro) {
         initialCredits = await getCredits(userId);
       }
+      moneyCreditCents = await getMoneyCreditCents(userId, isPro, isDev);
+      const { data: apiKeys } = await supabaseAdmin.from("api_keys").select("credits_remaining, revoked").eq("user_id", userId);
+      apiCredits = (apiKeys ?? []).filter((key) => !key.revoked).reduce((total, key) => total + Math.max(0, Number(key.credits_remaining ?? 0)), 0);
       dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
     } catch { /* Non-fatal */ }
     try {
@@ -59,24 +64,12 @@ export default async function AccountPage() {
 
   const canAccessDevDashboard = isDevEmail || isDev;
 
-  const rightContent = (
-    <>
-      {canAccessDevDashboard && (
-        <Link href="/dev" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block font-medium" style={{ background: "#ff9500", color: "#fff" }}>🛠️ Dev Dashboard</Link>
-      )}
-      <Link href="/settings" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Settings</Link>
-      <Link href="/settings/security" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Security</Link>
-      <Link href="/settings/privacy" className="text-xs btn-interact rounded-xl px-3 py-2 hidden sm:block" style={{ color: "var(--foreground)", opacity: 0.5 }}>Privacy</Link>
-    </>
-  );
-
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       <HamburgerNav
         currentPage="account"
         userName={name}
         title="👤 Account"
-        rightContent={rightContent}
         signOutAction={handleSignOut}
         isDev={canAccessDevDashboard}
       />
@@ -196,6 +189,26 @@ export default async function AccountPage() {
             )}
           </div>
         )}
+
+        <div className="max-w-3xl mx-auto rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+          <div><h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>Credits</h2><p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>Money credit converts to API Credit on the API Dashboard. App Credit supports in-app use and developer gifts.</p></div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{[
+            { label: "$ Credit (AUD)", value: isDev ? "Unlimited" : `$${(moneyCreditCents / 100).toFixed(2)}` },
+            { label: "API Credit", value: isDev ? "Unlimited" : apiCredits },
+            { label: "App Credit", value: isDev ? "Unlimited" : initialCredits ?? 0 },
+          ].map((credit) => <div key={credit.label} className="rounded-xl p-3" style={{ background: "var(--background)" }}><p className="text-xs" style={{ color: "var(--foreground)", opacity: .5 }}>{credit.label}</p><p className="text-lg font-semibold mt-1" style={{ color: "var(--foreground)" }}>{credit.value}</p></div>)}</div>
+          <div className="flex gap-3 flex-wrap"><Link href="/dashboard/api" className="text-xs underline" style={{ color: "var(--accent)" }}>Manage API Credit →</Link><a href="https://buymeacoffee.com/coolmanyt" target="_blank" rel="noreferrer" className="text-xs underline" style={{ color: "var(--accent)" }}>Support Sky Style →</a></div>
+        </div>
+
+        <div className="max-w-3xl mx-auto rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+          <div><h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>Account tools</h2><p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>Manage the parts of Sky Style that belong to your account.</p></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">{[
+            ["🔔 Inbox", "Read system, support, and recommendation notices", "/inbox"],
+            ["⏰ Automatic recommendations", "Review or pause saved schedules", "/automatic-recommendations"],
+            ["🔐 API Dashboard", "Manage keys and inspect your API activity", "/dashboard/api"],
+            ["💬 Feedback conversations", "Follow up on a support ticket", "/feedback"],
+          ].map(([label, description, href]) => <Link key={href} href={href} className="rounded-xl p-3 btn-interact" style={{ background: "var(--background)", border: "1px solid var(--card-border)", color: "var(--foreground)" }}><p className="text-sm font-medium">{label}</p><p className="text-xs mt-1 opacity-55">{description}</p></Link>)}</div>
+        </div>
 
         {/* Pricing */}
         <div className="max-w-6xl mx-auto space-y-4 px-4 sm:px-6 lg:px-8">
@@ -334,12 +347,6 @@ export default async function AccountPage() {
           </div>
         </div>
 
-        {/* Footer links */}
-        <div className="max-w-3xl mx-auto flex items-center justify-center gap-4 text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-          <Link href="/terms" className="underline hover:opacity-70">Terms</Link>
-          <Link href="/privacy" className="underline hover:opacity-70">Privacy</Link>
-        </div>
-
         {/* ── Security ── */}
         <div className="max-w-3xl mx-auto space-y-2">
           <h2
@@ -349,6 +356,11 @@ export default async function AccountPage() {
             🛡️ Security
           </h2>
           <SecurityClient mfaEnabled={mfaEnabled} embedded />
+        </div>
+
+        <div className="max-w-3xl mx-auto flex items-center justify-center gap-4 text-xs pt-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <Link href="/terms" className="underline hover:opacity-70">Terms</Link>
+          <Link href="/privacy" className="underline hover:opacity-70">Privacy</Link>
         </div>
 
         {/* ── Privacy ── */}

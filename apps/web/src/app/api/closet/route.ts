@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { item } = await req.json();
-  if (!item || typeof item !== "string") {
+  if (!item || typeof item !== "string" || !item.trim()) {
     return NextResponse.json({ error: "item is required" }, { status: 400 });
   }
 
@@ -52,12 +52,14 @@ export async function POST(req: NextRequest) {
     .eq("user_id", userId)
     .single();
 
+  const normalizedItem = item.trim().slice(0, 200);
   const items: string[] = existing?.items ?? [];
-  if (!items.includes(item)) items.push(item);
+  if (!items.some((existingItem) => existingItem.toLowerCase() === normalizedItem.toLowerCase())) items.push(normalizedItem);
 
-  await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from("closet")
     .upsert({ user_id: userId, items }, { onConflict: "user_id" });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({ items });
 }
@@ -87,9 +89,26 @@ export async function DELETE(req: NextRequest) {
     (i: string) => i !== item
   );
 
-  await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from("closet")
     .upsert({ user_id: userId, items }, { onConflict: "user_id" });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+  return NextResponse.json({ items });
+}
+
+/** Replace the full closet after editing, reordering, or multi-select deletion. */
+export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const body = await req.json().catch(() => null) as { items?: unknown } | null;
+  if (!Array.isArray(body?.items) || body.items.length > 500) return NextResponse.json({ error: "items must be an array of up to 500 entries" }, { status: 400 });
+  const seen = new Set<string>();
+  const items = body.items.filter((item): item is string => typeof item === "string").map((item) => item.trim().slice(0, 200)).filter((item) => {
+    const key = item.toLowerCase(); if (!item || seen.has(key)) return false; seen.add(key); return true;
+  });
+  await syncPublicUser(session);
+  const { error } = await supabaseAdmin.from("closet").upsert({ user_id: session.user.id, items }, { onConflict: "user_id" });
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ items });
 }

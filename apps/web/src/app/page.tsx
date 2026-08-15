@@ -174,12 +174,12 @@ export default function Home() {
             </span>
           </button>
           <div className="flex items-center gap-3">
-            <a href="#demo" className="text-sm px-3 py-1.5 rounded-lg btn-interact" style={{ color: "var(--foreground)" }}>
-              Demo
-            </a>
-            <a href="#pricing" className="text-sm px-3 py-1.5 rounded-lg btn-interact" style={{ color: "var(--foreground)" }}>
+            <Link href="/how-it-works" className="text-sm px-3 py-1.5 rounded-lg btn-interact" style={{ color: "var(--foreground)" }}>
+              How it works
+            </Link>
+            <Link href="/pricing" className="text-sm px-3 py-1.5 rounded-lg btn-interact" style={{ color: "var(--foreground)" }}>
               Pricing
-            </a>
+            </Link>
             {isLoggedIn ? (
               <Link
                 href="/dashboard"
@@ -238,6 +238,12 @@ export default function Home() {
           >
             Try Live Demo
           </a>
+        </div>
+      </section>
+
+      <section className="px-6 pb-8 max-w-5xl mx-auto" aria-label="Sky Style benefits">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[["🧥", "Wear what you own", "Use your closet to keep advice grounded in your real wardrobe."], ["⏰", "Plan ahead", "Save an exact-time automatic recommendation and review it later."], ["💬", "Keep refining", "Ask follow-ups when your plans, comfort, or conditions change."]].map(([emoji, title, description]) => <div key={title} className="rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}><p className="text-2xl" aria-hidden="true">{emoji}</p><h2 className="font-semibold mt-3">{title}</h2><p className="text-sm mt-1 opacity-60">{description}</p></div>)}
         </div>
       </section>
 
@@ -867,6 +873,8 @@ export default function Home() {
           <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OpenAI</a>
           {" · "}
           <a href="https://deepmind.google/technologies/gemini/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Google Gemini</a>
+          {" · "}
+          <a href="https://mistral.ai/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Mistral AI</a>
           {" · Geocoding: "}
           <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OSM Nominatim</a>
           {" · Built with "}
@@ -923,6 +931,10 @@ export default function Home() {
           <Link href="/privacy" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>
             Privacy Policy
           </Link>
+          {" · "}
+          <a href="https://skystyle-docs.vercel.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Docs</a>
+          {" · "}
+          <a href="https://status.skystyle.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Status</a>
         </p>
       </footer>
     </div>

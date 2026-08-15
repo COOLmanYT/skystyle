@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabase";
 import { verifyApiKey, API_KEY_PREFIX, API_KEY_PREVIEW_LENGTH } from "@/lib/api-keys";
 import { getEndpointCreditCost, getHalfCreditCharge } from "@/lib/api-key-credits";
+import { deductCredit, deductStoredAppCredit, getCredits, getStoredAppCredits } from "@/lib/credits";
 
 /** Default rate limit when API_RATE_LIMIT_PER_MINUTE is not set. */
 const DEFAULT_RATE_LIMIT = 60;
@@ -49,7 +50,7 @@ function applyStandardHeaders(response: NextResponse): void {
   response.headers.set("Access-Control-Max-Age", "86400");
   response.headers.set(
     "Access-Control-Expose-Headers",
-    "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After"
+    "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After, X-Credit-Warning"
   );
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Cache-Control", "no-store");
@@ -224,12 +225,13 @@ async function captureResponseDetails(response: NextResponse): Promise<Analytics
  * Check whether the API key has stayed within its per-minute rate limit.
  * Returns the limit, current usage, and whether the request is allowed.
  */
-async function checkRateLimit(apiKeyId: string): Promise<RateLimitResult> {
+async function checkRateLimit(apiKeyId: string, customLimit?: number | null): Promise<RateLimitResult> {
   const parsed = parseInt(
     process.env.API_RATE_LIMIT_PER_MINUTE ?? String(DEFAULT_RATE_LIMIT),
     10
   );
-  const limit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RATE_LIMIT;
+  const configuredLimit = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_RATE_LIMIT;
+  const limit = typeof customLimit === "number" && customLimit >= 0 ? customLimit : configuredLimit;
   const windowStart = new Date(Date.now() - 60 * 1000).toISOString();
 
   const { count } = await supabaseAdmin
@@ -351,9 +353,43 @@ export function withApiAuth(handler: ApiHandler) {
       return res;
     }
 
-    // 2b. Credit check before processing request
-    if (endpointCost > 0 && keyRecord.creditsRemaining < endpointCost) {
-      const res = NextResponse.json({ error: "insufficient_credits" }, { status: 403 });
+    const { data: profile, error: profileError } = await supabaseAdmin
+      .from("users")
+      .select("is_dev, is_pro")
+      .eq("id", keyRecord.userId)
+      .maybeSingle();
+    if (profileError) {
+      const res = NextResponse.json({ error: "internal_error", message: "Unable to load API account." }, { status: 500 });
+      applyStandardHeaders(res); queueUsageLog(keyRecord.id, res); return res;
+    }
+    const isDev = profile?.is_dev === true;
+    let useAppCreditFallback = false;
+    // Dev API keys are unlimited. Other keys use their allocated API credits
+    // first, then one regular App Credit when the key balance is exhausted.
+    if (!isDev && endpointCost > 0 && keyRecord.creditsRemaining < endpointCost) {
+      const appCredits = profile?.is_pro
+        ? await getCredits(keyRecord.userId)
+        : await getStoredAppCredits(keyRecord.userId);
+      if (appCredits <= 0) {
+        const res = NextResponse.json({ error: "insufficient_credits", message: "This key has no API Credit and your App Credit balance is empty." }, { status: 403 });
+        applyStandardHeaders(res); queueUsageLog(keyRecord.id, res); return res;
+      }
+      useAppCreditFallback = true;
+    }
+
+    const { data: accessControl, error: accessControlError } = await supabaseAdmin
+      .from("user_access_controls")
+      .select("api_blocked, api_rate_limit_per_min")
+      .eq("user_id", keyRecord.userId)
+      .maybeSingle();
+    if (accessControlError) {
+      const res = NextResponse.json({ error: "internal_error", message: "Unable to load API access controls." }, { status: 500 });
+      applyStandardHeaders(res);
+      queueUsageLog(keyRecord.id, res);
+      return res;
+    }
+    if (!isDev && accessControl?.api_blocked) {
+      const res = NextResponse.json({ error: "api_access_blocked", message: "API access has been disabled for this account." }, { status: 403 });
       applyStandardHeaders(res);
       queueUsageLog(keyRecord.id, res);
       return res;
@@ -362,7 +398,9 @@ export function withApiAuth(handler: ApiHandler) {
     // 3. Rate limit — checked before any heavy processing
     let rateLimit: RateLimitResult;
     try {
-      rateLimit = await checkRateLimit(keyRecord.id);
+      rateLimit = isDev
+        ? { allowed: true, remaining: Number.MAX_SAFE_INTEGER, limit: Number.MAX_SAFE_INTEGER }
+        : await checkRateLimit(keyRecord.id, accessControl?.api_rate_limit_per_min);
     } catch (err) {
       console.error("[api-middleware] Rate-limit lookup failed:", err);
       const res = NextResponse.json(
@@ -427,10 +465,20 @@ export function withApiAuth(handler: ApiHandler) {
       } else if (shouldHalfCharge) {
         charge = getHalfCreditCharge(endpointCost);
       }
-      if (charge > 0) {
+      if (charge > 0 && !isDev) {
+        if (useAppCreditFallback) {
+          response.headers.set("X-Credit-Warning", "API Credit exhausted; this request used one App Credit.");
+        }
         after(async () => {
           try {
-            await deductApiKeyCredits(keyRecord.id, charge);
+            if (useAppCreditFallback) {
+              const deducted = profile?.is_pro
+                ? await deductCredit(keyRecord.userId)
+                : await deductStoredAppCredit(keyRecord.userId);
+              if (!deducted) console.warn(`[api-middleware] App Credit fallback was unavailable for user ${keyRecord.userId}`);
+            } else {
+              await deductApiKeyCredits(keyRecord.id, charge);
+            }
           } catch (err) {
             console.warn(`[api-middleware] Failed to deduct API key credits for key ${keyRecord.id}:`, err);
           }

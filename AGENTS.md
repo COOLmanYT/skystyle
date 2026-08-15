@@ -2,7 +2,7 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-## Current version: 4.0.4
+## Current version: 5.0.0
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 
@@ -48,6 +48,13 @@ VALUES (
   false              -- show_on_next_login
 );
 ```
+
+### Changelog media and CTA guidance
+
+- Use standard Markdown images in `content` (`![Concise alt text](https://...)`) for inline visuals, or use the CMS header `image` field for the card/modal hero image.
+- The custom `![IMAGE-alt text][https://image-url.com]` and `!![IMAGE-CAR]` syntax remain available for legacy rich posts.
+- A CTA needs **both** a label and a safe `https://` or relative URL. Use it for one meaningful next action only; preview the post before publishing.
+- Never put API keys, user data, or unlicensed assets in a changelog image, link, or CTA.
 
 ### Semver guide
 

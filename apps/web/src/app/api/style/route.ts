@@ -78,11 +78,19 @@ export async function POST(req: NextRequest) {
     isPro = false;
     isDev = false;
   } else {
-    const [profileResult, settingsResult, closetResult] = await Promise.all([
+    const [profileResult, settingsResult, closetResult, accessControlResult] = await Promise.all([
       supabaseAdmin.from("users").select("*").eq("id", userId).single(),
       supabaseAdmin.from("settings").select("*").eq("user_id", userId).single(),
       supabaseAdmin.from("closet").select("items").eq("user_id", userId).single(),
+      supabaseAdmin.from("user_access_controls").select("app_blocked").eq("user_id", userId).maybeSingle(),
     ]);
+
+    if (accessControlResult.error) {
+      return NextResponse.json({ error: "Unable to load account access controls." }, { status: 500 });
+    }
+    if (accessControlResult.data?.app_blocked) {
+      return NextResponse.json({ error: "App access has been disabled for this account." }, { status: 403 });
+    }
 
     isPro = profileResult.data?.is_pro ?? false;
     isDev = profileResult.data?.is_dev ?? false;

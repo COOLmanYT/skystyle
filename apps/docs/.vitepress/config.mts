@@ -4,16 +4,19 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "Sky Style Docs",
   description: "Official docs for Sky Style weather-based outfit intelligence",
+  sitemap: { hostname: process.env.DOCS_SITE_URL ?? "https://docs.skystyle.app" },
   ignoreDeadLinks: true,
   themeConfig: {
     logo: '/images/settings.png',
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Home', link: '/' },
+      { text: 'Web App Guide', link: '/web-app' },
       { text: 'Platform Guide', link: '/markdown-examples' },
       { text: 'API Reference', link: '/api/' },
       { text: 'Quickstart', link: '/api/quickstart' },
       { text: 'Development', link: '/development' },
+      { text: 'Sky Style ↗', link: 'https://skystyle.app' },
     ],
 
     sidebar: [
@@ -21,6 +24,7 @@ export default defineConfig({
         text: 'Sky Style Docs',
         items: [
           { text: 'Overview', link: '/' },
+          { text: 'Web App Guide', link: '/web-app' },
           { text: 'Platform Guide', link: '/markdown-examples' },
         ]
       },

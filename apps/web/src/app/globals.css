@@ -58,6 +58,17 @@ body {
   transform: scale(0.96);
 }
 
+/* User-controlled accessibility preference. The OS preference remains respected
+   by browsers, while this switch gives people an explicit in-app option. */
+:root[data-skystyle-reduce-motion="true"] *,
+:root[data-skystyle-reduce-motion="true"] *::before,
+:root[data-skystyle-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+  transition-duration: 0.01ms !important;
+}
+
 /* ── Weather effect card overlays ── */
 .weather-card {
   border-radius: 1rem;

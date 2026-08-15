@@ -295,6 +295,133 @@ CREATE POLICY "Users can read own dev_messages"
   ON dev_messages FOR SELECT USING ((select auth.uid()) = user_id);
 
 -- ------------------------------------------------------------
+-- 13b. Inbox, notification preferences, support tickets, and automation
+-- ------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_inbox (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  category     text NOT NULL CHECK (category IN ('system', 'warning', 'error', 'notification', 'changelog', 'recommendation', 'support')),
+  title        text NOT NULL,
+  body         text NOT NULL DEFAULT '',
+  metadata     jsonb NOT NULL DEFAULT '{}'::jsonb,
+  read_at      timestamptz,
+  dismissed_at timestamptz,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_user_inbox_user_created ON user_inbox (user_id, created_at DESC);
+ALTER TABLE user_inbox ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own inbox" ON user_inbox FOR SELECT USING ((select auth.uid()) = user_id);
+CREATE POLICY "Users can update own inbox" ON user_inbox FOR UPDATE USING ((select auth.uid()) = user_id);
+
+CREATE TABLE IF NOT EXISTS notification_preferences (
+  user_id                 uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  browser_notifications  boolean NOT NULL DEFAULT false,
+  muted_categories       jsonb NOT NULL DEFAULT '[]'::jsonb,
+  blocked_categories     jsonb NOT NULL DEFAULT '[]'::jsonb,
+  updated_at             timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own notification preferences" ON notification_preferences FOR SELECT USING ((select auth.uid()) = user_id);
+CREATE POLICY "Users can update own notification preferences" ON notification_preferences FOR UPDATE USING ((select auth.uid()) = user_id);
+
+CREATE TABLE IF NOT EXISTS user_access_controls (
+  user_id                 uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  app_blocked             boolean NOT NULL DEFAULT false,
+  api_blocked             boolean NOT NULL DEFAULT false,
+  app_daily_ai_limit      integer CHECK (app_daily_ai_limit IS NULL OR app_daily_ai_limit >= 0),
+  api_rate_limit_per_min  integer CHECK (api_rate_limit_per_min IS NULL OR api_rate_limit_per_min >= 0),
+  reason                  text,
+  updated_by              uuid REFERENCES users(id) ON DELETE SET NULL,
+  updated_at              timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE user_access_controls ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own access controls" ON user_access_controls FOR SELECT USING ((select auth.uid()) = user_id);
+
+CREATE TABLE IF NOT EXISTS admin_audit_logs (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id    uuid REFERENCES users(id) ON DELETE SET NULL,
+  target_id   uuid REFERENCES users(id) ON DELETE SET NULL,
+  action      text NOT NULL,
+  metadata    jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_admin_audit_logs_created ON admin_audit_logs (created_at DESC);
+ALTER TABLE admin_audit_logs ENABLE ROW LEVEL SECURITY;
+
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'waiting_user', 'waiting_dev', 'closed'));
+ALTER TABLE feedback ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now();
+CREATE TABLE IF NOT EXISTS feedback_replies (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  feedback_id  uuid NOT NULL REFERENCES feedback(id) ON DELETE CASCADE,
+  sender_id    uuid REFERENCES users(id) ON DELETE SET NULL,
+  from_dev     boolean NOT NULL DEFAULT false,
+  body         text NOT NULL,
+  created_at   timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_feedback_replies_ticket ON feedback_replies (feedback_id, created_at);
+ALTER TABLE feedback_replies ENABLE ROW LEVEL SECURITY;
+
+CREATE TABLE IF NOT EXISTS automated_recommendation_schedules (
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  label            text NOT NULL,
+  latitude         double precision NOT NULL CHECK (latitude BETWEEN -90 AND 90),
+  longitude        double precision NOT NULL CHECK (longitude BETWEEN -180 AND 180),
+  unit_preference  text NOT NULL DEFAULT 'metric' CHECK (unit_preference IN ('metric', 'imperial')),
+  prompt           text,
+  run_at           timestamptz NOT NULL,
+  recurrence       text NOT NULL DEFAULT 'once' CHECK (recurrence IN ('once', 'daily', 'weekly')),
+  time_zone        text NOT NULL DEFAULT 'UTC',
+  active           boolean NOT NULL DEFAULT true,
+  next_run_at      timestamptz NOT NULL,
+  locked_at        timestamptz,
+  last_run_at      timestamptz,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_auto_recs_due ON automated_recommendation_schedules (next_run_at) WHERE active;
+ALTER TABLE automated_recommendation_schedules ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can manage own automatic schedules" ON automated_recommendation_schedules FOR ALL USING ((select auth.uid()) = user_id) WITH CHECK ((select auth.uid()) = user_id);
+
+CREATE TABLE IF NOT EXISTS automated_recommendation_runs (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  schedule_id  uuid REFERENCES automated_recommendation_schedules(id) ON DELETE SET NULL,
+  user_id      uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  status       text NOT NULL CHECK (status IN ('running', 'completed', 'failed')),
+  weather      jsonb,
+  recommendation jsonb,
+  error        text,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  completed_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS idx_auto_rec_runs_user ON automated_recommendation_runs (user_id, created_at DESC);
+ALTER TABLE automated_recommendation_runs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own automatic runs" ON automated_recommendation_runs FOR SELECT USING ((select auth.uid()) = user_id);
+
+CREATE OR REPLACE FUNCTION claim_due_automated_recommendation_schedules(max_jobs integer DEFAULT 25)
+RETURNS SETOF automated_recommendation_schedules
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  WITH due AS (
+    SELECT id
+    FROM automated_recommendation_schedules
+    WHERE active
+      AND next_run_at <= now()
+      AND (locked_at IS NULL OR locked_at < now() - interval '10 minutes')
+    ORDER BY next_run_at
+    FOR UPDATE SKIP LOCKED
+    LIMIT GREATEST(1, LEAST(max_jobs, 100))
+  )
+  UPDATE automated_recommendation_schedules schedules
+  SET locked_at = now(), updated_at = now()
+  FROM due
+  WHERE schedules.id = due.id
+  RETURNING schedules.*;
+$$;
+
+-- ------------------------------------------------------------
 -- 14. API Keys (hashed, revocable)
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -307,8 +434,22 @@ CREATE TABLE IF NOT EXISTS api_keys (
 );
 
 -- Migration-safe credit fields for existing environments.
-ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS credits_remaining integer NOT NULL DEFAULT 100;
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS credits_remaining integer NOT NULL DEFAULT 50;
 ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS credits_used integer NOT NULL DEFAULT 0;
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS nickname text;
+ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS folder text;
+
+-- Wallet values are deliberately separated: money credit is stored in cents,
+-- API credit is assigned per key, and app credit remains in the credits table.
+CREATE TABLE IF NOT EXISTS credit_wallets (
+  user_id                    uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  money_credit_cents         integer NOT NULL DEFAULT 0 CHECK (money_credit_cents >= 0),
+  last_pro_credit_month      date,
+  created_at                 timestamptz NOT NULL DEFAULT now(),
+  updated_at                 timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE credit_wallets ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Users can read own credit wallet" ON credit_wallets FOR SELECT USING ((select auth.uid()) = user_id);
 
 ALTER TABLE api_keys ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can read own api_keys"
@@ -320,7 +461,7 @@ CREATE INDEX IF NOT EXISTS api_keys_key_preview_revoked_idx
 
 -- RLS is row-level only; revoke key_hash from client roles so it stays server-only
 REVOKE SELECT ON TABLE api_keys FROM anon, authenticated;
-GRANT SELECT (id, user_id, key_preview, created_at, revoked, credits_remaining, credits_used)
+GRANT SELECT (id, user_id, key_preview, created_at, revoked, credits_remaining, credits_used, nickname, folder)
   ON api_keys TO authenticated;
 
 -- ------------------------------------------------------------
@@ -428,6 +569,17 @@ CREATE TABLE IF NOT EXISTS changelog_posts (
 --      ADD COLUMN IF NOT EXISTS response_output jsonb,
 --      ADD COLUMN IF NOT EXISTS error_code text,
 --      ADD COLUMN IF NOT EXISTS error_message text;
+--
+-- v4.1.0: Run the Feature Set 1 table/function block above. It creates durable
+-- inboxes, access controls, support-ticket replies, automatic-recommendation
+-- schedules/runs, and the claim_due_automated_recommendation_schedules RPC.
+-- Then reload the PostgREST schema cache:
+--    NOTIFY pgrst, 'reload schema';
+--
+-- v5.0.0: Run the credit_wallets block above, then add API key metadata:
+--    ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS nickname text;
+--    ALTER TABLE api_keys ADD COLUMN IF NOT EXISTS folder text;
+--    ALTER TABLE api_keys ALTER COLUMN credits_remaining SET DEFAULT 50;
 --
 -- ============================================================
 

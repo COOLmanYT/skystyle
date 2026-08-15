@@ -62,6 +62,9 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
   const [themeMode, setThemeMode] = useState<ThemeMode>(
     () => (getLocalStorage("skystyle_theme_mode", "system") as ThemeMode)
   );
+  const [reduceMotion, setReduceMotion] = useState(
+    () => getLocalStorage("skystyle_reduce_motion", "false") === "true"
+  );
   const [shareLocation, setShareLocation] = useState(() => getLocalStorage("skystyle_location_consent", "false") === "true");
   const [weatherOnly, setWeatherOnly] = useState(() => getLocalStorage("skystyle_weather_only", "false") === "true");
   const [defaultSimpleMode, setDefaultSimpleMode] = useState(
@@ -116,10 +119,19 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
 
   // Reflect extra-spacing toggles instantly (before saving) so user sees live preview
 
+  useEffect(() => {
+    document.documentElement.dataset.skystyleReduceMotion = String(reduceMotion);
+  }, [reduceMotion]);
+
   function toggleExtraSpacingPage(page: string) {
     setExtraSpacingPages((prev) =>
       prev.includes(page) ? prev.filter((p) => p !== page) : [...prev, page]
     );
+  }
+
+  function replayTutorial(id: "dashboard" | "api-dashboard" | "dev-dashboard", destination: string) {
+    try { localStorage.removeItem(`skystyle_tutorial_seen_${id}`); } catch { /* storage unavailable */ }
+    window.location.assign(destination);
   }
 
   function saveToLocalStorage() {
@@ -129,6 +141,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
     // for AI requests.
     try {
       localStorage.setItem("skystyle_theme_mode", themeMode);
+      localStorage.setItem("skystyle_reduce_motion", String(reduceMotion));
       localStorage.setItem("skystyle_location_consent", String(shareLocation));
       localStorage.setItem("skystyle_weather_only", String(weatherOnly));
       localStorage.setItem("skystyle_simple_mode", String(defaultSimpleMode));
@@ -197,6 +210,10 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
 
       {/* Content */}
       <main id="main-content">
+      <aside className="hidden 2xl:block fixed left-6 top-24 w-40" aria-label="Settings sections">
+        <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>On this page</p>
+        <nav className="space-y-1 text-xs"><a href="#settings-profile" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Profile</a><a href="#settings-appearance" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Appearance</a><a href="#settings-preferences" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Preferences</a><a href="#settings-dashboard" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Dashboard</a><a href="#settings-spacing" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Layout & spacing</a><a href="#settings-tutorials" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Tutorials</a></nav>
+      </aside>
       <div
         className="max-w-2xl mx-auto py-8 space-y-6"
         style={{
@@ -220,7 +237,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
         )}
 
         {/* Gender */}
-        <div
+        <div id="settings-profile"
           className="rounded-2xl p-5 space-y-3"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
@@ -262,7 +279,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
         </div>
 
         {/* Units */}
-        <div
+        <div id="settings-units"
           className="rounded-2xl p-5 space-y-3"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
@@ -289,7 +306,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
         </div>
 
         {/* Appearance */}
-        <div
+        <div id="settings-appearance"
           className="rounded-2xl p-5 space-y-3"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
@@ -313,10 +330,16 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
               </button>
             ))}
           </div>
+          <Toggle
+            checked={reduceMotion}
+            onChange={setReduceMotion}
+            label="Reduce motion"
+            description="Minimises animated weather effects and interface transitions."
+          />
         </div>
 
         {/* Preferences */}
-        <div
+        <div id="settings-preferences"
           className="rounded-2xl p-5 space-y-4"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
@@ -341,7 +364,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
         </div>
 
         {/* ── Dashboard Behaviour ── */}
-        <div
+        <div id="settings-dashboard"
           className="rounded-2xl p-5 space-y-5"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
@@ -442,7 +465,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
         </div>
 
         {/* ── Layout Mode ── */}
-        <div
+        <div id="settings-layout"
           className="rounded-2xl p-5 space-y-4"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
@@ -516,7 +539,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
         </div>
 
         {/* ── Extra Side Spacing ── */}
-        <div
+        <div id="settings-spacing"
           className="rounded-2xl p-5 space-y-4"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
@@ -530,16 +553,21 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
           {extraSpacing && (
             <div className="space-y-2 pt-1">
               <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Apply to pages:</p>
-              {(["dashboard", "account", "settings"] as const).map((page) => (
+              {(["dashboard", "account", "settings", "closet", "feedback", "inbox", "automatic-recommendations"] as const).map((page) => (
                 <Checkbox
                   key={page}
                   checked={extraSpacingPages.includes(page)}
                   onChange={() => toggleExtraSpacingPage(page)}
-                  label={page === "dashboard" ? "Dashboard" : page === "account" ? "Account" : "Settings"}
+                  label={page === "dashboard" ? "Dashboard" : page === "account" ? "Account" : page === "automatic-recommendations" ? "Automatic recommendations" : page[0].toUpperCase() + page.slice(1)}
                 />
               ))}
             </div>
           )}
+        </div>
+
+        <div id="settings-tutorials" className="rounded-2xl p-5 space-y-3" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+          <div><p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>Tutorials</p><p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>Replay any guided tour whenever you need a refresher.</p></div>
+          <div className="flex flex-wrap gap-2">{[["dashboard", "Dashboard", "/dashboard"], ["api-dashboard", "API Dashboard", "/dashboard/api"], ["dev-dashboard", "Dev Dashboard", "/dev"] as const].map(([id, label, destination]) => <button key={id} onClick={() => replayTutorial(id as "dashboard" | "api-dashboard" | "dev-dashboard", destination)} className="rounded-xl px-3 py-2 text-xs font-medium btn-interact" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}>Replay {label} tour</button>)}</div>
         </div>
 
         {/* ── Custom Spacing (drag to resize) ── */}
@@ -615,6 +643,7 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
           <Link href="/settings/privacy" className="underline hover:opacity-70">Privacy Hub</Link>
           <Link href="/account" className="underline hover:opacity-70">Account</Link>
           <a href="https://skystyle-docs.vercel.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70">Docs</a>
+          <a href="https://status.skystyle.app" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70">Status</a>
         </div>
       </div>
       </main>

@@ -5,6 +5,8 @@ import type { Metadata } from "next";
 import FeedbackForm from "@/components/FeedbackForm";
 import HamburgerNav from "@/components/HamburgerNav";
 import { handleSignOut } from "@/app/actions";
+import FeedbackTickets from "@/components/FeedbackTickets";
+import PageSpacingWrapper from "@/components/PageSpacingWrapper";
 
 export const metadata: Metadata = {
   title: "Feedback — Sky Style",
@@ -62,8 +64,7 @@ export default async function FeedbackPage() {
     >
       <HamburgerNav currentPage="feedback" userName={userName} title="💬 Feedback" signOutAction={handleSignOut} isDev={isDev} />
 
-      <div className="flex-1 px-4">
-      <div className="w-full max-w-md mx-auto space-y-6 py-8">
+      <div className="flex-1 px-4"><PageSpacingWrapper page="feedback" className="w-full max-w-md mx-auto space-y-6 py-8">
         {/* Main card */}
         <div
           className="rounded-2xl p-6 space-y-5"
@@ -86,8 +87,8 @@ export default async function FeedbackPage() {
 
           <FeedbackForm isPro={isPro} isDev={isDev} />
         </div>
-      </div>
-      </div>
+        <FeedbackTickets />
+      </PageSpacingWrapper></div>
     </div>
   );
 }

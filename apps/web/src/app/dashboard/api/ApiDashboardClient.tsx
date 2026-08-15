@@ -5,6 +5,8 @@ import Link from "next/link";
 import HamburgerNav from "@/components/HamburgerNav";
 import { handleSignOut } from "@/app/actions";
 import { API_DASHBOARD_ENDPOINTS } from "@/lib/api-key-credits";
+import Tutorial from "@/components/Tutorial";
+import CreditCenter from "@/components/CreditCenter";
 
 interface ApiKey {
   id: string;
@@ -13,6 +15,8 @@ interface ApiKey {
   revoked: boolean;
   credits_remaining?: number;
   credits_used?: number;
+  nickname?: string | null;
+  folder?: string | null;
 }
 
 interface UsagePoint {
@@ -105,6 +109,8 @@ export default function ApiDashboardClient() {
   const [busyAction, setBusyAction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [newApiKey, setNewApiKey] = useState<string | null>(null);
+  const [newKeyNickname, setNewKeyNickname] = useState("");
+  const [newKeyFolder, setNewKeyFolder] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
   const showToast = (message: string) => {
@@ -179,13 +185,14 @@ export default function ApiDashboardClient() {
     setBusyAction(true);
     setError(null);
     try {
-      const res = await fetch("/api/api-keys", { method: "POST" });
+      const res = await fetch("/api/api-keys", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nickname: newKeyNickname, folder: newKeyFolder }) });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(typeof data.error === "string" ? data.error : "Failed to create API key.");
       }
       const data = await res.json();
       setNewApiKey(typeof data.apiKey === "string" ? data.apiKey : null);
+      setNewKeyNickname(""); setNewKeyFolder("");
       await refreshAll();
       showToast("API key created.");
     } catch (err) {
@@ -193,6 +200,12 @@ export default function ApiDashboardClient() {
     } finally {
       setBusyAction(false);
     }
+  }
+
+  async function updateApiKey(id: string, updates: { nickname?: string; folder?: string }) {
+    const res = await fetch("/api/api-keys", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...updates }) });
+    if (!res.ok) { setError("Unable to update API key details."); return; }
+    await refreshAll();
   }
 
   async function revokeApiKey(id: string) {
@@ -205,7 +218,7 @@ export default function ApiDashboardClient() {
       const res = await fetch("/api/api-keys", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ id, action: "revoke" }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -220,7 +233,9 @@ export default function ApiDashboardClient() {
     }
   }
 
-  return (
+  return (<>
+    <Tutorial id="api-dashboard" title="API Dashboard tour" steps={[{ title: "Create a key", body: "Generate a key and copy it immediately; the full key is only shown once." }, { title: "Track usage", body: "Review requests, error responses, latency, and sanitized request diagnostics." }, { title: "Control access", body: "Revoke keys when they are no longer needed." }]} />
+
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       <HamburgerNav
         currentPage="other"
@@ -234,6 +249,7 @@ export default function ApiDashboardClient() {
       />
 
       <main id="main-content" className="max-w-5xl mx-auto px-4 py-8 space-y-6">
+        <CreditCenter keys={apiKeys} onChanged={refreshAll} />
         {error && (
           <div
             role="alert"
@@ -252,9 +268,10 @@ export default function ApiDashboardClient() {
                 API Key Management
               </p>
               <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>
-                Create and revoke keys. Full keys are shown only once at creation.
+                Create and revoke keys. Full keys are shown only once at creation. Free accounts can keep 3 active keys, Pro 20, and developers are unlimited.
               </p>
             </div>
+            <div className="flex flex-col sm:flex-row gap-2"><input value={newKeyNickname} onChange={(event) => setNewKeyNickname(event.target.value)} maxLength={80} placeholder="Key nickname (optional)" className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }} /><input value={newKeyFolder} onChange={(event) => setNewKeyFolder(event.target.value)} maxLength={80} placeholder="Folder/group (optional)" className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }} /></div>
             <button
               onClick={createApiKey}
               disabled={busyAction}
@@ -308,7 +325,9 @@ export default function ApiDashboardClient() {
               {apiKeys.map((key) => (
                 <div key={key.id} className="flex items-center justify-between gap-3 p-3 rounded-xl" style={{ background: "var(--background)" }}>
                   <div>
-                    <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{key.key_preview}</p>
+                    <p className="text-sm font-medium" style={{ color: "var(--foreground)" }}>{key.nickname || key.key_preview}</p>
+                    <div className="flex gap-2 mt-2"><input aria-label="API key nickname" defaultValue={key.nickname ?? ""} onBlur={(event) => event.currentTarget.value !== (key.nickname ?? "") && void updateApiKey(key.id, { nickname: event.currentTarget.value })} placeholder="Nickname" className="w-28 rounded px-2 py-1 text-xs" style={{ background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--card-border)" }} /><input aria-label="API key folder" defaultValue={key.folder ?? ""} onBlur={(event) => event.currentTarget.value !== (key.folder ?? "") && void updateApiKey(key.id, { folder: event.currentTarget.value })} placeholder="Folder/group" className="w-28 rounded px-2 py-1 text-xs" style={{ background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--card-border)" }} /></div>
+                    <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.45 }}>{key.key_preview}{key.folder ? ` · ${key.folder}` : ""}</p>
                     <p className="text-xs mt-0.5" aria-label={`Created date ${new Date(key.created_at).toLocaleString(undefined, DATE_TIME_OPTIONS)}`} style={{ color: "var(--foreground)", opacity: 0.45 }}>
                       Created {new Date(key.created_at).toLocaleString(undefined, DATE_TIME_OPTIONS)}
                     </p>
@@ -482,6 +501,6 @@ export default function ApiDashboardClient() {
         </div>
       )}
     </div>
-  );
+  </>);
 }
 

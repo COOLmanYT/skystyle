@@ -1,4 +1,5 @@
-const DEFAULT_INITIAL_API_KEY_CREDITS = 100;
+const DEFAULT_INITIAL_API_KEY_CREDITS = 50;
+export const API_CREDITS_PER_AUD_DOLLAR = 50;
 const MIN_CHARGE = 0;
 
 export const API_ENDPOINT_CREDIT_COSTS: Record<string, number> = {

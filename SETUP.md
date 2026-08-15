@@ -10,7 +10,7 @@ This repository uses a monorepo-style layout:
 - `apps/docs` - VitePress docs site
 - `apps/api` - future standalone API placeholder
 
-The current deployment is still a work in progress / proof of concept at `https://what2wear-two.vercel.app`.
+The intended production deployment is `https://skystyle.app`; preview deployments use their own Vercel URL.
 
 ## Deploying to Vercel
 

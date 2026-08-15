@@ -123,6 +123,7 @@ export type SecurityEventType =
   | "passkey_added"
   | "passkey_removed"
   | "api_key_created"
+  | "api_key_updated"
   | "api_key_revoked"
   | "mfa_enabled"
   | "mfa_disabled"

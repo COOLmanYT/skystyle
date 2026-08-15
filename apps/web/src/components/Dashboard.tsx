@@ -12,6 +12,7 @@ import Link from "next/link";
 import Checkbox from "@/components/Checkbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HamburgerNav from "@/components/HamburgerNav";
+import Tutorial from "@/components/Tutorial";
 import { getAllModels, isModelAvailable, ModelID, type PlanningData } from "@/lib/ai";
 import type { DailyLimitsInfo } from "@/lib/daily-usage";
 
@@ -907,6 +908,7 @@ export default function Dashboard({
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--background)" }}>
+      <Tutorial id="dashboard" title="Dashboard tour" steps={[{ title: "Choose a location", body: "Use the weather panel to enter a location or use GPS." }, { title: "Set your preferences", body: "Adjust planning and closet options before generating an outfit." }, { title: "Continue the conversation", body: "Use follow-ups to refine an outfit once it is ready." }]} />
       {showUpgradeModal && (
         <UpgradePlanModal onClose={() => setShowUpgradeModal(false)} />
       )}
@@ -935,6 +937,11 @@ export default function Dashboard({
                 );
               }
             } catch { /* ignore */ }
+            void fetch("/api/inbox/changelog", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ version: loginPopupEntry.version, title: loginPopupEntry.title, body: loginPopupEntry.description ?? loginPopupEntry.content ?? "" }),
+            });
             setLoginPopupEntry(null);
           }}
         />
@@ -2577,6 +2584,8 @@ export default function Dashboard({
           <a href="https://openai.com/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OpenAI</a>
           {" · "}
           <a href="https://deepmind.google/technologies/gemini/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Google Gemini</a>
+          {" · "}
+          <a href="https://mistral.ai/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>Mistral AI</a>
           {" · Geocoding: "}
           <a href="https://nominatim.openstreetmap.org/" target="_blank" rel="noopener noreferrer" className="underline hover:opacity-70" style={{ color: "var(--foreground)" }}>OSM Nominatim</a>
           {" · Hosted on "}

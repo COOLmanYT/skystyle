@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import Tutorial from "@/components/Tutorial";
+import { sanitizeUrl } from "@/lib/sanitize-url";
 
 interface DeletionRequest {
   id: string;
@@ -96,6 +98,7 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
+      <Tutorial id="dev-dashboard" title="Dev Dashboard tour" steps={[{ title: "Triage requests", body: "Review deletion requests and record the resolution." }, { title: "Support users", body: "Use chat and ticket replies to communicate with users." }, { title: "Publish carefully", body: "Preview Changelog content before publishing it." }]} />
       {/* Nav */}
       <nav
         className="sticky-nav px-4 py-3"
@@ -118,13 +121,15 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
       </nav>
 
       <div className="max-w-6xl mx-auto px-4 py-6">
-        {/* Tab Bar */}
-        <div className="flex gap-2 flex-wrap mb-6">
+        <div className="flex gap-6 items-start">
+        <aside className="hidden md:block sticky top-20 w-40 shrink-0" aria-label="Dev Dashboard sections">
+          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>On this page</p>
+          <div className="space-y-1">
           {navItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setSection(item.id)}
-              className="rounded-xl px-4 py-2 text-sm font-medium btn-interact"
+              className="w-full text-left rounded-xl px-3 py-2 text-sm font-medium btn-interact"
               style={{
                 background: section === item.id ? "var(--foreground)" : "var(--card)",
                 color: section === item.id ? "var(--background)" : "var(--foreground)",
@@ -135,6 +140,11 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
               {item.emoji} {item.label}
             </button>
           ))}
+          </div>
+        </aside>
+        <div className="flex-1 min-w-0">
+        <div className="md:hidden flex gap-2 flex-wrap mb-6">
+          {navItems.map((item) => <button key={item.id} onClick={() => setSection(item.id)} className="rounded-xl px-3 py-2 text-xs btn-interact" style={{ background: section === item.id ? "var(--foreground)" : "var(--card)", color: section === item.id ? "var(--background)" : "var(--foreground)", border: "1px solid var(--card-border)" }}>{item.emoji} {item.label}</button>)}
         </div>
 
         {/* Triage */}
@@ -335,6 +345,8 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
 
         {/* Health */}
         {section === "health" && <HealthPanel />}
+        </div>
+        </div>
       </div>
 
       {/* Toast */}
@@ -385,7 +397,7 @@ const EMPTY_ENTRY: Omit<ChangelogEntry, "date" | "id"> = {
   slug: "",
   large: false,
   showOnNextLogin: false,
-  published: true,
+  published: false,
 };
 
 const SKY_MARKDOWN_GUIDE = `## Standard Markdown
@@ -395,6 +407,10 @@ const SKY_MARKDOWN_GUIDE = `## Standard Markdown
 > Blockquote
 - Unordered list item
 1. Ordered list item
+---
+| Column | Value |
+| --- | ---: |
+| Left | Right |
 \`\`\`
 code block
 \`\`\`
@@ -454,6 +470,9 @@ function ChangelogCMS() {
 
   async function handleSave() {
     if (!form.version.trim() || !form.title.trim()) { setSaveError("Version and title are required."); return; }
+    if (form.expanded && !form.slug?.trim()) { setSaveError("A slug is required for an expanded changelog page."); return; }
+    if (Boolean(form.ctaLabel?.trim()) !== Boolean(form.ctaLink?.trim())) { setSaveError("A CTA needs both a label and a link."); return; }
+    if (form.ctaLink?.trim() && !sanitizeUrl(form.ctaLink)) { setSaveError("Use a safe CTA URL or relative path."); return; }
     setSaving(true);
     setSaveError(null);
     const entry: ChangelogEntry = {
@@ -531,9 +550,9 @@ function ChangelogCMS() {
             className="rounded-2xl overflow-hidden"
             style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
           >
-            {form.image && (
+            {(form.image || form.imageUrl) && (
               <div
-                style={{ height: 160, backgroundImage: `url(${form.image})`, backgroundSize: "cover", backgroundPosition: "center" }}
+                style={{ height: 160, backgroundImage: `url(${form.image || form.imageUrl})`, backgroundSize: "cover", backgroundPosition: "center" }}
                 aria-hidden="true"
               />
             )}
@@ -565,7 +584,7 @@ function ChangelogCMS() {
                 />
               )}
               {form.ctaLabel && form.ctaLink && (() => {
-                const safeUrl = form.ctaLink.match(/^https?:\/\//) ? form.ctaLink : null;
+                const safeUrl = sanitizeUrl(form.ctaLink);
                 return (
                   <div className="pt-1">
                     {safeUrl ? (
@@ -614,7 +633,7 @@ function ChangelogCMS() {
                 <option value="post">post</option>
               </select>
             </div>
-            <input value={form.image} onChange={e => setForm(f => ({ ...f, image: e.target.value }))} placeholder="Header image URL (optional)" style={inputStyle} />
+            <input value={form.image || form.imageUrl} onChange={e => setForm(f => ({ ...f, image: e.target.value, imageUrl: e.target.value }))} placeholder="Header image URL (optional)" style={inputStyle} />
             <div className="flex gap-2">
               <input value={form.ctaLabel} onChange={e => setForm(f => ({ ...f, ctaLabel: e.target.value }))} placeholder="CTA Label (optional)" style={{ ...inputStyle, flex: 1 }} />
               <input value={form.ctaLink} onChange={e => setForm(f => ({ ...f, ctaLink: e.target.value }))} placeholder="CTA Link (optional)" style={{ ...inputStyle, flex: 1 }} />
@@ -686,9 +705,11 @@ function HealthPanel() {
     supabase: ServiceCheck;
     weather: ServiceCheck;
     ai: ServiceCheck & { provider: string };
+    mistral: ServiceCheck;
     env: {
       openaiConfigured: boolean;
       geminiConfigured: boolean;
+      mistralConfigured: boolean;
       openweatherConfigured: boolean;
       supabaseConfigured: boolean;
       nodeEnv: string;
@@ -766,7 +787,7 @@ function HealthPanel() {
       {health ? (
         <>
           {/* Service Status Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             {(
               [
                 {
@@ -777,6 +798,7 @@ function HealthPanel() {
                     : "OpenWeatherMap · Not configured",
                 },
                 { label: "AI Provider", svc: health.ai, sub: health.ai.provider !== "none" ? health.ai.provider : "—" },
+                { label: "Mistral", svc: health.mistral, sub: health.env.mistralConfigured ? "Fallback provider" : "Not configured" },
                 { label: "Supabase DB", svc: health.supabase, sub: "PostgreSQL" },
               ] as { label: string; svc: ServiceCheck; sub: string }[]
             ).map((item) => (
@@ -816,10 +838,11 @@ function HealthPanel() {
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
               API Response Latency
             </p>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { label: "Weather", ms: health.weather.latencyMs },
                 { label: "AI Provider", ms: health.ai.latencyMs },
+                { label: "Mistral", ms: health.mistral.latencyMs },
                 { label: "Supabase", ms: health.supabase.latencyMs },
               ].map((r) => (
                 <div key={r.label} className="text-center">
@@ -853,6 +876,7 @@ function HealthPanel() {
               {[
                 { label: "OpenAI", ok: health.env.openaiConfigured },
                 { label: "Gemini", ok: health.env.geminiConfigured },
+                { label: "Mistral", ok: health.env.mistralConfigured },
                 { label: "OpenWeather", ok: health.env.openweatherConfigured },
                 { label: "Supabase", ok: health.env.supabaseConfigured },
               ].map((e) => (

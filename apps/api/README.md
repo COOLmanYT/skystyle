@@ -1,6 +1,6 @@
 # Sky Style API (Placeholder)
 
-This folder contains the API service at `https://what2wear-two.vercel.app/`. (to be updated to subdomain when domain is obtained)
+The public API is served by the web app at `https://skystyle.app/api/v1/`. A separate `api.skystyle.app` host is reserved for a future standalone service.
 
 ## Current status
 

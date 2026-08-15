@@ -9,4 +9,8 @@ This repository is configured to use `NEXT_PUBLIC_SITE_URL=https://skystyle.app`
 5. In Supabase Auth URL Configuration, set the Site URL to `https://skystyle.app` and allow `https://skystyle.app/**` plus the Vercel preview URLs required for testing.
 6. Verify sign-in, sign-out, passwordless/provider callbacks, API requests, canonical URLs, and the `www` redirect. Only then redirect or retire the old production hostname.
 
+## Documentation host
+
+Deploy `apps/docs` as its own Vercel project, then add `docs.skystyle.app` to that project and create the Vercel DNS record supplied for the hostname. Set `DOCS_SITE_URL=https://docs.skystyle.app` in the docs project, redeploy, and verify the VitePress sitemap/canonical URLs before retiring `skystyle-docs.vercel.app`.
+
 The public API remains at `https://skystyle.app/api/v1/*`; no CORS change is required because it already permits external clients.

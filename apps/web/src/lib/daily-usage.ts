@@ -90,7 +90,18 @@ export async function canUseFeature(
 ): Promise<{ allowed: boolean; used: number; limit: number }> {
   const usage = await getDailyUsage(userId);
   const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
-  const limit = LIMITS[tier][field];
+  let limit = LIMITS[tier][field];
+  if (field === "ai_uses" && !isDev && !isDemo) {
+    const { data: accessControl, error } = await supabaseAdmin
+      .from("user_access_controls")
+      .select("app_daily_ai_limit")
+      .eq("user_id", userId)
+      .maybeSingle();
+    if (error) throw error;
+    if (typeof accessControl?.app_daily_ai_limit === "number") {
+      limit = Math.min(limit, accessControl.app_daily_ai_limit);
+    }
+  }
   const used = usage[field];
   return { allowed: used < limit, used, limit };
 }

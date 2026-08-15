@@ -4,6 +4,7 @@ import PageSpacingWrapper from "@/components/PageSpacingWrapper";
 import DevNavBar from "@/components/DevNavBar";
 import Link from "next/link";
 import { getDevEmails } from "@/lib/dev-auth";
+import Tutorial from "@/components/Tutorial";
 
 export default async function DevLandingPage() {
   const session = await auth();
@@ -12,6 +13,7 @@ export default async function DevLandingPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
+      <Tutorial id="dev-dashboard" title="Dev Dashboard tour" steps={[{ title: "Choose a workspace", body: "Open triage, support, changelog, health, or operations from this Dev Center." }, { title: "Monitor safely", body: "Operations shows sanitized API diagnostics and user controls." }, { title: "Publish carefully", body: "Use the Changelog CMS preview before changing public posts." }]} />
       <DevNavBar email={session.user.email} />
 
       <main id="main-content">
@@ -55,6 +57,13 @@ export default async function DevLandingPage() {
                 title: "System Health",
                 desc: "API usage, error rates, and diagnostics",
                 color: "#bf5af2",
+              },
+              {
+                href: "/dev/operations",
+                emoji: "🛠️",
+                title: "Operations",
+                desc: "Monitor API activity, manage access, and reply to feedback",
+                color: "#0a84ff",
               },
             ].map((card) => (
               <Link

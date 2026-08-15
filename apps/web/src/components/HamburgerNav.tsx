@@ -262,8 +262,30 @@ export default function HamburgerNav({
                 💬 Feedback
               </button>
 
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  router.push("/inbox");
+                }}
+                className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
+                style={{ color: "var(--foreground)" }}
+              >
+                🔔 Inbox
+              </button>
+
+              <button
+                onClick={() => {
+                  setMenuOpen(false);
+                  router.push("/automatic-recommendations");
+                }}
+                className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
+                style={{ color: "var(--foreground)" }}
+              >
+                ⏰ Automatic recommendations
+              </button>
+
               {/* Dev Dashboard (only for dev users) */}
-              {isDev && (
+              {isDev && currentPage === "dashboard" && (
                 <button
                   onClick={() => {
                     setMenuOpen(false);
@@ -341,6 +363,8 @@ export default function HamburgerNav({
               >
                 Privacy Policy
               </Link>
+              <a href="https://skystyle-docs.vercel.app" target="_blank" rel="noopener noreferrer" className="block rounded-xl px-3 py-2 text-xs btn-interact" style={{ color: "var(--foreground)", opacity: 0.6 }}>Docs ↗</a>
+              <a href="https://status.skystyle.app" target="_blank" rel="noopener noreferrer" className="block rounded-xl px-3 py-2 text-xs btn-interact" style={{ color: "var(--foreground)", opacity: 0.6 }}>System status ↗</a>
             </div>
           </div>
         </>

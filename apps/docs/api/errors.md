@@ -67,6 +67,7 @@ Every v1 API response includes the following standard headers:
 | `X-RateLimit-Limit` | Maximum requests allowed per minute. |
 | `X-RateLimit-Remaining` | Requests remaining in the current 60-second window. |
 | `Retry-After` | Seconds to wait before retrying (only present on `429` responses). |
+| `X-Credit-Warning` | Explains when an exhausted API key used one available App Credit instead. |
 | `Cache-Control` | Always `no-store` — API responses must not be cached. |
 | `Access-Control-Allow-Origin` | `*` — the API supports cross-origin requests from any origin. |
 
@@ -74,7 +75,9 @@ Every v1 API response includes the following standard headers:
 
 ## Credits
 
-Each API key starts with **100 credits**. Credits are deducted after each successful request. You can view your current balance in the [API Dashboard](https://skystyle.app/dashboard/api).
+Each API key starts with **50 API Credit**. Credits are deducted after each successful request. You can name and group keys, see their individual balances, and allocate $ Credit in the [API Dashboard](https://skystyle.app/dashboard/api).
+
+When a key has no API Credit, Sky Style uses one available App Credit for the request and returns `X-Credit-Warning` so API clients can surface the fallback. Developers have unlimited API usage. Free accounts may keep 3 active keys; Pro accounts may keep 20.
 
 ### Credit costs
 

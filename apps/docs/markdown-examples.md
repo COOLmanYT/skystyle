@@ -24,14 +24,14 @@ Sky Style uses a single monorepo with separate deployable apps.
 ## Deployment Targets
 
 - skystyle.app: Main product experience
-- skystyle-docs.vercel.app: Documentation and integration guides
+- docs.skystyle.app: Documentation and integration guides
 - api.skystyle.app: Future API endpoint base
 
 ## Environment Notes
 
 The current public preview is still a work-in-progress and proof of concept:
 
-- https://what2wear-two.vercel.app
+- https://skystyle.app
 
 ## Local Development
 

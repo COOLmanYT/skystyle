@@ -66,11 +66,36 @@ async function checkWeatherApi(): Promise<ServiceCheck> {
   }
 }
 
+/** Check Mistral independently so a configured fallback is visible even when
+ * OpenAI or Gemini is currently the preferred provider. */
+async function checkMistralApi(apiKey = process.env.MISTRAL_API_KEY): Promise<ServiceCheck> {
+  if (!apiKey) {
+    return { status: "unconfigured", latencyMs: null, detail: "MISTRAL_API_KEY not set" };
+  }
+  const start = Date.now();
+  try {
+    const res = await fetch("https://api.mistral.ai/v1/models", {
+      headers: { Authorization: `Bearer ${apiKey}` },
+      signal: AbortSignal.timeout(6000),
+    });
+    const latencyMs = Date.now() - start;
+    if (!res.ok) return { status: "degraded", latencyMs, detail: `HTTP ${res.status}` };
+    return { status: "ok", latencyMs, detail: "Mistral reachable" };
+  } catch (err) {
+    return {
+      status: "error",
+      latencyMs: Date.now() - start,
+      detail: err instanceof Error ? err.message : "Request failed",
+    };
+  }
+}
+
 async function checkAiProvider(): Promise<ServiceCheck & { provider: string }> {
   const openaiKey = process.env.OPENAI_API_KEY;
   const geminiKey = process.env.GEMINI_API_KEY;
+  const mistralKey = process.env.MISTRAL_API_KEY;
 
-  if (!openaiKey && !geminiKey) {
+  if (!openaiKey && !geminiKey && !mistralKey) {
     return {
       status: "unconfigured",
       latencyMs: null,
@@ -103,6 +128,7 @@ async function checkAiProvider(): Promise<ServiceCheck & { provider: string }> {
   }
 
   // Gemini fallback
+  if (geminiKey) {
   const start = Date.now();
   try {
     const geminiParams = new URLSearchParams({ key: geminiKey! });
@@ -123,6 +149,11 @@ async function checkAiProvider(): Promise<ServiceCheck & { provider: string }> {
       provider: "gemini",
     };
   }
+  }
+
+  // Mistral fallback
+  const mistral = await checkMistralApi(mistralKey);
+  return { ...mistral, provider: "mistral" };
 }
 
 export async function GET() {
@@ -135,10 +166,11 @@ export async function GET() {
   }
 
   // Run all checks in parallel
-  const [supabase, weather, ai] = await Promise.all([
+  const [supabase, weather, ai, mistral] = await Promise.all([
     checkSupabase(),
     checkWeatherApi(),
     checkAiProvider(),
+    checkMistralApi(),
   ]);
 
   return NextResponse.json({
@@ -146,9 +178,11 @@ export async function GET() {
     supabase,
     weather,
     ai,
+    mistral,
     env: {
       openaiConfigured: !!process.env.OPENAI_API_KEY,
       geminiConfigured: !!process.env.GEMINI_API_KEY,
+      mistralConfigured: !!process.env.MISTRAL_API_KEY,
       openweatherConfigured: !!process.env.OPENWEATHER_API_KEY,
       supabaseConfigured: !!(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY),
       nodeEnv: process.env.NODE_ENV ?? "unknown",

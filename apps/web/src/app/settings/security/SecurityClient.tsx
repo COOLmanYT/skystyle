@@ -35,6 +35,7 @@ const EVENT_LABELS: Record<string, string> = {
   passkey_added: "🪪 Passkey added",
   passkey_removed: "🗑️ Passkey removed",
   api_key_created: "🧩 API key created",
+  api_key_updated: "✏️ API key updated",
   api_key_revoked: "🚫 API key revoked",
   mfa_enabled: "🛡️ 2FA enabled",
   mfa_disabled: "⚠️ 2FA disabled",

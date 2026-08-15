@@ -128,6 +128,19 @@ function getItemText(line: string): string {
   return line.replace(/^\s*(?:[-*]|\d+\.)\s/, "");
 }
 
+function isHorizontalRule(line: string): boolean {
+  return /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/.test(line);
+}
+
+function splitTableRow(line: string): string[] {
+  return line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+}
+
+function isTableDivider(line: string): boolean {
+  const cells = splitTableRow(line);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
+}
+
 function buildList(
   lines: string[],
   startIdx: number,
@@ -417,6 +430,24 @@ export default function MarkdownRenderer({
       i++;
       continue;
     }
+
+    // ── Horizontal rule ─────────────────────────────────────────────────────
+    if (isHorizontalRule(line)) {
+      elements.push(<hr key={`hr-${i}`} style={{ border: 0, borderTop: "1px solid var(--card-border)", margin: "14px 0" }} />);
+      i++;
+      continue;
+    }
+
+    // ── GFM-style table ─────────────────────────────────────────────────────
+    if (i + 1 < lines.length && line.includes("|") && isTableDivider(lines[i + 1])) {
+      const headers = splitTableRow(line);
+      const alignments = splitTableRow(lines[i + 1]).map((cell) => cell.startsWith(":") && cell.endsWith(":") ? "center" : cell.endsWith(":") ? "right" : "left");
+      i += 2;
+      const rows: string[][] = [];
+      while (i < lines.length && lines[i].includes("|") && lines[i].trim()) { rows.push(splitTableRow(lines[i])); i++; }
+      elements.push(<div key={`table-${i}`} style={{ overflowX: "auto", margin: "8px 0" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9em" }}><thead><tr>{headers.map((header, index) => <th key={index} style={{ textAlign: alignments[index], padding: "7px 9px", borderBottom: "2px solid var(--card-border)" }}>{renderInline(header, closetItems, `th-${i}-${index}`)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex} style={{ textAlign: alignments[cellIndex], padding: "7px 9px", borderBottom: "1px solid var(--card-border)" }}>{renderInline(row[cellIndex] ?? "", closetItems, `td-${i}-${rowIndex}-${cellIndex}`)}</td>)}</tr>)}</tbody></table></div>);
+      continue;
+    }
     if (trimmed.startsWith("### ")) {
       elements.push(
         <h3 key={i} className="text-sm font-semibold mt-2 mb-0.5" style={{ color: "var(--foreground)", opacity: 0.8 }}>
@@ -505,6 +536,8 @@ export default function MarkdownRenderer({
       !lines[i].trim().startsWith("#") &&
       !lines[i].trim().startsWith("> ") &&
       !lines[i].trim().startsWith("```") &&
+      !isHorizontalRule(lines[i]) &&
+      !(i + 1 < lines.length && lines[i].includes("|") && isTableDivider(lines[i + 1])) &&
       !isUnorderedItem(lines[i]) &&
       !isOrderedItem(lines[i]) &&
       !tryParseCustomBlock(lines[i].trim())

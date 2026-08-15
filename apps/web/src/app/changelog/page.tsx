@@ -218,6 +218,11 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
                       {entry.category}
                     </span>
                   )}
+                  {entry.type && (
+                    <span className="text-xs px-2 py-0.5 rounded-lg" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)", opacity: 0.7 }}>
+                      {entry.type}
+                    </span>
+                  )}
                   {entry.large && (
                     <span
                       className="text-xs px-2 py-0.5 rounded-lg font-medium"
@@ -286,7 +291,7 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
                 )}
 
                 {/* Expanded slug entries get a page link */}
-                {entry.expanded && entry.slug && !entry.large && (
+                {entry.expanded && entry.slug && (
                   <div className="pt-1">
                     <Link
                       href={`/changelog/${entry.slug}`}

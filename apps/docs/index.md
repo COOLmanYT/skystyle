@@ -16,6 +16,9 @@ hero:
     - theme: alt
       text: Platform Guide
       link: /markdown-examples
+    - theme: alt
+      text: Open Sky Style
+      link: https://skystyle.app
 
 features:
   - title: AI Outfit API
@@ -41,6 +44,7 @@ features:
 - [GET /weather](/api/weather)
 - [GET /closet](/api/closet)
 - [Errors & Credits](/api/errors)
+- [Web app guide](/web-app)
 
 ## Development
 

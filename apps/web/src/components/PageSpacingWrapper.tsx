@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 
 interface PageSpacingWrapperProps {
-  page: "dashboard" | "account" | "settings";
+  page: string;
   className?: string;
   style?: React.CSSProperties;
   children: React.ReactNode;
