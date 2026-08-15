@@ -12,7 +12,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return NextResponse.json({ error: "Invalid user id." }, { status: 400 });
 
   const [profile, settings, closet, dailyUsage, feedback, securityLogs, passkeys, deletionRequest, inbox, apiKeys] = await Promise.all([
-    supabaseAdmin.from("users").select("id, name, email, image, is_pro, is_dev, pending_deletion, mfa_enabled").eq("id", userId).maybeSingle(),
+    supabaseAdmin.from("users").select("id, name, email, image, is_pro, is_dev, mfa_enabled").eq("id", userId).maybeSingle(),
     supabaseAdmin.from("settings").select("*").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("closet").select("*").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("daily_usage").select("*").eq("user_id", userId).order("usage_date", { ascending: false }),
@@ -46,7 +46,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
     exported_at: new Date().toISOString(),
     exported_by: "Sky Style developer",
     schema_version: "5.1.0",
-    profile: profile.data,
+    profile: { ...profile.data, pending_deletion: deletionRequest.data?.status === "pending" },
     settings: settings.data ?? null,
     closet: closet.data ?? null,
     daily_usage: dailyUsage.data ?? [],

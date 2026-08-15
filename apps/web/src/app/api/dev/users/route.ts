@@ -17,16 +17,18 @@ function missingColumn(error: { code?: string; message?: string } | null, column
   return !!error && (error.code === "42703" || error.code === "PGRST204") && (error.message ?? "").includes(column);
 }
 
+type UserRow = { id: string; name: string | null; email: string | null; is_pro: boolean; is_dev: boolean; created_at: string | null; pending_deletion: boolean };
+
 export async function GET() {
   const session = await requireDev();
   if (!session?.user?.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const usersResult = await supabaseAdmin.from("users").select("id, name, email, is_pro, is_dev, pending_deletion, created_at").order("email").limit(500);
-  let userRows = usersResult.data;
+  let userRows: UserRow[] = (usersResult.data ?? []) as UserRow[];
   let usersError = usersResult.error;
-  if (missingColumn(usersError, "created_at")) {
-    const legacyUsersResult = await supabaseAdmin.from("users").select("id, name, email, is_pro, is_dev, pending_deletion").order("email").limit(500);
-    userRows = (legacyUsersResult.data ?? []).map((user) => ({ ...user, created_at: null }));
+  if (missingColumn(usersError, "created_at") || missingColumn(usersError, "pending_deletion")) {
+    const legacyUsersResult = await supabaseAdmin.from("users").select("id, name, email, is_pro, is_dev").order("email").limit(500);
+    userRows = (legacyUsersResult.data ?? []).map((user) => ({ ...user, created_at: null, pending_deletion: false }));
     usersError = legacyUsersResult.error;
   }
   const [controlsResult, usageResult, creditsResult, apiKeysResult, feedbackResult, deletionResult] = await Promise.all([
@@ -53,7 +55,7 @@ export async function GET() {
   const pendingDeletion = new Set((deletionResult.data ?? []).filter((row) => row.status === "pending").map((row) => row.user_id));
   const apiKeys = apiKeysResult.data ?? [];
 
-  return NextResponse.json((userRows ?? []).map((user) => ({
+  return NextResponse.json(userRows.map((user) => ({
     ...user,
     plan: user.is_dev ? "dev" : user.is_pro ? "pro" : "free",
     joinedAt: user.created_at ?? null,
