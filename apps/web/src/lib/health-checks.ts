@@ -1,15 +1,20 @@
 /**
- * Shared health-check logic for the public /api/health* endpoints.
+ * Shared health-check logic for the public /api/v1/health* endpoints.
  *
  * These checks are intentionally lightweight: each provider is pinged once
  * with a cheap request and a short timeout. Checks never reveal secret
  * material — only whether a key is configured and the provider is reachable.
+ * Every check reports its round-trip latency so callers can see both the
+ * per-service response time and Sky Style's own response time.
  *
  * Used by:
- *   - GET /api/health         (overall Sky Style health, no auth)
- *   - GET /api/health/ai      (AI provider health, optional ?provider=)
- *   - GET /api/health/weather (weather provider health, optional ?provider=)
+ *   - GET /api/v1/health         (overall Sky Style health, no auth)
+ *   - GET /api/v1/health/ai      (AI provider health, optional ?provider=)
+ *   - GET /api/v1/health/weather (weather provider health, optional ?provider=)
+ *   - GET /api/v1/health/db      (database connection health)
  */
+
+import { getSupabaseAdmin } from "./supabase";
 
 /** A single health-check result for one provider or subsystem. */
 export interface ServiceCheck {
@@ -317,6 +322,52 @@ export async function checkBom(): Promise<ProviderCheck> {
   }
 }
 
+/**
+ * Check the Supabase database connection by selecting a single row from the
+ * `users` table. Requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.
+ */
+export async function checkSupabase(): Promise<ProviderCheck> {
+  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return {
+      provider: "supabase",
+      configured: false,
+      ...unconfigured("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set"),
+    };
+  }
+  const start = Date.now();
+  try {
+    const { error } = await getSupabaseAdmin()
+      .from("users")
+      .select("id")
+      .limit(1);
+    const latencyMs = timed(start);
+    if (error) {
+      return {
+        provider: "supabase",
+        configured: true,
+        status: "degraded",
+        latencyMs,
+        detail: error.message,
+      };
+    }
+    return {
+      provider: "supabase",
+      configured: true,
+      status: "ok",
+      latencyMs,
+      detail: "Database reachable",
+    };
+  } catch (err) {
+    return {
+      provider: "supabase",
+      configured: true,
+      status: "error",
+      latencyMs: timed(start),
+      detail: err instanceof Error ? err.message : "Request failed",
+    };
+  }
+}
+
 const AI_CHECKS: Record<AiProvider, () => Promise<ProviderCheck>> = {
   openai: () => checkOpenAI(),
   gemini: () => checkGemini(),
@@ -390,4 +441,85 @@ export function aggregateStatus(checks: ProviderCheck[]): ServiceCheck["status"]
   if (statuses.has("degraded")) return "degraded";
   if (statuses.has("unconfigured") && !statuses.has("error")) return "unconfigured";
   return "error";
+}
+
+
+/** The status and round-trip response time of a single service category. */
+export interface ServiceCategoryHealth {
+  status: ServiceCheck["status"];
+  responseTime: number | null;
+}
+
+/** Per-category health used by the consolidated /api/v1/health response. */
+export interface ServicesHealth {
+  database: ServiceCategoryHealth;
+  ai: ServiceCategoryHealth;
+  weather: ServiceCategoryHealth;
+}
+
+/**
+ * Measure the response time of a category by running its checks and summing
+ * the parallel wall-clock cost. Falls back to null when no checks ran.
+ */
+function categoryResponseTime(checks: ProviderCheck[]): number | null {
+  const measured = checks
+    .map((c) => c.latencyMs)
+    .filter((v): v is number => typeof v === "number");
+  if (measured.length === 0) return null;
+  // Checks run in parallel, so the category response time is the slowest
+  // individual check rather than the sum of all latencies.
+  return Math.max(...measured);
+}
+
+/**
+ * Run all service categories (database, AI, weather) in parallel and return
+ * each category's aggregated status and response time. Used by the
+ * consolidated GET /api/v1/health endpoint.
+ */
+export async function checkAllServices(): Promise<ServicesHealth> {
+  const [database, ai, weather] = await Promise.all([
+    checkSupabase().then((c) => [c]),
+    checkAiProviders(),
+    checkWeatherProviders(),
+  ]);
+
+  return {
+    database: {
+      status: aggregateStatus(database),
+      responseTime: categoryResponseTime(database),
+    },
+    ai: {
+      status: aggregateStatus(ai),
+      responseTime: categoryResponseTime(ai),
+    },
+    weather: {
+      status: aggregateStatus(weather),
+      responseTime: categoryResponseTime(weather),
+    },
+  };
+}
+
+/**
+ * Overall status across all service categories. A category counts as healthy
+ * when its status is "ok" or "unconfigured" (a provider that is simply not
+ * configured is not itself a failure). The overall status is "degraded" when
+ * any category is degraded/error, and "error" only when every category has
+ * failed.
+ */
+export function overallStatus(services: ServicesHealth): ServiceCheck["status"] {
+  const statuses: ServiceCheck["status"][] = [
+    services.database.status,
+    services.ai.status,
+    services.weather.status,
+  ];
+
+  const hasOk = statuses.includes("ok");
+  const hasDegraded = statuses.includes("degraded");
+  const hasError = statuses.includes("error");
+
+  if (hasError && hasOk) return "degraded";
+  if (hasError && hasDegraded) return "degraded";
+  if (hasError && !hasOk && !hasDegraded) return "error";
+  if (hasDegraded) return "degraded";
+  return "ok";
 }

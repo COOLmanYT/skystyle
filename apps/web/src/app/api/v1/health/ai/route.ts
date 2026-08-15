@@ -1,28 +1,28 @@
 export const dynamic = "force-dynamic";
 
 /**
- * GET /api/health/weather
+ * GET /api/v1/health/ai
  *
- * Health of Sky Style's weather providers. No API key required.
+ * Health of Sky Style's AI providers. No API key required.
  *
- * By default, all configured weather providers are checked in parallel. Pass a
+ * By default, all configured AI providers are checked in parallel. Pass a
  * `provider` query parameter to check a single provider.
  *
  * Query parameters:
- *   provider  string  optional  One of: openweather, weatherapi,
- *                               visualcrossing, pirateweather, open-meteo, bom
+ *   provider  string  optional  One of: openai, gemini, mistral
  *
  * Response (200):
- *   status       string              "ok" | "degraded" | "error" | "unconfigured"
- *   providers    ProviderCheck[]     One entry per checked provider
- *   timestamp    string              ISO-8601 UTC timestamp
+ *   status         string              "ok" | "degraded" | "error" | "unconfigured"
+ *   providers      ProviderCheck[]     One entry per checked provider (with latencyMs)
+ *   timestamp      string              ISO-8601 UTC timestamp
+ *   responseTimeMs number              Sky Style's own response time for this request (ms)
  *
  * Each ProviderCheck:
- *   provider   string  Provider identifier (e.g. "openweather")
- *   configured boolean Whether an API key is configured (true for keyless providers)
- *   status     string  "ok" | "degraded" | "error" | "unconfigured"
- *   latencyMs  number  Round-trip latency in ms (null if not checked)
- *   detail     string  Human-readable detail
+ *   provider    string  Provider identifier (e.g. "openai")
+ *   configured  boolean Whether an API key is configured
+ *   status      string  "ok" | "degraded" | "error" | "unconfigured"
+ *   latencyMs   number  Provider round-trip latency in ms (null if not checked)
+ *   detail      string  Human-readable detail
  *
  * Response (400):
  *   error   string  "invalid_provider"
@@ -31,21 +31,23 @@ export const dynamic = "force-dynamic";
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  checkWeatherProviders,
+  checkAiProviders,
   HealthCheckError,
   aggregateStatus,
 } from "@/lib/health-checks";
 
 export async function GET(req: NextRequest) {
+  const start = Date.now();
   const provider = req.nextUrl.searchParams.get("provider")?.trim() || undefined;
 
   try {
-    const providers = await checkWeatherProviders(provider);
+    const providers = await checkAiProviders(provider);
     return NextResponse.json(
       {
         status: aggregateStatus(providers),
         providers,
         timestamp: new Date().toISOString(),
+        responseTimeMs: Date.now() - start,
       },
       {
         headers: {

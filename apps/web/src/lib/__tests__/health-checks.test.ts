@@ -7,13 +7,23 @@
 import {
   aggregateStatus,
   anyOk,
+  overallStatus,
   checkAiProviders,
   checkWeatherProviders,
+  checkSupabase,
+  checkAllServices,
+  ServicesHealth,
   HealthCheckError,
   AI_PROVIDERS,
   WEATHER_PROVIDERS,
   ProviderCheck,
 } from '../health-checks';
+
+// The Supabase admin client is only used by checkSupabase; mock it so the
+// database check does not need real credentials or network access.
+jest.mock('@/lib/supabase', () => ({
+  getSupabaseAdmin: jest.fn(),
+}));
 
 function makeCheck(
   provider: string,
@@ -208,5 +218,162 @@ describe("checkWeatherProviders", () => {
     expect(results).toHaveLength(1);
     expect(results[0].provider).toBe("openweather");
     expect(results[0].status).toBe("ok");
+  });
+});
+
+
+function makeServices(
+  database: ProviderCheck["status"],
+  ai: ProviderCheck["status"],
+  weather: ProviderCheck["status"]
+): ServicesHealth {
+  return {
+    database: { status: database, responseTime: database === "unconfigured" ? null : 10 },
+    ai: { status: ai, responseTime: ai === "unconfigured" ? null : 20 },
+    weather: { status: weather, responseTime: weather === "unconfigured" ? null : 30 },
+  };
+}
+
+describe("overallStatus", () => {
+  it("returns ok when all categories are ok", () => {
+    expect(overallStatus(makeServices("ok", "ok", "ok"))).toBe("ok");
+  });
+
+  it("returns degraded when one category is degraded and the rest ok", () => {
+    expect(overallStatus(makeServices("ok", "degraded", "ok"))).toBe("degraded");
+  });
+
+  it("returns degraded when one category errored but another is ok", () => {
+    expect(overallStatus(makeServices("error", "ok", "ok"))).toBe("degraded");
+  });
+
+  it("returns error when every category has errored", () => {
+    expect(overallStatus(makeServices("error", "error", "error"))).toBe("error");
+  });
+
+  it("returns degraded when error and degraded are mixed without ok", () => {
+    expect(overallStatus(makeServices("error", "degraded", "error"))).toBe("degraded");
+  });
+
+  it("treats unconfigured as healthy when an ok category is present", () => {
+    expect(overallStatus(makeServices("ok", "unconfigured", "unconfigured"))).toBe("ok");
+  });
+});
+
+describe("checkSupabase", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("returns unconfigured when Supabase env vars are missing", async () => {
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const result = await checkSupabase();
+    expect(result.provider).toBe("supabase");
+    expect(result.status).toBe("unconfigured");
+    expect(result.configured).toBe(false);
+  });
+
+  it("returns ok when the database query succeeds", async () => {
+    process.env.SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    const { getSupabaseAdmin } = jest.requireMock("@/lib/supabase");
+    (getSupabaseAdmin as jest.Mock).mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue({ error: null }),
+        }),
+      }),
+    });
+
+    const result = await checkSupabase();
+    expect(result.status).toBe("ok");
+    expect(result.configured).toBe(true);
+    expect(typeof result.latencyMs).toBe("number");
+  });
+
+  it("returns degraded when the database query returns an error", async () => {
+    process.env.SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    const { getSupabaseAdmin } = jest.requireMock("@/lib/supabase");
+    (getSupabaseAdmin as jest.Mock).mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue({ error: { message: "relation not found" } }),
+        }),
+      }),
+    });
+
+    const result = await checkSupabase();
+    expect(result.status).toBe("degraded");
+    expect(result.detail).toBe("relation not found");
+  });
+
+  it("returns error when the database query throws", async () => {
+    process.env.SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    const { getSupabaseAdmin } = jest.requireMock("@/lib/supabase");
+    (getSupabaseAdmin as jest.Mock).mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          limit: jest.fn().mockRejectedValue(new Error("Connection refused")),
+        }),
+      }),
+    });
+
+    const result = await checkSupabase();
+    expect(result.status).toBe("error");
+    expect(result.detail).toBe("Connection refused");
+  });
+});
+
+describe("checkAllServices", () => {
+  const originalEnv = { ...process.env };
+
+  afterEach(() => {
+    process.env = { ...originalEnv };
+  });
+
+  it("returns aggregated status and responseTime per category", async () => {
+    // No provider keys set -> categories will be unconfigured, except the
+    // keyless weather providers which still run a fetch.
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.MISTRAL_API_KEY;
+    delete process.env.SUPABASE_URL;
+    delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    const result = await checkAllServices();
+    expect(result.database.status).toBe("unconfigured");
+    expect(result.database.responseTime).toBeNull();
+    expect(result.ai.status).toBe("unconfigured");
+    expect(result.ai.responseTime).toBeNull();
+    expect(result.weather).toBeDefined();
+    expect(result.weather).toHaveProperty("status");
+    expect(result.weather).toHaveProperty("responseTime");
+  });
+
+  it("reports ok database and unconfigured AI when only Supabase is configured", async () => {
+    process.env.SUPABASE_URL = "https://test.supabase.co";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.MISTRAL_API_KEY;
+    const { getSupabaseAdmin } = jest.requireMock("@/lib/supabase");
+    (getSupabaseAdmin as jest.Mock).mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          limit: jest.fn().mockResolvedValue({ error: null }),
+        }),
+      }),
+    });
+
+    const result = await checkAllServices();
+    expect(result.database.status).toBe("ok");
+    expect(typeof result.database.responseTime).toBe("number");
+    expect(result.ai.status).toBe("unconfigured");
   });
 });
