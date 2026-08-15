@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const plans = [
   { name: "Free", price: "A$0", note: "For everyday weather-aware outfit checks.", items: ["5 AI recommendations each day", "Real-time multi-source weather", "Manual or GPS location", "Up to 3 active API keys"] },
-  { name: "Pro", price: "A$4/month", note: "For more frequent planning and API work.", featured: true, items: ["Everything in Free", "50 App Credit refreshed weekly", "A$1 Credit each calendar month", "Up to 20 active API keys", "Custom prompts and weather sources"] },
+  { name: "Pro", price: "A$4/month", note: "For more frequent planning and API work.", featured: true, items: ["Everything in Free", "50 App Credit refreshed daily", "A$1 Credit each calendar month", "Up to 20 active API keys", "Custom prompts and weather sources"] },
   { name: "Pay as you go", price: "Coming soon", note: "Designed for flexible App Credit later on.", items: ["No purchase flow is live yet", "App Credit can be gifted by a developer", "Credit purchases currently open a support donation", "Details will be announced before launch"] },
 ];
 

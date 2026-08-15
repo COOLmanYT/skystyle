@@ -14,6 +14,7 @@ export async function submitFeedback(data: {
   category: string;
   rating: number;
   comment: string;
+  source?: string;
 }): Promise<{ success: boolean; error?: string; rateLimited?: boolean; retryAfterSeconds?: number }> {
   try {
     const session = await auth();
@@ -55,14 +56,30 @@ export async function submitFeedback(data: {
       .single();
 
     const plan = profile?.is_dev ? "dev" : profile?.is_pro ? "pro" : "free";
+    const source = typeof data.source === "string" && data.source.trim()
+      ? data.source.trim().slice(0, 80)
+      : "Web app";
 
-    const { error } = await supabaseAdmin.from("feedback").insert({
+    let { error } = await supabaseAdmin.from("feedback").insert({
       user_id: userId,
       plan,
       category: data.category,
       rating: data.rating,
       comment: data.comment || null,
+      source,
     });
+
+    // Older databases may not yet have the provenance column. Feedback must
+    // continue to work while the idempotent v5.1.0 migration is being applied.
+    if (error && (error.code === "42703" || error.code === "PGRST204") && error.message.includes("source")) {
+      ({ error } = await supabaseAdmin.from("feedback").insert({
+        user_id: userId,
+        plan,
+        category: data.category,
+        rating: data.rating,
+        comment: data.comment || null,
+      }));
+    }
 
     if (error) {
       return { success: false, error: "Failed to save feedback. Please try again." };

@@ -31,6 +31,7 @@ interface FeedbackFormProps {
   isPro?: boolean;
   isDev?: boolean;
   initialCategory?: string;
+  source?: string;
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -39,6 +40,7 @@ export default function FeedbackForm({
   isPro,
   isDev,
   initialCategory,
+  source,
   onSuccess,
   onCancel,
 }: FeedbackFormProps) {
@@ -101,7 +103,7 @@ export default function FeedbackForm({
     }
     setSubmitting(true);
     setError(null);
-    const result = await submitFeedback({ category, rating, comment });
+      const result = await submitFeedback({ category, rating, comment, source });
     setSubmitting(false);
     if (result.success) {
       setSuccess(true);

@@ -22,7 +22,7 @@ Planned production domain: **https://skystyle.app**
 | | Free | Pro Monthly |
 |---|---|---|
 | Price | A$0 | A$4/mo |
-| AI uses | 20/day | 50 credits/week |
+| AI uses | 20/day | 50 App Credits/day |
 | Follow-ups | 40/day | 400/day |
 | Closet | 4 uses/day | Unlimited |
 | Source picker | 4/day | Unlimited |

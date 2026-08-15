@@ -14,18 +14,41 @@ export async function GET() {
   if (!actor) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const query = supabaseAdmin
     .from("feedback")
-    .select("id, user_id, category, rating, comment, created_at, status, updated_at")
+    .select("id, user_id, category, rating, comment, created_at, status, updated_at, source")
     .order("updated_at", { ascending: false })
     .limit(actor.isDev ? 200 : 50);
   if (!actor.isDev) query.eq("user_id", actor.id);
-  const { data: tickets, error } = await query;
+  let { data: tickets, error } = await query;
+  if (error && (error.code === "42703" || error.code === "PGRST204") && error.message.includes("source")) {
+    const legacyQuery = supabaseAdmin
+      .from("feedback")
+      .select("id, user_id, category, rating, comment, created_at, status, updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(actor.isDev ? 200 : 50);
+    if (!actor.isDev) legacyQuery.eq("user_id", actor.id);
+    const legacyResult = await legacyQuery;
+    tickets = (legacyResult.data ?? []).map((ticket) => ({ ...ticket, source: "Unknown (legacy)" }));
+    error = legacyResult.error;
+  }
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  const senderIds = [...new Set((tickets ?? []).map((ticket) => ticket.user_id).filter((id): id is string => typeof id === "string"))];
+  const { data: senders, error: sendersError } = senderIds.length
+    ? await supabaseAdmin.from("users").select("id, name, email").in("id", senderIds)
+    : { data: [], error: null };
+  if (sendersError) return NextResponse.json({ error: sendersError.message }, { status: 500 });
+  const senderById = new Map((senders ?? []).map((sender) => [sender.id, { name: sender.name, email: sender.email }]));
   const ticketIds = (tickets ?? []).map((ticket) => ticket.id);
   const { data: replies, error: repliesError } = ticketIds.length
     ? await supabaseAdmin.from("feedback_replies").select("id, feedback_id, sender_id, from_dev, body, created_at").in("feedback_id", ticketIds).order("created_at")
     : { data: [], error: null };
   if (repliesError) return NextResponse.json({ error: repliesError.message }, { status: 500 });
-  return NextResponse.json({ tickets: tickets ?? [], replies: replies ?? [] });
+  return NextResponse.json({
+    tickets: (tickets ?? []).map((ticket) => ({
+      ...ticket,
+      sender: senderById.get(ticket.user_id) ?? { name: null, email: null },
+    })),
+    replies: replies ?? [],
+  });
 }
 
 export async function POST(req: NextRequest) {

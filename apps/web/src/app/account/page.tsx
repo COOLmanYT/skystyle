@@ -184,7 +184,7 @@ export default async function AccountPage() {
             </div>
             {isPro && (
               <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-                Pro users have higher limits. Credits are refreshed weekly.
+                Pro users have higher limits. App Credits are refreshed daily.
               </p>
             )}
           </div>
@@ -272,7 +272,7 @@ export default async function AccountPage() {
               </p>
               <ul className="text-sm space-y-2 mt-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
                 <li>✅ Everything in Free</li>
-                <li>✅ 50 credits per week</li>
+                <li>✅ 50 App Credits per day</li>
                 <li>✅ 100 follow-ups/day</li>
                 <li>✅ Unlimited closet &amp; sources</li>
                 <li>✅ Custom AI prompts</li>

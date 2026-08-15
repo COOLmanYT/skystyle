@@ -704,7 +704,7 @@ export default function Home() {
             </p>
             <ul className="text-sm space-y-3 mt-6" style={{ color: "var(--foreground)", opacity: 0.7 }}>
               <li>✅ Everything in Free</li>
-              <li>✅ 50 credits per week</li>
+              <li>✅ 50 App Credits per day</li>
               <li>✅ 100 follow-ups/day</li>
               <li>✅ Unlimited closet &amp; sources</li>
               <li>✅ Custom AI prompts</li>

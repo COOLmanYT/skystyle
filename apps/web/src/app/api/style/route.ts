@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       const balance = await getCredits(userId);
       if (balance <= 0) {
         return NextResponse.json(
-          { error: "Insufficient credits. Your weekly credits reset in a few days." },
+          { error: "Insufficient credits. Your daily App Credits reset tomorrow." },
           { status: 402 }
         );
       }

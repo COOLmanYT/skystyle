@@ -1,12 +1,12 @@
 /**
  * Credits system for Pro users.
- * Pro users receive 50 credits per week.
+ * Pro users receive 50 App Credits per day.
  * Each /api/style call costs 1 credit.
  */
 
 import { supabaseAdmin } from "./supabase";
 
-const WEEKLY_CREDITS = 50;
+export const DAILY_APP_CREDITS = 50;
 export const PRO_MONTHLY_MONEY_CREDIT_CENTS = 100;
 
 export interface CreditRecord {
@@ -15,7 +15,7 @@ export interface CreditRecord {
   last_reset_date: string; // ISO date string
 }
 
-/** Return the current credit balance for a user, resetting weekly if needed. */
+/** Return the current credit balance for a user, resetting daily if needed. */
 export async function getCredits(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin
     .from("credits")
@@ -24,30 +24,29 @@ export async function getCredits(userId: string): Promise<number> {
     .single();
 
   if (error || !data) {
-    // First-time user: initialise with full weekly credits
+    // First-time user: initialise with the full daily allowance.
     await supabaseAdmin.from("credits").insert({
       user_id: userId,
-      current_balance: WEEKLY_CREDITS,
+      current_balance: DAILY_APP_CREDITS,
       last_reset_date: new Date().toISOString().split("T")[0],
     });
-    return WEEKLY_CREDITS;
+    return DAILY_APP_CREDITS;
   }
 
   const record = data as CreditRecord;
-  const lastReset = new Date(record.last_reset_date);
-  const now = new Date();
-  const daysSinceReset = (now.getTime() - lastReset.getTime()) / (1000 * 60 * 60 * 24);
+  const today = new Date().toISOString().split("T")[0];
 
-  // Reset weekly (every 7 days)
-  if (daysSinceReset >= 7) {
+  // Reset once per UTC calendar day. This is deliberately date-based rather
+  // than a rolling 24-hour window so the allowance is predictable.
+  if (record.last_reset_date !== today) {
     await supabaseAdmin
       .from("credits")
       .update({
-        current_balance: WEEKLY_CREDITS,
-        last_reset_date: now.toISOString().split("T")[0],
+        current_balance: DAILY_APP_CREDITS,
+        last_reset_date: today,
       })
       .eq("user_id", userId);
-    return WEEKLY_CREDITS;
+    return DAILY_APP_CREDITS;
   }
 
   return record.current_balance;
@@ -66,7 +65,7 @@ export async function deductCredit(userId: string): Promise<boolean> {
   return true;
 }
 
-/** Read App Credit without creating the Pro weekly allowance for a free user. */
+/** Read App Credit without creating the Pro daily allowance for a free user. */
 export async function getStoredAppCredits(userId: string): Promise<number> {
   const { data, error } = await supabaseAdmin
     .from("credits")

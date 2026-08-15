@@ -62,13 +62,14 @@ CREATE TABLE IF NOT EXISTS users (
   is_pro           boolean NOT NULL DEFAULT false,
   is_dev           boolean NOT NULL DEFAULT false,
   pending_deletion boolean NOT NULL DEFAULT false,
-  mfa_enabled      boolean NOT NULL DEFAULT false
+  mfa_enabled      boolean NOT NULL DEFAULT false,
+  created_at       timestamptz NOT NULL DEFAULT now()
 );
 
 -- ------------------------------------------------------------
--- 2. Credits  (Pro users: 50 per week)
+-- 2. Credits  (Pro users: 50 App Credits per day)
 --    Actively used: /api/style deducts 1 credit per AI call for
---    Pro users. Balance is shown in the dashboard and weekly
+--    Pro users. Balance is shown in the dashboard and daily
 --    reset is handled by src/lib/credits.ts.
 -- ------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS credits (
@@ -166,6 +167,7 @@ CREATE TABLE IF NOT EXISTS public.feedback (
   category   text        NOT NULL,
   rating     integer     NOT NULL CHECK (rating BETWEEN 1 AND 5),
   comment    text,
+  source     text        NOT NULL DEFAULT 'Web app',
   created_at timestamptz NOT NULL DEFAULT now()
 );
 

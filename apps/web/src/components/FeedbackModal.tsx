@@ -9,6 +9,7 @@ interface FeedbackModalProps {
   isPro?: boolean;
   isDev?: boolean;
   initialCategory?: string;
+  source?: string;
 }
 
 export default function FeedbackModal({
@@ -17,6 +18,7 @@ export default function FeedbackModal({
   isPro,
   isDev,
   initialCategory,
+  source,
 }: FeedbackModalProps) {
   useEffect(() => {
     if (isOpen) {
@@ -83,6 +85,7 @@ export default function FeedbackModal({
           isPro={isPro}
           isDev={isDev}
           initialCategory={initialCategory}
+          source={source}
           onSuccess={onClose}
           onCancel={onClose}
         />

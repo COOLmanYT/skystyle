@@ -85,7 +85,7 @@ export default async function FeedbackPage() {
             </p>
           </div>
 
-          <FeedbackForm isPro={isPro} isDev={isDev} />
+          <FeedbackForm isPro={isPro} isDev={isDev} source="Feedback page" />
         </div>
         <FeedbackTickets />
       </PageSpacingWrapper></div>

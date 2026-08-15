@@ -919,6 +919,7 @@ export default function Dashboard({
           isPro={isPro}
           isDev={isDev}
           initialCategory={feedbackCategory}
+          source="Dashboard"
         />
       )}
       {loginPopupEntry && (

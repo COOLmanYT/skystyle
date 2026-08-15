@@ -38,8 +38,26 @@ export default function HamburgerNav({
 }: HamburgerNavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [homeExpanded, setHomeExpanded] = useState(false);
+  const [inboxUnread, setInboxUnread] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    let active = true;
+    const loadInboxIndicator = async () => {
+      try {
+        const res = await fetch("/api/inbox");
+        if (!res.ok || !active) return;
+        const data = await res.json();
+        setInboxUnread(Array.isArray(data.messages) && data.messages.some((message: { read_at?: string | null }) => !message.read_at));
+      } catch {
+        // The indicator is helpful but must never interfere with navigation.
+      }
+    };
+    void loadInboxIndicator();
+    const interval = window.setInterval(loadInboxIndicator, 60_000);
+    return () => { active = false; window.clearInterval(interval); };
+  }, []);
 
   // Close menu on outside click
   useEffect(() => {
@@ -270,7 +288,7 @@ export default function HamburgerNav({
                 className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
                 style={{ color: "var(--foreground)" }}
               >
-                🔔 Inbox
+                🔔 Inbox{inboxUnread && <span className="ml-2 inline-block h-2 w-2 rounded-full" style={{ background: "#ff453a" }} aria-label="New inbox items" />}
               </button>
 
               <button

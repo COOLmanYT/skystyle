@@ -24,7 +24,7 @@ Sky Style keeps three balances distinct:
 | --- | --- |
 | $ Credit (AUD) | Convert $1.00 into 50 API Credit for a key you choose. Pro receives $1.00 each calendar month. |
 | API Credit | Per-key balance consumed by public API requests. |
-| App Credit | In-app balance, including developer gifts and API fallback when a key's API Credit is empty. |
+| App Credit | In-app balance, including developer gifts and API fallback when a key's API Credit is empty. Pro receives 50 App Credits each day. |
 
 API credit purchases are not live yet; the app's donation prompt is intentionally informational.
 
