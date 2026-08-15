@@ -12,7 +12,6 @@ export default defineConfig({
     nav: [
       { text: 'Home', link: '/' },
       { text: 'Web App Guide', link: '/web-app' },
-      { text: 'Platform Guide', link: '/markdown-examples' },
       { text: 'API Reference', link: '/api/' },
       { text: 'Quickstart', link: '/api/quickstart' },
       { text: 'Development', link: '/development' },
@@ -24,8 +23,22 @@ export default defineConfig({
         text: 'Sky Style Docs',
         items: [
           { text: 'Overview', link: '/' },
-          { text: 'Web App Guide', link: '/web-app' },
-          { text: 'Platform Guide', link: '/markdown-examples' },
+        ]
+      },
+      {
+        text: 'Web App Guide',
+        items: [
+          { text: 'Overview', link: '/web-app' },
+          { text: 'Getting Started', link: '/web-app/getting-started' },
+          { text: 'How It Works', link: '/web-app/how-it-works' },
+          { text: 'Dashboard & Closet', link: '/web-app/dashboard' },
+          { text: 'Settings', link: '/web-app/settings' },
+          { text: 'Security & Privacy', link: '/web-app/security-and-privacy' },
+          { text: 'Automatic Recommendations', link: '/web-app/automatic-recommendations' },
+          { text: 'API Dashboard', link: '/web-app/api-dashboard' },
+          { text: 'Custom Weather Sources', link: '/web-app/custom-weather-sources' },
+          { text: 'Account & Support', link: '/web-app/account-and-support' },
+          { text: 'FAQ & Troubleshooting', link: '/web-app/faq' },
         ]
       },
       {

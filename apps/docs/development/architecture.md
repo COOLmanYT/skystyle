@@ -108,6 +108,7 @@ Response with outfit suggestion
 - OpenAI (GPT-4o, GPT-4o Mini)
 - Google Gemini (2.5 Flash, 2.5 Flash Lite)
 - Mistral AI (Large Latest, Small Latest, Ministral)
+- Gemma (served through the Gemini provider — no separate key required)
 
 ### Model Tiering
 
@@ -145,10 +146,12 @@ Bring Your Own Key (BYOK) is supported for all providers. Users can configure th
 
 ### Rate Limits
 
-| Feature | Free | Pro | Dev |
-|---------|------|-----|-----|
-| AI uses | 20/day | ∞ | ∞ |
-| Follow-ups | 40/day | 400/day | ∞ |
-| Closet uses | 4/day | ∞ | ∞ |
-| Source picks | 4/day | ∞ | ∞ |
-| Model switches | 2/week | ∞ | ∞ |
+The `demo` tier is only created automatically when the deployment is a preview/development environment; it multiplies the free limits by 10 for preview testing.
+
+| Feature | Free | Demo | Pro | Dev |
+|---------|------|------|-----|-----|
+| AI uses | 20/day | 200/day | ∞ | ∞ |
+| Follow-ups | 40/day | 400/day | 400/day | ∞ |
+| Closet uses | 4/day | 40/day | ∞ | ∞ |
+| Source picks | 4/day | 40/day | ∞ | ∞ |
+| Model switches | 2/day | 20/day | ∞ | ∞ |

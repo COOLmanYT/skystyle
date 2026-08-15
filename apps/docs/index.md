@@ -14,9 +14,6 @@ hero:
       text: API Reference
       link: /api/
     - theme: alt
-      text: Platform Guide
-      link: /markdown-examples
-    - theme: alt
       text: Open Sky Style
       link: https://skystyle.app
 

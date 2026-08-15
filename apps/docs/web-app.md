@@ -1,20 +1,39 @@
 # Web App Guide
 
-Sky Style combines live weather, your saved closet, and an AI recommendation in one dashboard.
+Sky Style combines live weather, your saved closet, and an AI recommendation in one dashboard. This guide is split into focused pages covering each area of the app.
 
 ## Getting started
 
-1. Create an account at [skystyle.app](https://skystyle.app).
-2. Choose a location manually or permit location access.
+1. Create an account at [skystyle.app](https://skystyle.app) by signing in with GitHub or Google.
+2. On the dashboard, choose a location manually or permit location access.
 3. Add the clothes you actually own in **Closet**.
 4. Generate a recommendation and use follow-up questions to refine it.
 
-## Useful account tools
+New here? Try the [no-login Live Demo](https://skystyle.app/#demo) first to see real weather data.
 
-- **Inbox** keeps recommendation, support, system, and changelog notices together.
-- **Automatic recommendations** store an exact scheduled weather/outfit result for later review.
-- **Settings** controls appearance, layout, dashboard behaviour, spacing, and replayable tutorials.
-- **Account** shows usage, security, privacy controls, and API access.
+## Guides
+
+**Start here:**
+
+- **[Getting Started](./getting-started)** — a step-by-step walkthrough from sign-up to your first refined recommendation.
+- **[How It Works](./how-it-works)** — the end-to-end flow, weather sources, AI models, accuracy scoring, and usage limits.
+
+**Feature reference:**
+
+- **[Dashboard & Closet](./dashboard)** — recommendation modes, weather planning panel, model switching, follow-up questions, BYOK, and your wardrobe.
+- **[Settings](./settings)** — profile, units, appearance, preferences, dashboard behaviour, layout & spacing, and tutorials.
+- **[Security & Privacy](./security-and-privacy)** — 2FA, passkeys, API keys, security log, data export, and account deletion.
+- **[Automatic Recommendations](./automatic-recommendations)** — schedule exact-time outfit recommendations with a manual location.
+- **[API Dashboard](./api-dashboard)** — manage API keys, allocate credits, and view per-key balances.
+- **[Account & Support](./account-and-support)** — the account hub, plans, feedback, inbox, changelog, and service status.
+
+**Advanced:**
+
+- **[Custom Weather Sources](./custom-weather-sources)** — (Pro) add your own HTTPS weather sources with SSRF-safe validation.
+
+**Need help?**
+
+- **[FAQ & Troubleshooting](./faq)** — common questions, error explanations, and fixes.
 
 ## Credits
 
@@ -26,8 +45,4 @@ Sky Style keeps three balances distinct:
 | API Credit | Per-key balance consumed by public API requests. |
 | App Credit | In-app balance, including developer gifts and API fallback when a key's API Credit is empty. Pro receives 50 App Credits each day. |
 
-API credit purchases are not live yet; the app's donation prompt is intentionally informational.
-
-## Help and service status
-
-Use the app Inbox or Feedback page for account help. API users should consult the [API error guide](/api/errors) and the [COOLman service status page](https://status.coolmanyt.com/) for service and downtime information. Monitoring integrations can use its [live component status JSON](https://status.coolmanyt.com/v3/components.json).
+API credit purchases are not live yet; the app's donation prompt is intentionally informational. See [API Dashboard → Credits](./api-dashboard#credits) for details.

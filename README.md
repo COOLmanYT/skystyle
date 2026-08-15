@@ -2,7 +2,7 @@
 
 AI-powered outfit recommendations based on hyper-local weather data. Never overdress or underdress again.
 
-Planned production domain: **https://skystyle.app**
+Production domain: **https://skystyle.app**
 
 [![Buy Me A Coffee](https://img.shields.io/badge/Support_Me!-Buy%20Me%20A%20Coffee-yellow)](https://buymeacoffee.com/coolmanyt)
 
@@ -33,13 +33,13 @@ Planned production domain: **https://skystyle.app**
 
 | Dashboard | Weather Flow |
 |---|---|
-| ![Dashboard overview](apps/docs/images/dashboard-1.png) | ![Weather and recommendation flow](apps/docs/images/dashboard-2.png) |
+| ![Dashboard overview](public/images/dashboard-1.png) | ![Weather and recommendation flow](public/images/dashboard-2.png) |
 
 | Usage + Limits | Account + Security |
 |---|---|
-| ![Usage and limits panel](apps/docs/images/dashboard-3.png) | ![Account settings overview](apps/docs/images/account.png) |
+| ![Usage and limits panel](public/images/dashboard-3.png) | ![Account settings overview](public/images/account.png) |
 
-![Settings page](apps/docs/images/settings.png)
+![Settings page](public/images/settings.png)
 
 ## Architecture
 

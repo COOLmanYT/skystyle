@@ -69,8 +69,7 @@ VALUES (
 - **DO NOT write to `changelog.json`** — the JSON changelog system is fully deprecated and removed.
 - **DO NOT use the JSON file as a fallback** — all changelog reads come from Supabase `changelog_posts`.
 - All completed tasks MUST output a Supabase SQL statement for the changelog.
-- At the end of a Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular chanhelog entry consisting of all changes made in the entire Agent Task.
-- At the end of a Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular changelog entry consisting of all changes made in the entire Agent Task.
+- At the end of an Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular changelog entry consisting of all changes made in the entire Agent Task.
 
 ---
 
@@ -81,9 +80,9 @@ VALUES (
 
 - **Build:** `npm run build` (Next.js 16.1.6 with Turbopack)
 - **Lint:** `npm run lint` (targets `apps/web`)
-- **No test suite** — validate with build + lint only
+- **Tests:** `npm test` (Jest) — run before considering a change complete
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`)
 - **Auth:** NextAuth v5 JWT — `auth()` server-side, `/api/auth/session` client-side
 - **DB:** Supabase admin client at `apps/web/src/lib/supabase.ts`; always set `onConflict` on upserts
-- **Rate limits:** `free` 5 AI/day · `demo` 10× free · `pro` credits · `dev` unlimited
+- **Rate limits:** `free` 20 AI/day · `demo` 10× free · `pro` credits · `dev` unlimited
 - **localStorage prefix:** all keys use `skystyle_` (e.g. `skystyle_last_seen_changelog`)
