@@ -15,7 +15,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
     if (!res.ok) setError(typeof body.error === "string" ? body.error : "Unable to load user profile.");
     else { setData(body); setError(null); }
   }, [userId]);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
   async function update(change: Record<string, unknown>) {
     const res = await fetch("/api/dev/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId, ...change }) });
     const body = await res.json().catch(() => ({}));

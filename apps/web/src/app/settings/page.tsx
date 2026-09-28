@@ -22,5 +22,5 @@ export default async function SettingsPage() {
     } catch { /* Non-fatal */ }
   }
 
-  return <SettingsClient initialUnitPreference={unitPreference} />;
+  return <SettingsClient initialUnitPreference={unitPreference} userId={session.user.id ?? "guest"} />;
 }

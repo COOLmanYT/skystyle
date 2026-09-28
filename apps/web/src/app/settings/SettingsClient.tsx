@@ -5,6 +5,7 @@ import Link from "next/link";
 import Toggle from "@/components/Toggle";
 import Checkbox from "@/components/Checkbox";
 import HamburgerNav from "@/components/HamburgerNav";
+import StyleFeedbackPanel from "@/components/StyleFeedbackPanel";
 import { handleSignOut } from "@/app/actions";
 
 const MAX_GENDER_LENGTH = 30;
@@ -35,9 +36,10 @@ const WEATHER_PLANNING_OPTIONS: { value: WeatherPlanningVisibility; label: strin
 
 interface SettingsClientProps {
   initialUnitPreference: "metric" | "imperial";
+  userId: string;
 }
 
-export default function SettingsClient({ initialUnitPreference }: SettingsClientProps) {
+export default function SettingsClient({ initialUnitPreference, userId }: SettingsClientProps) {
   const [gender, setGender] = useState<string>(() => {
     const stored = getLocalStorage("skystyle_gender", "N/A");
     if (!stored) return "N/A";
@@ -362,6 +364,8 @@ export default function SettingsClient({ initialUnitPreference }: SettingsClient
             label="Default to Simple Mode on Terms & Privacy pages (plain-English summaries)"
           />
         </div>
+
+        <StyleFeedbackPanel userId={userId} showVoting={false} />
 
         {/* ── Dashboard Behaviour ── */}
         <div id="settings-dashboard"

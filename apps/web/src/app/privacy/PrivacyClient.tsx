@@ -90,6 +90,7 @@ export default function PrivacyClient() {
               <li><strong>Gender preference</strong>{" "}— optional. Stored locally on your device and sent to the AI when generating recommendations.</li>
               <li><strong>Closet items</strong>{" "}— optional. Stored so AI can personalise recommendations.</li>
               <li><strong>Daily usage counts</strong>{" "}— for rate limiting only. No request content stored.</li>
+              <li><strong>Private style feedback</strong>{" "}— local by default, or cloud if you choose. Notes, votes, and a short outfit excerpt are sent to Mistral Small for an editable preference summary. Delete it in Dashboard or Settings.</li>
             </ul>
           </div>
           <div
@@ -211,6 +212,7 @@ export default function PrivacyClient() {
                 <strong>Usage counts</strong>{" "}— daily counters for rate limiting (AI uses,
                 follow-ups, closet uses, source picks). No request content is stored.
               </li>
+              <li><strong>Private style feedback</strong>{" "}— votes, optional notes, short outfit excerpts, and an editable summary. Stored on this device by default; cloud storage is optional. There is no automatic expiry. Cloud feedback is deleted with the account; device copies must be deleted in each browser. Mistral processes submitted feedback to summarize preferences, and the saved summary is included with subsequent Style advice.</li>
             </ul>
           </section>
 
@@ -268,6 +270,7 @@ export default function PrivacyClient() {
               <li>
                 <strong>Weather providers:</strong>{" "}OpenWeatherMap, Open-Meteo, BOM, WeatherAPI, Visual Crossing, Pirate Weather — only coordinates are sent.
               </li>
+              <li><strong>Mistral</strong>{" "}— AI outfit advice and feedback preference summaries. The summary service receives votes, notes, and limited outfit text, not account identifiers or API credentials. Provider-side processing and retention are subject to Mistral&apos;s own terms; deleting Sky Style feedback does not recall already processed requests.</li>
               <li>
                 <strong>
                   <a href="https://osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>

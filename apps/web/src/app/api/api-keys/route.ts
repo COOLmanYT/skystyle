@@ -101,7 +101,9 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (hasMissingMetadataColumn(error)) {
-    const { nickname: _nickname, folder: _folder, ...legacyPayload } = insertPayload;
+    const legacyPayload: Partial<typeof insertPayload> = { ...insertPayload };
+    delete legacyPayload.nickname;
+    delete legacyPayload.folder;
     const legacyResult = await supabaseAdmin
       .from("api_keys")
       .insert(legacyPayload)

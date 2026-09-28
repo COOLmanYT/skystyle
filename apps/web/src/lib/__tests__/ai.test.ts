@@ -13,11 +13,6 @@ import {
 } from '../ai';
 import type { ModelID } from '../ai';
 
-import {
-  mockModelConfigs,
-  mockByokModels,
-} from '../../__tests__/mocks';
-
 describe('AI Module - Model Configuration', () => {
   describe('MODEL_PRIORITIES', () => {
     it('should have correct model priorities for pro users', () => {
@@ -210,17 +205,12 @@ describe('AI Module - Model Provider Validation', () => {
 });
 
 describe('AI Module - Model Tier Separation', () => {
-  it('should have no overlap between pro and free model IDs', () => {
+  it('should have unique model IDs within each tier', () => {
     const proIds = new Set(MODEL_PRIORITIES.pro.map(m => m.id));
     const freeIds = new Set(MODEL_PRIORITIES.free.map(m => m.id));
     
-    // Find intersection
-    const overlap = [...proIds].filter(id => freeIds.has(id));
-    
-    // There should be no overlap (free models are subset but with different order)
-    // Actually, some models might be in both tiers, which is fine
-    // The important thing is that pro has more models
-    expect(MODEL_PRIORITIES.pro.length).toBeGreaterThan(MODEL_PRIORITIES.free.length);
+    expect(proIds.size).toBe(MODEL_PRIORITIES.pro.length);
+    expect(freeIds.size).toBe(MODEL_PRIORITIES.free.length);
   });
 
   it('should have pro tier with more models than free tier', () => {

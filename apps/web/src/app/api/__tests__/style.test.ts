@@ -4,52 +4,66 @@
  */
 
 import { POST } from '../style/route';
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 import {
   mockUser,
   mockProUser,
-  mockSession,
+  mockDevUser,
   mockWeatherData,
   mockStyleRecommendation,
-  createMockFetch,
-  createMockFetchError,
 } from '../../../__tests__/mocks';
 
 // Mock dependencies
-jest.mock('@/auth', () => ({
-  auth: jest.fn().mockResolvedValue(mockSession),
-  DEMO_USER_ID: 'demo-user-id',
-}));
+jest.mock('@/auth', () => {
+  const actualMocks = jest.requireActual('../../../__tests__/mocks') as typeof import('../../../__tests__/mocks');
+  return {
+    auth: jest.fn().mockResolvedValue(actualMocks.mockSession),
+    DEMO_USER_ID: 'demo-user-id',
+  };
+});
 
-jest.mock('@/lib/supabase', () => ({
-  supabaseAdmin: {
-    from: jest.fn((table: string) => ({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: mockUser, error: null }),
-      upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
-    })),
-  },
-}));
+jest.mock('@/lib/supabase', () => {
+  const actualMocks = jest.requireActual('../../../__tests__/mocks') as typeof import('../../../__tests__/mocks');
+  return {
+    supabaseAdmin: {
+      from: jest.fn(() => ({
+        select: jest.fn().mockReturnThis(),
+        eq: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({ data: actualMocks.mockUser, error: null }),
+        maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+        upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
+      })),
+    },
+  };
+});
 
-jest.mock('@/lib/weather', () => ({
-  getWeather: jest.fn().mockResolvedValue(mockWeatherData),
-  CustomSource: jest.fn(),
-  SourceMode: jest.fn(),
-  MAX_CUSTOM_SOURCES: 5,
-}));
+jest.mock('@/lib/weather', () => {
+  const actualMocks = jest.requireActual('../../../__tests__/mocks') as typeof import('../../../__tests__/mocks');
+  return {
+    getWeather: jest.fn().mockResolvedValue(actualMocks.mockWeatherData),
+    CustomSource: jest.fn(),
+    SourceMode: jest.fn(),
+    MAX_CUSTOM_SOURCES: 5,
+  };
+});
 
-jest.mock('@/lib/ai', () => ({
-  getStyleRecommendation: jest.fn().mockResolvedValue(mockStyleRecommendation),
-  getDevChatResponse: jest.fn().mockResolvedValue(mockStyleRecommendation),
+jest.mock('@/lib/ai', () => {
+  const actualMocks = jest.requireActual('../../../__tests__/mocks') as typeof import('../../../__tests__/mocks');
+  return {
+  getStyleRecommendation: jest.fn().mockResolvedValue(actualMocks.mockStyleRecommendation),
+  getDevChatResponse: jest.fn().mockResolvedValue(actualMocks.mockStyleRecommendation),
+  getDefaultModel: jest.fn((isPro: boolean, isDev: boolean) => ({
+    id: isPro || isDev ? 'gpt-4o' : 'gemini-2.5-flash',
+  })),
   PlanningData: jest.fn(),
   ModelID: jest.fn(),
   getModelById: jest.fn((modelId: string) => {
     const validModels = ['gpt-4o', 'gemini-2.5-flash', 'mistral-large-latest'];
     return validModels.includes(modelId) ? { id: modelId, provider: 'openai', name: modelId } : null;
   }),
-}));
+  };
+});
 
 jest.mock('@/lib/credits', () => ({
   deductCredit: jest.fn().mockResolvedValue(49),
@@ -85,10 +99,22 @@ function createMockNextRequest(body: unknown): NextRequest {
   } as unknown as NextRequest;
 }
 
+function setMockProfile(profile: typeof mockUser) {
+  (jest.requireMock('@/lib/supabase').supabaseAdmin.from as jest.Mock).mockImplementation(() => ({
+    select: jest.fn().mockReturnThis(),
+    eq: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: profile, error: null }),
+    maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null }),
+    upsert: jest.fn().mockResolvedValue({ data: null, error: null }),
+  }));
+}
+
+afterEach(() => setMockProfile(mockUser));
+
 describe('Style API Route - Authentication', () => {
   it('should return 401 for unauthenticated requests', async () => {
     // Mock unauthenticated session
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue(null);
     
@@ -163,7 +189,7 @@ describe('Style API Route - Input Validation', () => {
     });
     
     // Mock the model validation
-    const aiModule = await import('@/lib/ai');
+    const aiModule = jest.requireMock('@/lib/ai');
     const originalGetModelById = aiModule.getModelById;
     aiModule.getModelById = jest.fn().mockReturnValue({ id: 'gpt-4o', provider: 'openai', name: 'GPT-4o' });
     
@@ -174,6 +200,31 @@ describe('Style API Route - Input Validation', () => {
     // Restore original
     aiModule.getModelById = originalGetModelById;
   });
+
+  it('should reject an invalid recommendation context', async () => {
+    const req = createMockNextRequest({
+      lat: 40.7128,
+      lon: -74.0060,
+      recommendationContext: { budget: { maxAmount: 100, currency: 'CAD' } },
+    });
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toEqual({ error: 'budget.currency must be AUD, USD, EUR, or GBP' });
+  });
+
+  it('passes the combined V6 input range and preferences to the stylist', async () => {
+    const context = {
+      budget: { minAmount: 50, maxAmount: 150, currency: 'AUD' },
+      occasion: { kind: 'date' },
+      event: { at: '2026-09-28T08:30:00.000Z', timeZone: 'Australia/Melbourne' },
+      fragrance: { mode: 'pair', owned: 'citrus fragrance' },
+      feedbackSummary: 'User prefers brief advice',
+    };
+    const response = await POST(createMockNextRequest({ lat: -37.8, lon: 145, recommendationContext: context }));
+    expect(response.status).toBe(200);
+    expect(jest.requireMock('@/lib/ai').getStyleRecommendation).toHaveBeenCalledWith(expect.objectContaining({ recommendationContext: context }));
+    expect((await response.json()).meta.recommendationContext).toEqual(context);
+  });
 });
 
 describe('Style API Route - Model Switch Rate Limiting', () => {
@@ -181,16 +232,16 @@ describe('Style API Route - Model Switch Rate Limiting', () => {
     const req = createMockNextRequest({ 
       lat: 40.7128, 
       lon: -74.0060,
-      modelId: 'gemini-2.5-flash' // Different from default
+      modelId: 'mistral-large-latest' // Different from default
     });
     
     // Mock user as free
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockUser });
     
     // Mock canUseFeature to allow model switch
-    const dailyUsageModule = await import('@/lib/daily-usage');
+    const dailyUsageModule = jest.requireMock('@/lib/daily-usage');
     const originalCanUseFeature = dailyUsageModule.canUseFeature;
     dailyUsageModule.canUseFeature = jest.fn().mockResolvedValue({ 
       allowed: true, 
@@ -211,22 +262,24 @@ describe('Style API Route - Model Switch Rate Limiting', () => {
     const req = createMockNextRequest({ 
       lat: 40.7128, 
       lon: -74.0060,
-      modelId: 'gemini-2.5-flash' // Different from default
+      modelId: 'mistral-large-latest' // Different from default
     });
     
     // Mock user as free
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockUser });
     
     // Mock canUseFeature to deny model switch (at limit)
-    const dailyUsageModule = await import('@/lib/daily-usage');
+    const dailyUsageModule = jest.requireMock('@/lib/daily-usage');
     const originalCanUseFeature = dailyUsageModule.canUseFeature;
-    dailyUsageModule.canUseFeature = jest.fn().mockResolvedValue({ 
-      allowed: false, 
-      used: 2, 
-      limit: 2 
-    });
+    dailyUsageModule.canUseFeature = jest.fn().mockImplementation(
+      (_userId: string, feature: string) => Promise.resolve(
+        feature === 'model_switches'
+          ? { allowed: false, used: 2, limit: 2 }
+          : { allowed: true, used: 0, limit: 20 }
+      )
+    );
     
     const res = await POST(req);
     
@@ -247,12 +300,12 @@ describe('Style API Route - Model Switch Rate Limiting', () => {
     });
     
     // Mock user as pro
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockProUser });
     
     // Mock canUseFeature to allow (pro users have infinite limit)
-    const dailyUsageModule = await import('@/lib/daily-usage');
+    const dailyUsageModule = jest.requireMock('@/lib/daily-usage');
     const originalCanUseFeature = dailyUsageModule.canUseFeature;
     dailyUsageModule.canUseFeature = jest.fn().mockResolvedValue({ 
       allowed: true, 
@@ -362,7 +415,7 @@ describe('Style API Route - Successful Requests', () => {
     });
     
     // Mock user as free
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockUser });
     
@@ -377,13 +430,14 @@ describe('Style API Route - Successful Requests', () => {
   });
 
   it('should include creditsRemaining for pro users', async () => {
+    setMockProfile(mockProUser);
     const req = createMockNextRequest({ 
       lat: 40.7128, 
       lon: -74.0060 
     });
     
     // Mock user as pro
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockProUser });
     
@@ -400,7 +454,7 @@ describe('Style API Route - Successful Requests', () => {
 describe('Style API Route - Error Handling', () => {
   it('should return 502 for weather fetch failure', async () => {
     // Mock weather fetch to fail
-    const weatherModule = await import('@/lib/weather');
+    const weatherModule = jest.requireMock('@/lib/weather');
     const originalGetWeather = weatherModule.getWeather;
     weatherModule.getWeather = jest.fn().mockRejectedValue(new Error('Weather fetch failed'));
     
@@ -421,7 +475,7 @@ describe('Style API Route - Error Handling', () => {
 
   it('should return 502 for AI recommendation failure', async () => {
     // Mock AI recommendation to fail
-    const aiModule = await import('@/lib/ai');
+    const aiModule = jest.requireMock('@/lib/ai');
     const originalGetStyleRecommendation = aiModule.getStyleRecommendation;
     aiModule.getStyleRecommendation = jest.fn().mockRejectedValue(new Error('AI request failed'));
     
@@ -441,13 +495,14 @@ describe('Style API Route - Error Handling', () => {
   });
 
   it('should return 402 for pro users with insufficient credits', async () => {
+    setMockProfile(mockProUser);
     // Mock user as pro with no credits
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockProUser });
     
     // Mock getCredits to return 0
-    const creditsModule = await import('@/lib/credits');
+    const creditsModule = jest.requireMock('@/lib/credits');
     const originalGetCredits = creditsModule.getCredits;
     creditsModule.getCredits = jest.fn().mockResolvedValue(0);
     
@@ -469,12 +524,12 @@ describe('Style API Route - Error Handling', () => {
 
   it('should return 429 for free users at AI limit', async () => {
     // Mock user as free
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockUser });
     
     // Mock canUseFeature to deny AI usage
-    const dailyUsageModule = await import('@/lib/daily-usage');
+    const dailyUsageModule = jest.requireMock('@/lib/daily-usage');
     const originalCanUseFeature = dailyUsageModule.canUseFeature;
     dailyUsageModule.canUseFeature = jest.fn().mockResolvedValue({ 
       allowed: false, 
@@ -501,6 +556,7 @@ describe('Style API Route - Error Handling', () => {
 
 describe('Style API Route - Dev Mode', () => {
   it('should handle dev chat messages for dev users', async () => {
+    setMockProfile(mockDevUser);
     const req = createMockNextRequest({ 
       lat: 0, 
       lon: 0,
@@ -508,7 +564,7 @@ describe('Style API Route - Dev Mode', () => {
     });
     
     // Mock user as dev
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ 
       user: { 
@@ -535,7 +591,7 @@ describe('Style API Route - Dev Mode', () => {
     });
     
     // Mock user as non-dev
-    const authModule = await import('@/auth');
+    const authModule = jest.requireMock('@/auth');
     const originalAuth = authModule.auth;
     authModule.auth = jest.fn().mockResolvedValue({ user: mockUser });
     

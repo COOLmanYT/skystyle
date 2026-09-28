@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { getCredits } from "@/lib/credits";
 import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
+import { getOnboardingState } from "@/lib/onboarding";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -18,6 +19,7 @@ export default async function DashboardPage() {
   let pendingDeletion = false;
   let initialCredits: number | null = null;
   let initialDailyLimits: DailyLimitsInfo | null = null;
+  let initialExperienceMode: "guided" | "advanced" | null = null;
 
   if (userId) {
     try {
@@ -33,6 +35,8 @@ export default async function DashboardPage() {
         initialCredits = await getCredits(userId);
       }
       initialDailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
+      const onboarding = await getOnboardingState(userId);
+      initialExperienceMode = onboarding.experienceMode ?? (onboarding.persistenceAvailable ? "guided" : null);
     } catch {
       // Non-fatal: dashboard still works without credits info
     }
@@ -89,11 +93,13 @@ export default async function DashboardPage() {
         </div>
       )}
       <Dashboard
+        userId={userId ?? "guest"}
         userName={name}
         isPro={isPro}
         isDev={isDev}
         initialCredits={initialCredits}
         initialDailyLimits={initialDailyLimits}
+        initialExperienceMode={initialExperienceMode}
       />
     </>
   );

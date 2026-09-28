@@ -2,15 +2,15 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-## Current version: 5.2.0
+## Current version: 6.0.0
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 
 ## ⚠️ Mandatory: Update the Changelog in Supabase after every task
 
-After completing **any** code change in this repository, you **must** output a Supabase SQL statement to insert a new changelog entry into the `changelog_posts` table. The JSON changelog system has been **fully removed** — Supabase is the **single source of truth** for all changelog data.
+After completing **any** code change in this repository, you **must** prepare a Supabase SQL statement to insert a new changelog entry into the `changelog_posts` table. If the Sky Style Supabase project is accessible, run the statement and verify the entry exists. If it is inaccessible, output the statement for manual execution and clearly say it was not run. The JSON changelog system has been **fully removed** — Supabase is the **single source of truth** for all changelog data.
 
-You do not need to do this **only if** user says so. For example, if the user says "just fix the typo in `README.md` and no changelog entry is needed", then you can skip the changelog update. But for any non-trivial change, always update the changelog in Supabase.
+You do not need to do this **only if** user says so. For example, if the user says "just fix the typo in `README.md` and no changelog entry is needed", then you can skip the changelog update. For any non-trivial change, follow the Supabase access rule above.
 
 ### SQL statement format
 
@@ -26,7 +26,7 @@ VALUES (
 );
 ```
 
-Run this statement in the **Supabase SQL Editor** for the project.
+Run and verify this statement in the Sky Style Supabase project when it is accessible. Do not include access or execution instructions in user-facing output.
 
 ### Optional fields
 
@@ -68,7 +68,7 @@ VALUES (
 
 - **DO NOT write to `changelog.json`** — the JSON changelog system is fully deprecated and removed.
 - **DO NOT use the JSON file as a fallback** — all changelog reads come from Supabase `changelog_posts`.
-- All completed tasks MUST output a Supabase SQL statement for the changelog.
+- For completed code-change tasks, run and verify the changelog SQL when Supabase is accessible. Otherwise, output the SQL and state that it was not run. Never claim an unverified entry was added.
 - At the end of an Agent Task series, you may be asked to "squash" or "merge" changelog entries. If possible, make 1 singular changelog entry consisting of all changes made in the entire Agent Task.
 
 ---
@@ -78,11 +78,11 @@ VALUES (
 
 ## Key codebase facts
 
-- **Build:** `npm run build` (Next.js 16.1.6 with Turbopack)
+- **Build:** `npm run build` (Next.js 16.2.3 with Turbopack)
 - **Lint:** `npm run lint` (targets `apps/web`)
-- **Tests:** `npm test` (Jest) — run before considering a change complete
+- **Tests:** `npm test -- --runInBand` (Jest); validate with tests, build, and lint.
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`)
 - **Auth:** NextAuth v5 JWT — `auth()` server-side, `/api/auth/session` client-side
 - **DB:** Supabase admin client at `apps/web/src/lib/supabase.ts`; always set `onConflict` on upserts
-- **Rate limits:** `free` 20 AI/day · `demo` 10× free · `pro` credits · `dev` unlimited
+- **Current enforcement:** Free 20 AI/day and 40 follow-ups/day; demo 10× Free; Pro uses daily credits; dev unlimited. V6 targets in Notion are not active until cost and launch approval.
 - **localStorage prefix:** all keys use `skystyle_` (e.g. `skystyle_last_seen_changelog`)

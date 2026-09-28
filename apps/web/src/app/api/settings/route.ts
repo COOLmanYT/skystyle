@@ -5,7 +5,7 @@ export const dynamic = "force-dynamic";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { auth, DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
@@ -33,6 +33,41 @@ export async function PATCH(req: NextRequest) {
 
   const userId = session.user.id;
 
+  let updates: Record<string, unknown>;
+  try {
+    updates = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const onboardingUpdates: Record<string, unknown> = {};
+  if (updates.onboarding !== undefined) {
+    if (typeof updates.onboarding !== "object" || updates.onboarding === null || Array.isArray(updates.onboarding)) {
+      return NextResponse.json({ error: "onboarding must be an object" }, { status: 400 });
+    }
+    const onboarding = updates.onboarding as Record<string, unknown>;
+    if (onboarding.experienceMode !== undefined) {
+      if (onboarding.experienceMode !== "guided" && onboarding.experienceMode !== "advanced") {
+        return NextResponse.json({ error: "Invalid onboarding experience mode" }, { status: 400 });
+      }
+      onboardingUpdates.experience_mode = onboarding.experienceMode;
+    }
+    if (onboarding.complete === true) {
+      onboardingUpdates.onboarding_completed_at = new Date().toISOString();
+    } else if (onboarding.complete !== undefined) {
+      return NextResponse.json({ error: "onboarding.complete may only be set to true" }, { status: 400 });
+    }
+  }
+
+  // Demo sessions cannot be persisted in UUID-backed tables. Keep the already-supported
+  // browser fallback explicit instead of surfacing a misleading server error.
+  if (userId === DEMO_USER_ID && Object.keys(updates).every((key) => key === "onboarding")) {
+    if (Object.keys(onboardingUpdates).length === 0) {
+      return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
+    }
+    return NextResponse.json({ success: true, updated: onboardingUpdates, persistence: "browser" });
+  }
+
   // Sync NextAuth user to public.users (required for FK references in app tables)
   await syncPublicUser(session);
 
@@ -45,8 +80,6 @@ export async function PATCH(req: NextRequest) {
 
   const isPro = profile?.is_pro ?? false;
   const isDev = profile?.is_dev ?? false;
-
-  const updates = await req.json();
   const allowedKeys = (isPro || isDev)
     ? ["unit_preference", "custom_system_prompt", "custom_source_url", "custom_weather_api_key"]
     : ["unit_preference", "custom_source_url"];
@@ -55,6 +88,7 @@ export async function PATCH(req: NextRequest) {
   for (const key of allowedKeys) {
     if (key in updates) filtered[key] = updates[key];
   }
+  Object.assign(filtered, onboardingUpdates);
 
   if (Object.keys(filtered).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
@@ -72,9 +106,13 @@ export async function PATCH(req: NextRequest) {
     await incrementUsage(userId, "source_picks", isPro, isDev);
   }
 
-  await supabaseAdmin
+  const { error } = await supabaseAdmin
     .from("settings")
-    .upsert({ user_id: userId, ...filtered });
+    .upsert({ user_id: userId, ...filtered }, { onConflict: "user_id" });
+
+  if (error) {
+    return NextResponse.json({ error: "Unable to save settings" }, { status: 500 });
+  }
 
   return NextResponse.json({ success: true, updated: filtered });
 }

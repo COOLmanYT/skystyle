@@ -18,7 +18,7 @@ export default function DevUsers() {
   const [users, setUsers] = useState<User[]>([]); const [error, setError] = useState<string | null>(null); const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState(""); const [sort, setSort] = useState<SortKey>("joinedAt"); const [descending, setDescending] = useState(true);
   const load = useCallback(async () => { setLoading(true); const res = await fetch("/api/dev/users"); const data = await res.json().catch(() => ({})); if (!res.ok) setError(errorMessage(data, "Unable to load users.")); else { setUsers(Array.isArray(data) ? data : []); setError(null); } setLoading(false); }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
   async function updateUser(user: User, change: Record<string, unknown>) { const res = await fetch("/api/dev/users", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: user.id, ...change }) }); if (!res.ok) { setError(errorMessage(await res.json().catch(() => ({})), "User update failed.")); return; } void load(); }
   async function exportUser(user: User) {
     if (!window.confirm(`Download all stored data for ${user.email || user.name || "this user"}? This action is logged.`)) return;

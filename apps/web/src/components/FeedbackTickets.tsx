@@ -18,7 +18,7 @@ export default function FeedbackTickets({ devMode = false }: { devMode?: boolean
     if (!res.ok) { setError("Unable to load feedback conversations."); return; }
     const data = await res.json(); setTickets(data.tickets ?? []); setReplies(data.replies ?? []);
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
   const sortedTickets = useMemo(() => [...tickets].sort((a, b) => {
     if (sort === "oldest") return Date.parse(a.created_at) - Date.parse(b.created_at);
     if (sort === "rating") return b.rating - a.rating || Date.parse(b.updated_at) - Date.parse(a.updated_at);

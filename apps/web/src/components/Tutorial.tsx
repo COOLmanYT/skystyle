@@ -7,7 +7,7 @@ export default function Tutorial({ id, title, steps }: { id: string; title: stri
   const key = `skystyle_tutorial_seen_${id}`;
   const [open, setOpen] = useState(false); const [step, setStep] = useState(0);
   useEffect(() => {
-    try { if (!localStorage.getItem(key)) setOpen(true); } catch { /* unavailable storage */ }
+    try { if (!localStorage.getItem(key)) queueMicrotask(() => setOpen(true)); } catch { /* unavailable storage */ }
     const replay = (event: Event) => { if ((event as CustomEvent<string>).detail === id) { setStep(0); setOpen(true); } };
     window.addEventListener("skystyle-replay-tutorial", replay); return () => window.removeEventListener("skystyle-replay-tutorial", replay);
   }, [id, key]);

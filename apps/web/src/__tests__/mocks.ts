@@ -175,7 +175,7 @@ export const mockErrorResponse = (message: string, status: number = 400) => ({
 // ============================================================================
 
 export const mockSupabaseAdmin = {
-  from: jest.fn((table: string) => mockSupabaseAdmin),
+  from: jest.fn(() => mockSupabaseAdmin),
   select: jest.fn().mockReturnThis(),
   eq: jest.fn().mockReturnThis(),
   single: jest.fn().mockReturnThis(),

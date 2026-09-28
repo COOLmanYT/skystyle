@@ -14,6 +14,13 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Mistral } from "@mistralai/mistralai";
 import { WeatherData } from "./weather";
+import {
+  type EventForecastMatch,
+  type RecommendationContext,
+  formatEventLocalTime,
+  formatRecommendationContext,
+  selectFutureHourlyForecast,
+} from "./recommendation-context";
 
 // Model definitions and priorities
 export const MODEL_PRIORITIES = {
@@ -184,6 +191,10 @@ export interface StyleInput {
   customContext?: string[];
   /** Weather planning data from the planning panel */
   planningData?: PlanningData;
+  /** Validated V6 planning context supplied for this recommendation. */
+  recommendationContext?: RecommendationContext;
+  /** Event-to-hour match computed from the fetched forecast. */
+  eventForecast?: EventForecastMatch;
   /** Specific model to use (for model switching feature) */
   modelId?: ModelID;
 }
@@ -196,6 +207,8 @@ export interface FollowUpInput {
   unitPreference: "metric" | "imperial";
   customSystemPrompt?: string;
   userApiKey?: string;
+  recommendationContext?: RecommendationContext;
+  eventForecast?: EventForecastMatch;
   /** Dev mode: include raw AI output in response */
   isDev?: boolean;
   /** Specific model to use (for model switching feature) */
@@ -628,7 +641,7 @@ export async function getStyleRecommendation(
   const {
     weather, closetItems, unitPreference, customSystemPrompt, clientCustomPrompt,
     userApiKey, byokProvider, gender, shareLocation, forceCloset, customContext, planningData,
-    modelId,
+    recommendationContext, eventForecast, modelId,
   } = input;
   const isDev = input.isDev === true;
   let closetWarning: string | undefined;
@@ -669,7 +682,7 @@ export async function getStyleRecommendation(
   // Include hourly forecast if available
   let hourlySection = "";
   if (weather.hourly && weather.hourly.length > 0) {
-    const nextHours = weather.hourly.slice(0, 12);
+    const nextHours = selectFutureHourlyForecast(weather.hourly, Date.now(), 12);
     hourlySection = `\n\nHourly forecast (next ${nextHours.length} hours):\n${nextHours
       .map(
         (h) =>
@@ -677,6 +690,16 @@ export async function getStyleRecommendation(
       )
       .join("\n")}`;
   }
+
+  let eventForecastSection = "";
+  if (recommendationContext?.event && eventForecast?.status === "matched" && eventForecast.hour) {
+    const hour = eventForecast.hour;
+    eventForecastSection = `\n\nForecast nearest the requested event time:\n- ${formatEventLocalTime(hour.time, recommendationContext.event.timeZone)}: ${formatTemp(hour.temp, unitPreference)}, ${hour.description}, rain ${hour.rainChance}%, wind ${formatWind(hour.windSpeed, unitPreference)}\nUse this event forecast and local time, rather than current conditions, for event-specific clothing advice.`;
+  } else if (recommendationContext?.event && eventForecast?.status === "unavailable") {
+    eventForecastSection = "\n\nThe requested event is outside the available hourly forecast range. Do not describe current conditions as the event forecast. Give general occasion advice and tell the user to refresh closer to the event for weather-specific guidance.";
+  }
+
+  const recommendationContextSection = formatRecommendationContext(recommendationContext);
 
   // Custom source context (RSS content, URL references)
   const customContextSection =
@@ -744,7 +767,7 @@ export async function getStyleRecommendation(
 - Conditions: ${weather.description}
 - Rain chance: ${weather.rainChance}%
 - UV Index: ${weather.uvIndex}
-- Time of day: ${weather.isDay ? "Daytime" : "Night-time"}${genderSection}${locationSection}${alertSection}${sourcesSection}${hourlySection}${customContextSection}${planningSection}${closetSection}
+- Time of day: ${weather.isDay ? "Daytime" : "Night-time"}${genderSection}${locationSection}${alertSection}${sourcesSection}${hourlySection}${eventForecastSection}${customContextSection}${planningSection}${recommendationContextSection}${closetSection}
 
 ${complexityInstruction}
 
@@ -814,9 +837,19 @@ export async function getDevChatResponse(
 export async function getFollowUpRecommendation(
   input: FollowUpInput
 ): Promise<StyleRecommendation> {
-  const { previousOutfit, previousReasoning, weather, followUpMessage, unitPreference, customSystemPrompt, userApiKey, modelId } = input;
+  const {
+    previousOutfit, previousReasoning, weather, followUpMessage, unitPreference,
+    customSystemPrompt, userApiKey, recommendationContext, eventForecast, modelId,
+  } = input;
   const isDev = input.isDev === true;
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+
+  const recommendationContextSection = formatRecommendationContext(recommendationContext);
+  const eventForecastSection = recommendationContext?.event && eventForecast?.status === "unavailable"
+    ? "\nThe event remains outside the available forecast range. Do not present current weather as the event forecast."
+    : recommendationContext?.event && eventForecast?.status === "matched" && eventForecast.hour
+      ? `\nForecast nearest the event: ${formatEventLocalTime(eventForecast.hour.time, recommendationContext.event.timeZone)}, ${formatTemp(eventForecast.hour.temp, unitPreference)}, ${eventForecast.hour.description}, rain ${eventForecast.hour.rainChance}%.`
+      : "";
 
   const userMessage = `Previous outfit recommendation:
 ${previousOutfit}
@@ -825,6 +858,7 @@ Previous reasoning:
 ${previousReasoning}
 
 Current weather: ${formatTemp(weather.temp, unitPreference)}, ${weather.description}, rain chance ${weather.rainChance}%, wind ${formatWind(weather.windSpeed, unitPreference)}
+${recommendationContextSection}${eventForecastSection}
 
 User follow-up question: "${followUpMessage}"
 

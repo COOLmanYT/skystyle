@@ -31,6 +31,8 @@ export interface SourceWeatherData {
   uvIndex: number;
   source: string;
   hourly?: HourlyForecast[];
+  /** IANA time zone for hourly entries, when supplied by the forecast provider. */
+  timeZone?: string;
 }
 
 export interface WeatherData {
@@ -49,12 +51,13 @@ export interface WeatherData {
   accuracyScore: "High" | "Medium" | "Low";
   source: "BOM" | "OpenWeather" | "Custom" | "Multi";
   hourly?: HourlyForecast[];
+  timeZone?: string;
   /** Individual source data (sent to AI for better context) */
   sources?: SourceWeatherData[];
 }
 
 /** Australia's approximate bounding box */
-const AUS_BOUNDS = {
+export const AUS_BOUNDS = {
   minLat: -43.74,
   maxLat: -10.69,
   minLon: 113.15,
@@ -338,7 +341,7 @@ async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promi
   const key = apiKey ? sanitizeApiKey(apiKey) : process.env.WEATHERAPI_KEY;
   if (!key) throw new Error("WEATHERAPI_KEY is not set");
 
-  const params = new URLSearchParams({ key, q: `${lat.toFixed(6)},${lon.toFixed(6)}`, days: "1", aqi: "no", alerts: "no" });
+  const params = new URLSearchParams({ key, q: `${lat.toFixed(6)},${lon.toFixed(6)}`, days: "2", aqi: "no", alerts: "no" });
   const url = `https://api.weatherapi.com/v1/forecast.json?${params}`;
   const res = await fetch(url, { next: { revalidate: 600 } });
   if (!res.ok) throw new Error(`WeatherAPI fetch failed: ${res.status}`);
@@ -348,10 +351,13 @@ async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promi
   const current = data.current ?? {};
   const forecastDay = data.forecast?.forecastday?.[0] ?? {};
 
-  const hourly: HourlyForecast[] = (forecastDay.hour ?? []).map(
+  const hourly: HourlyForecast[] = (data.forecast?.forecastday ?? []).flatMap(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (day: any) => day.hour ?? []
+  ).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (h: any) => ({
-      time: h.time ?? "",
+      time: Number.isFinite(h.time_epoch) ? new Date(h.time_epoch * 1000).toISOString() : h.time ?? "",
       temp: Math.round(h.temp_c ?? 0),
       description: h.condition?.text ?? "Unknown",
       rainChance: h.chance_of_rain ?? 0,
@@ -370,6 +376,7 @@ async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promi
     uvIndex: current.uv ?? 0,
     source: "WeatherAPI",
     hourly,
+    timeZone: data.location?.tz_id,
   };
 }
 
@@ -384,7 +391,7 @@ async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): P
   const safeLat = encodeURIComponent(lat.toFixed(6));
   const safeLon = encodeURIComponent(lon.toFixed(6));
   const vcParams = new URLSearchParams({ unitGroup: "metric", key, include: "current,hours", contentType: "json" });
-  const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${safeLat},${safeLon}/today?${vcParams}`;
+  const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${safeLat},${safeLon}/next2days?${vcParams}`;
   const res = await fetch(url, { next: { revalidate: 600 } });
   if (!res.ok) throw new Error(`Visual Crossing fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -393,10 +400,13 @@ async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): P
   const current = data.currentConditions ?? {};
   const dayData = data.days?.[0] ?? {};
 
-  const hourly: HourlyForecast[] = (dayData.hours ?? []).map(
+  const hourly: HourlyForecast[] = (data.days ?? []).flatMap(
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (day: any) => day.hours ?? []
+  ).map(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (h: any) => ({
-      time: h.datetime ?? "",
+      time: Number.isFinite(h.datetimeEpoch) ? new Date(h.datetimeEpoch * 1000).toISOString() : h.datetime ?? "",
       temp: Math.round(h.temp ?? 0),
       description: h.conditions ?? "Unknown",
       rainChance: Math.round(h.precipprob ?? 0),
@@ -415,6 +425,7 @@ async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): P
     uvIndex: current.uvindex ?? 0,
     source: "VisualCrossing",
     hourly,
+    timeZone: data.timezone,
   };
 }
 
@@ -460,6 +471,7 @@ async function fetchPirateWeather(lat: number, lon: number, apiKey?: string): Pr
     uvIndex: Math.round(currently.uvIndex ?? 0),
     source: "PirateWeather",
     hourly,
+    timeZone: data.timezone,
   };
 }
 
@@ -473,7 +485,8 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
     longitude: lon.toFixed(6),
     current: "temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m,wind_direction_10m",
     hourly: "temperature_2m,weather_code,precipitation_probability,wind_speed_10m",
-    forecast_days: "1",
+    forecast_days: "2",
+    timeformat: "unixtime",
     timezone: "auto",
   });
   const url = `https://api.open-meteo.com/v1/forecast?${omParams}`;
@@ -485,35 +498,19 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
   const current = data.current ?? {};
   const hourlyData = data.hourly ?? {};
 
-  // utc_offset_seconds: the queried location's UTC offset (e.g. 39600 for AEDT UTC+11).
-  // Open-Meteo returns local times (timezone=auto), so we normalise to UTC ISO so the
-  // client can display them in the user's own timezone regardless of where they are.
-  const utcOffsetSeconds: number = data.utc_offset_seconds ?? 0;
-
   const hourly: HourlyForecast[] = [];
-  const times: string[] = hourlyData.time ?? [];
+  const times: number[] = hourlyData.time ?? [];
   const temps: number[] = hourlyData.temperature_2m ?? [];
   const codes: number[] = hourlyData.weather_code ?? [];
   const rainProbs: number[] = hourlyData.precipitation_probability ?? [];
   const winds: number[] = hourlyData.wind_speed_10m ?? [];
 
   for (let i = 0; i < times.length; i++) {
-    // Convert "YYYY-MM-DDTHH:MM" (queried-location local) → UTC ISO with Z suffix.
-    // Guard against malformed entries that would produce NaN timestamps.
-    const raw = times[i] ?? "";
-    const tIdx = raw.indexOf("T");
-    if (tIdx < 0) continue; // skip entries without T separator
-    const dateParts = raw.slice(0, tIdx).split("-").map(Number);
-    const timeParts = raw.slice(tIdx + 1).split(":").map(Number);
-    const [year, month, day] = dateParts;
-    const hour = timeParts[0] ?? 0;
-    const min = timeParts[1] ?? 0;
-    if (!year || !month || isNaN(year) || isNaN(month) || isNaN(day)) continue;
-    const utcMs = Date.UTC(year, month - 1, day, hour, min, 0) - utcOffsetSeconds * 1000;
-    const utcIso = new Date(utcMs).toISOString();
+    const epochSeconds = times[i];
+    if (!Number.isFinite(epochSeconds)) continue;
 
     hourly.push({
-      time: utcIso,
+      time: new Date(epochSeconds * 1000).toISOString(),
       temp: Math.round(temps[i] ?? 0),
       description: wmoCodeToDescription(codes[i] ?? 0),
       rainChance: Math.round(rainProbs[i] ?? 0),
@@ -532,6 +529,7 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
     uvIndex: 0,
     source: "Open-Meteo",
     hourly,
+    timeZone: data.timezone,
   };
 }
 
@@ -559,7 +557,7 @@ function averageSources(sources: SourceWeatherData[], primary: WeatherData): Wea
   };
 
   // Merge hourly from first source that has it
-  const hourly = sources.find((s) => s.hourly && s.hourly.length > 0)?.hourly;
+  const hourlySource = sources.find((s) => s.hourly && s.hourly.length > 0);
 
   return {
     ...primary,
@@ -570,7 +568,8 @@ function averageSources(sources: SourceWeatherData[], primary: WeatherData): Wea
     rainChance: avg("rainChance"),
     uvIndex: avg("uvIndex"),
     source: sources.length > 1 ? "Multi" : primary.source,
-    hourly,
+    hourly: hourlySource?.hourly,
+    timeZone: hourlySource?.timeZone,
     sources,
   };
 }

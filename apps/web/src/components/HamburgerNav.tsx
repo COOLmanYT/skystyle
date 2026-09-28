@@ -224,6 +224,14 @@ export default function HamburgerNav({
                     >
                       Dashboard
                     </Link>
+                    <Link
+                      href="/onboarding?replay=1"
+                      onClick={() => setMenuOpen(false)}
+                      className="block rounded-xl px-3 py-2 text-sm btn-interact"
+                      style={{ color: "var(--foreground)", opacity: 0.8 }}
+                    >
+                      Setup guide
+                    </Link>
                      <Link
                        href="/dashboard/api"
                        onClick={() => setMenuOpen(false)}

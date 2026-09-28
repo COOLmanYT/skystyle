@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 import ThemeController from "@/components/ThemeController";
 
@@ -24,7 +23,6 @@ export default function RootLayout({
         </a>
         <ThemeController />
         {children}
-        <Analytics />
       </body>
     </html>
   );

@@ -12,7 +12,6 @@ import {
 
 import {
   mockWeatherData,
-  mockSourceWeatherData,
 } from '../../__tests__/mocks';
 import type { WeatherData } from '../weather';
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
 import WeatherPlanningPanel from "./WeatherPlanningPanel";
-import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
+import WeatherEffectCard, { getWeatherCondition, formatHourlyDay, formatHourlyTime, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
 import UpgradePlanModal from "./UpgradePlanModal";
 import FeedbackModal from "./FeedbackModal";
 import ChangelogModal, { type ChangelogModalEntry } from "./ChangelogModal";
@@ -13,8 +13,25 @@ import Checkbox from "@/components/Checkbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HamburgerNav from "@/components/HamburgerNav";
 import Tutorial from "@/components/Tutorial";
+import ShopPanel from "@/components/ShopPanel";
+import StyleFeedbackPanel from "@/components/StyleFeedbackPanel";
+import { selectLatestLoginPopup } from "@/lib/changelog-popup";
 import { getAllModels, isModelAvailable, ModelID, type PlanningData } from "@/lib/ai";
 import type { DailyLimitsInfo } from "@/lib/daily-usage";
+import {
+  BUDGET_CURRENCIES,
+  FRAGRANCE_FAMILIES,
+  FRAGRANCE_TIERS,
+  OCCASIONS,
+  selectFutureHourlyForecast,
+  withCurrentFeedback,
+  type BudgetCurrency,
+  type EventForecastStatus,
+  type FragranceFamily,
+  type FragranceTier,
+  type Occasion,
+  type RecommendationContext,
+} from "@/lib/recommendation-context";
 
 /** Returns true if version string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -27,6 +44,7 @@ function isVersionGreater(a: string, b: string): boolean {
 }
 
 type LayoutMode = "symmetric" | "large-weather" | "large-settings";
+type DashboardSection = "style" | "shop";
 
 interface HourlyForecast {
   time: string;
@@ -53,6 +71,7 @@ interface StyleResponse {
     accuracyScore: "High" | "Medium" | "Low";
     source: "BOM" | "OpenWeather" | "Custom" | "Multi";
     hourly?: HourlyForecast[];
+    timeZone?: string;
     sources?: {
       source: string;
       temp: number;
@@ -77,6 +96,8 @@ interface StyleResponse {
     creditsRemaining: number | null;
     dailyLimits?: DailyLimitsInfo;
     modelUsed?: string;
+    recommendationContext?: RecommendationContext;
+    eventForecastStatus?: EventForecastStatus;
   };
 }
 
@@ -124,19 +145,23 @@ function isGenderActive(option: string, gender: string): boolean {
 }
 
 interface DashboardProps {
+  userId: string;
   userName: string;
   isPro: boolean;
   isDev: boolean;
   initialCredits: number | null;
   initialDailyLimits: DailyLimitsInfo | null;
+  initialExperienceMode: "guided" | "advanced" | null;
 }
 
 export default function Dashboard({
+  userId,
   userName,
   isPro,
   isDev,
   initialCredits,
   initialDailyLimits,
+  initialExperienceMode,
 }: DashboardProps) {
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -174,7 +199,19 @@ export default function Dashboard({
   // Feedback modal state
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackCategory, setFeedbackCategory] = useState<string | undefined>(undefined);
-  const [simpleMode, setSimpleMode] = useState(true);
+  const [simpleMode, setSimpleMode] = useState(initialExperienceMode !== "advanced");
+  const [activeSection, setActiveSection] = useState<DashboardSection>("style");
+  const [feedbackSummary, setFeedbackSummary] = useState("");
+  const [budgetMin, setBudgetMin] = useState("");
+  const [budgetMax, setBudgetMax] = useState("");
+  const [budgetCurrency, setBudgetCurrency] = useState<BudgetCurrency>("AUD");
+  const [occasion, setOccasion] = useState<Occasion>("everyday");
+  const [customOccasion, setCustomOccasion] = useState("");
+  const [eventDateTime, setEventDateTime] = useState("");
+  const [fragranceMode, setFragranceMode] = useState<"none" | "pair" | "suggest">("none");
+  const [ownedFragrance, setOwnedFragrance] = useState("");
+  const [fragranceFamily, setFragranceFamily] = useState<FragranceFamily>("any");
+  const [fragranceTier, setFragranceTier] = useState<FragranceTier>("any");
   // BYOK enhancements — provider selector + client-side custom prompt (Pro/Dev)
   const [byokProvider, setByokProvider] = useState<"openai" | "gemini" | "mistral">("openai");
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
@@ -205,6 +242,44 @@ export default function Dashboard({
   const [showDiagnostics, setShowDiagnostics] = useState(false);
   // BYOK collapsible
   const [byokOpen, setByokOpen] = useState(false);
+
+  const buildRecommendationContext = useCallback((): RecommendationContext | undefined => {
+    const context: RecommendationContext = {};
+    if (feedbackSummary.trim()) context.feedbackSummary = feedbackSummary.trim().slice(0, 600);
+    const parsedMinimum = Number(budgetMin);
+    const parsedBudget = Number(budgetMax);
+    if (budgetMax.trim() && Number.isFinite(parsedBudget) && parsedBudget > 0
+      && (!budgetMin.trim() || (Number.isFinite(parsedMinimum) && parsedMinimum >= 0 && parsedMinimum <= parsedBudget))) {
+      context.budget = {
+        ...(budgetMin.trim() ? { minAmount: parsedMinimum } : {}),
+        maxAmount: parsedBudget,
+        currency: budgetCurrency,
+      };
+    }
+    context.occasion = {
+      kind: occasion,
+      ...(occasion === "other" && customOccasion.trim()
+        ? { custom: customOccasion.trim().slice(0, 80) }
+        : {}),
+    };
+    if (eventDateTime) {
+      const parsedEvent = new Date(eventDateTime);
+      if (!Number.isNaN(parsedEvent.getTime())) {
+        context.event = {
+          at: parsedEvent.toISOString(),
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
+        };
+      }
+    }
+    if (fragranceMode === "pair" && ownedFragrance.trim()) {
+      context.fragrance = { mode: "pair", owned: ownedFragrance.trim().slice(0, 120) };
+    } else if (fragranceMode === "suggest") {
+      context.fragrance = { mode: "suggest", family: fragranceFamily, tier: fragranceTier };
+    } else {
+      context.fragrance = { mode: "none" };
+    }
+    return context;
+  }, [budgetCurrency, budgetMin, budgetMax, customOccasion, eventDateTime, feedbackSummary, fragranceFamily, fragranceMode, fragranceTier, occasion, ownedFragrance]);
 
   // Returns the gradient/background CSS class for plan-based primary buttons
   const planBtnClass = isDev ? "btn-plan-dev" : isPro ? "btn-plan-pro" : "btn-plan-free";
@@ -286,7 +361,9 @@ export default function Dashboard({
       }
 
       const savedSimpleMode = localStorage.getItem("skystyle_simple_mode");
-      if (savedSimpleMode !== null) setSimpleMode(savedSimpleMode === "true");
+      if (initialExperienceMode === null && savedSimpleMode !== null) {
+        setSimpleMode(savedSimpleMode === "true");
+      }
 
       const savedByokProvider = localStorage.getItem("skystyle_byok_provider");
       if (savedByokProvider === "gemini") setByokProvider("gemini");
@@ -305,7 +382,7 @@ export default function Dashboard({
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [initialExperienceMode]);
 
   // Load custom sources from localStorage on mount
   useEffect(() => {
@@ -362,13 +439,11 @@ export default function Dashboard({
           if (!seen || isVersionGreater(latest, seen)) {
             setChangelogUnread(true);
           }
-          // Check for showOnNextLogin entries
+          // Only the latest published changelog item may become a login popup.
           const seenPopups: string[] = JSON.parse(
             localStorage.getItem("skystyle_seen_login_popups") ?? "[]"
           );
-          const popup = entries.find(
-            (e) => e.showOnNextLogin && !seenPopups.includes(e.version)
-          );
+          const popup = selectLatestLoginPopup(entries, seenPopups);
           if (popup) {
             setLoginPopupEntry({
               version: popup.version,
@@ -568,6 +643,7 @@ export default function Dashboard({
     const effectiveGender = gender === "Other - Manual" ? customGender.slice(0, MAX_GENDER_LENGTH) : gender;
 
     const planningData = readPlanningData();
+    const recommendationContext = buildRecommendationContext();
 
     // Both requests start immediately (parallel)
     const weatherPromise = fetch(`/api/weather?lat=${location.lat}&lon=${location.lon}`);
@@ -580,6 +656,7 @@ export default function Dashboard({
         ...(userApiKey ? { userApiKey, byokProvider } : {}),
         ...(clientCustomPrompt ? { clientCustomPrompt } : {}),
         ...(planningData ? { planningData } : {}),
+        ...(recommendationContext ? { recommendationContext } : {}),
       }),
     });
 
@@ -636,7 +713,7 @@ export default function Dashboard({
     } finally {
       setAiLoading(false);
     }
-  }, [location, weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, isDev, showDiagnostics, userUnitPreference, sourceMode, customSources, userApiKey, byokProvider, clientCustomPrompt]);
+  }, [location, weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, isDev, showDiagnostics, userUnitPreference, sourceMode, customSources, userApiKey, byokProvider, clientCustomPrompt, buildRecommendationContext]);
 
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
@@ -656,6 +733,7 @@ export default function Dashboard({
     const baseReasoning = followUpMode === "chat" && followUpHistory.length > 0
       ? followUpHistory[followUpHistory.length - 1].reasoning
       : result.recommendation.reasoning;
+    const followUpContext = withCurrentFeedback(result.meta.recommendationContext, feedbackSummary);
     try {
       const res = await fetch("/api/followup", {
         method: "POST",
@@ -665,6 +743,7 @@ export default function Dashboard({
           previousOutfit: baseOutfit,
           previousReasoning: baseReasoning,
           weather: result.weather,
+          ...(followUpContext ? { recommendationContext: followUpContext } : {}),
           ...(userApiKey ? { userApiKey } : {}),
         }),
       });
@@ -754,6 +833,7 @@ export default function Dashboard({
     
     try {
       const planningData = readPlanningData();
+      const recommendationContext = buildRecommendationContext();
       const res = await fetch("/api/style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -769,6 +849,7 @@ export default function Dashboard({
           ...(userApiKey ? { userApiKey, byokProvider } : {}),
           ...(clientCustomPrompt ? { clientCustomPrompt } : {}),
           ...(planningData ? { planningData } : {}),
+          ...(recommendationContext ? { recommendationContext } : {}),
         }),
       });
       
@@ -810,6 +891,7 @@ export default function Dashboard({
     
     try {
       const planningData = readPlanningData();
+      const recommendationContext = buildRecommendationContext();
       const res = await fetch("/api/style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -826,6 +908,7 @@ export default function Dashboard({
           ...(userApiKey ? { userApiKey, byokProvider } : {}),
           ...(clientCustomPrompt ? { clientCustomPrompt } : {}),
           ...(planningData ? { planningData } : {}),
+          ...(recommendationContext ? { recommendationContext } : {}),
         }),
       });
       
@@ -973,6 +1056,51 @@ export default function Dashboard({
         className="flex-1 py-6"
         style={{ paddingLeft: extraSpacingEnabled ? 32 : 16, paddingRight: extraSpacingEnabled ? 32 : 16 }}
       >
+        <nav aria-label="Dashboard sections" className="mx-auto mb-6 max-w-7xl">
+          <div className="inline-flex rounded-2xl border p-1" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+            {(["style", "shop"] as const).map((section) => (
+              <button
+                key={section}
+                id={`dashboard-${section}-tab`}
+                type="button"
+                aria-pressed={activeSection === section}
+                aria-controls={`dashboard-${section}-panel`}
+                onClick={() => setActiveSection(section)}
+                className="min-w-24 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors btn-interact"
+                style={{
+                  background: activeSection === section ? "var(--accent)" : "transparent",
+                  color: activeSection === section ? "#fff" : "var(--foreground)",
+                }}
+              >
+                {section === "style" ? "Style" : "Shop"}
+              </button>
+            ))}
+          </div>
+        </nav>
+        <section
+          id="dashboard-style-panel"
+          aria-labelledby="dashboard-style-tab"
+          style={{ display: activeSection === "style" ? undefined : "none" }}
+        >
+        <div className="max-w-7xl mx-auto mb-4 flex justify-end">
+          <button
+            type="button"
+            onClick={() => {
+              const next = !simpleMode;
+              setSimpleMode(next);
+              try { localStorage.setItem("skystyle_simple_mode", String(next)); } catch { /* unavailable storage */ }
+              void fetch("/api/settings", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ onboarding: { experienceMode: next ? "guided" : "advanced" } }),
+              });
+            }}
+            className="rounded-xl border px-3 py-2 text-xs font-medium btn-interact"
+            style={{ borderColor: "var(--card-border)", color: "var(--foreground)" }}
+          >
+            {simpleMode ? "Show advanced controls" : "Use guided view"}
+          </button>
+        </div>
         <div
           ref={columnsContainerRef}
           className="max-w-7xl mx-auto flex flex-col lg:flex-row"
@@ -984,7 +1112,7 @@ export default function Dashboard({
             style={{ flex: leftFlex }}
           >
             {/* ── Weather Planning Panel ── */}
-            <WeatherPlanningPanel />
+            {!simpleMode && <WeatherPlanningPanel />}
 
             {/* ── Location Picker ── */}
             <LocationPicker onLocationResolved={handleLocationResolved} />
@@ -1004,6 +1132,170 @@ export default function Dashboard({
                 <span>{location.source === "gps" ? "📍" : "🔍"}</span>
                 <span className="truncate">{location.displayName}</span>
               </WeatherEffectCard>
+            )}
+
+            {!weatherOnly && (
+              <section
+                aria-labelledby="recommendation-context-heading"
+                className="rounded-2xl p-4 space-y-4"
+                style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
+              >
+                <div>
+                  <h2 id="recommendation-context-heading" className="text-sm font-semibold">Plan this recommendation</h2>
+                  <p className="mt-1 text-xs opacity-55">Optional details stay with your follow-up questions.</p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <label htmlFor="budget-min" className="mb-1 block text-xs font-medium">Preferred total outfit budget range</label>
+                    <div className="flex gap-2">
+                      <select
+                        aria-label="Budget currency"
+                        value={budgetCurrency}
+                        onChange={(event) => setBudgetCurrency(event.target.value as BudgetCurrency)}
+                        className="rounded-xl px-3 py-2 text-sm"
+                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                      >
+                        {BUDGET_CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
+                      </select>
+                      <input
+                        id="budget-min"
+                        type="number"
+                        min="0"
+                        max="1000000"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={budgetMin}
+                        onChange={(event) => setBudgetMin(event.target.value)}
+                        placeholder="Min"
+                        aria-label="Minimum outfit budget"
+                        className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
+                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                      />
+                      <input
+                        id="budget-max"
+                        type="number"
+                        min="0.01"
+                        max="1000000"
+                        step="0.01"
+                        inputMode="decimal"
+                        value={budgetMax}
+                        onChange={(event) => setBudgetMax(event.target.value)}
+                        placeholder="Max"
+                        aria-label="Maximum outfit budget"
+                        className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
+                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                      />
+                    </div>
+                    <p className="mt-1 text-[11px] opacity-50">
+                      Enter a maximum, plus an optional minimum. This guides advice; item prices and the total are not verified.
+                    </p>
+                    {budgetMin.trim() && (!budgetMax.trim() || Number(budgetMin) > Number(budgetMax)) && (
+                      <p role="alert" className="mt-1 text-xs text-red-500">The minimum must not exceed the maximum.</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label htmlFor="occasion" className="mb-1 block text-xs font-medium">Occasion</label>
+                    <select
+                      id="occasion"
+                      value={occasion}
+                      onChange={(event) => setOccasion(event.target.value as Occasion)}
+                      className="w-full rounded-xl px-3 py-2 text-sm capitalize"
+                      style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                    >
+                      {OCCASIONS.map((option) => <option key={option} value={option}>{option.replace("-", " ")}</option>)}
+                    </select>
+                  </div>
+
+                  {occasion === "other" && (
+                    <div className="sm:col-span-2">
+                      <label htmlFor="custom-occasion" className="mb-1 block text-xs font-medium">Describe the occasion</label>
+                      <input
+                        id="custom-occasion"
+                        value={customOccasion}
+                        maxLength={80}
+                        onChange={(event) => setCustomOccasion(event.target.value)}
+                        placeholder="e.g. outdoor graduation lunch"
+                        className="w-full rounded-xl px-3 py-2 text-sm"
+                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label htmlFor="event-date-time" className="mb-1 block text-xs font-medium">Date and time</label>
+                    <input
+                      id="event-date-time"
+                      type="datetime-local"
+                      value={eventDateTime}
+                      onChange={(event) => setEventDateTime(event.target.value)}
+                      className="w-full rounded-xl px-3 py-2 text-sm"
+                      style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                    />
+                    <p className="mt-1 text-[11px] opacity-50">Uses your device time zone. Later dates get general advice until a forecast is available.</p>
+                  </div>
+
+                  <div>
+                    <label htmlFor="fragrance-mode" className="mb-1 block text-xs font-medium">Fragrance</label>
+                    <select
+                      id="fragrance-mode"
+                      value={fragranceMode}
+                      onChange={(event) => setFragranceMode(event.target.value as "none" | "pair" | "suggest")}
+                      className="w-full rounded-xl px-3 py-2 text-sm"
+                      style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                    >
+                      <option value="none">No fragrance advice</option>
+                      <option value="pair">Pair my fragrance</option>
+                      <option value="suggest">Suggest a scent</option>
+                    </select>
+                  </div>
+
+                  {fragranceMode === "pair" && (
+                    <div className="sm:col-span-2">
+                      <label htmlFor="owned-fragrance" className="mb-1 block text-xs font-medium">Your fragrance</label>
+                      <input
+                        id="owned-fragrance"
+                        value={ownedFragrance}
+                        maxLength={120}
+                        onChange={(event) => setOwnedFragrance(event.target.value)}
+                        placeholder="Name or scent description"
+                        className="w-full rounded-xl px-3 py-2 text-sm"
+                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                      />
+                    </div>
+                  )}
+
+                  {fragranceMode === "suggest" && (
+                    <>
+                      <div>
+                        <label htmlFor="fragrance-family" className="mb-1 block text-xs font-medium">Scent family</label>
+                        <select
+                          id="fragrance-family"
+                          value={fragranceFamily}
+                          onChange={(event) => setFragranceFamily(event.target.value as FragranceFamily)}
+                          className="w-full rounded-xl px-3 py-2 text-sm capitalize"
+                          style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                        >
+                          {FRAGRANCE_FAMILIES.map((family) => <option key={family} value={family}>{family}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label htmlFor="fragrance-tier" className="mb-1 block text-xs font-medium">Market tier</label>
+                        <select
+                          id="fragrance-tier"
+                          value={fragranceTier}
+                          onChange={(event) => setFragranceTier(event.target.value as FragranceTier)}
+                          className="w-full rounded-xl px-3 py-2 text-sm capitalize"
+                          style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
+                        >
+                          {FRAGRANCE_TIERS.map((tier) => <option key={tier} value={tier}>{tier}</option>)}
+                        </select>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </section>
             )}
 
             {/* ── Fetch Button (shown after location selected, before fetch starts) ── */}
@@ -1307,10 +1599,10 @@ export default function Dashboard({
                         Hourly Forecast
                       </p>
                       <div className="flex gap-2 overflow-x-auto pb-1" tabIndex={0} role="region" aria-label="Hourly forecast — scroll horizontally">
-                        {w!.hourly.filter(h => isHourlyCurrentOrFuture(h.time)).slice(0, HOURLY_FORECAST_LIMIT).map((h, i) => (
+                        {selectFutureHourlyForecast(w!.hourly, Date.now(), HOURLY_FORECAST_LIMIT).map((h, i) => (
                           <div
                             key={i}
-                            className="flex-shrink-0 rounded-xl p-2 text-center min-w-[72px]"
+                            className="flex-shrink-0 rounded-xl p-2 text-center min-w-[80px]"
                             style={{ background: "var(--background)" }}
                           >
                             <p
@@ -1320,7 +1612,7 @@ export default function Dashboard({
                                 opacity: 0.5,
                               }}
                             >
-                              {formatHourlyTime(h.time)}
+                              {formatHourlyDay(h.time, w!.timeZone)} {formatHourlyTime(h.time, w!.timeZone)}
                             </p>
                             <p
                               className="text-sm font-medium"
@@ -1356,6 +1648,17 @@ export default function Dashboard({
                     </div>
                   )}
                 </WeatherEffectCard>
+
+                {result?.meta?.eventForecastStatus === "unavailable" && (
+                  <div
+                    role="status"
+                    className="rounded-xl p-3 text-sm"
+                    style={{ background: "#ff950018", border: "1px solid #ff950040", color: "var(--foreground)" }}
+                  >
+                    <strong>Event forecast unavailable.</strong>{" "}
+                    This recommendation uses your occasion and preferences, but not current weather as a forecast for that later date. Refresh closer to the event for weather-specific advice.
+                  </div>
+                )}
 
                 {/* ── AI Loading Skeleton (weather arrived, AI still loading) ── */}
                 {aiLoading && !rec?.outfit && (
@@ -1416,6 +1719,15 @@ export default function Dashboard({
                       className="text-base leading-relaxed"
                       style={{ color: "var(--foreground)" }}
                     />
+                    {result?.meta.recommendationContext?.budget && (
+                      <p className="text-xs opacity-60">
+                        Budget guide: {result.meta.recommendationContext.budget.currency}{" "}
+                        {result.meta.recommendationContext.budget.minAmount !== undefined
+                          ? `${result.meta.recommendationContext.budget.minAmount.toFixed(2)}–${result.meta.recommendationContext.budget.maxAmount.toFixed(2)}`
+                          : `up to ${result.meta.recommendationContext.budget.maxAmount.toFixed(2)}`}.
+                        Item prices are not verified.
+                      </p>
+                    )}
                     {rec!.reasoning && (
                       <>
                         <h3
@@ -1474,19 +1786,6 @@ export default function Dashboard({
                         </pre>
                       </>
                     )}
-                    <div className="pt-1">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFeedbackCategory("Style");
-                          setFeedbackOpen(true);
-                        }}
-                        className="text-xs btn-interact rounded-xl px-2 py-1"
-                        style={{ color: "var(--foreground)", opacity: 0.45 }}
-                      >
-                        Was this helpful?
-                      </button>
-                    </div>
                     
                     {/* ── Regeneration Buttons ── */}
                     <div className="flex gap-2 pt-2">
@@ -2016,7 +2315,7 @@ export default function Dashboard({
             {/* ── Closet Management ── */}
             <div
               id="closet-section"
-              className="rounded-2xl p-4 space-y-3"
+              className={`${simpleMode ? "hidden" : ""} rounded-2xl p-4 space-y-3`}
               style={{
                 background: "var(--card)",
                 border: "1px solid var(--card-border)",
@@ -2106,7 +2405,7 @@ export default function Dashboard({
 
             {/* ── Weather Sources ── */}
             <div
-              className="rounded-2xl p-4 space-y-3"
+              className={`${simpleMode ? "hidden" : ""} rounded-2xl p-4 space-y-3`}
               style={{
                 background: "var(--card)",
                 border: "1px solid var(--card-border)",
@@ -2424,7 +2723,7 @@ export default function Dashboard({
             </div>
 
             {/* ── Bring Your Own Key (Pro / Dev) ── */}
-            {(isPro || isDev) && (
+            {!simpleMode && (isPro || isDev) && (
               <div
                 className="rounded-2xl overflow-hidden"
                 style={{
@@ -2564,6 +2863,15 @@ export default function Dashboard({
 
           </div>
         </div>
+          <div className="mx-auto mt-5 max-w-7xl">
+            <StyleFeedbackPanel userId={userId} hasRecommendation={Boolean(rec?.outfit)} recommendation={rec?.outfit ?? ""} onSummaryChange={setFeedbackSummary} />
+          </div>
+        </section>
+        <ShopPanel
+          outfitIdea={rec?.outfit}
+          onSwitchToStyle={() => setActiveSection("style")}
+          hidden={activeSection !== "shop"}
+        />
       </main>
 
       <footer

@@ -1,6 +1,6 @@
 {
   "name": "skystyle-web",
-  "version": "0.1.0",
+  "version": "6.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -16,7 +16,6 @@
     "@simplewebauthn/browser": "^9.0.1",
     "@simplewebauthn/server": "^9.0.3",
     "@supabase/supabase-js": "^2.97.0",
-    "@vercel/analytics": "^1.6.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "bcryptjs": "^3.0.3",
     "next": "16.2.3",

@@ -272,13 +272,13 @@ describe('Weather Module - Edge Cases', () => {
     // Points on either side of the 180th meridian
     const distance = haversineKm(0, 179, 0, -179);
     expect(distance).toBeGreaterThan(0);
-    expect(distance).toBeLessThan(200); // Should be a small distance
+    expect(distance).toBeLessThan(230); // About 222 km at the equator
   });
 
   it('should handle polar coordinates correctly', () => {
     // North Pole area
     const distance = haversineKm(89, 0, 89, 180);
     expect(distance).toBeGreaterThan(0);
-    expect(distance).toBeLessThan(100); // Should be a small distance near the pole
+    expect(distance).toBeLessThan(230); // About 222 km near the pole
   });
 });

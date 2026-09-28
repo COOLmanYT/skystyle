@@ -18,6 +18,7 @@ import { getStyleRecommendation, getDevChatResponse, PlanningData, ModelID, getD
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
+import { matchEventForecast, parseRecommendationContext } from "@/lib/recommendation-context";
 
 export async function POST(req: NextRequest) {
   // 1. Auth check
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     devMessage?: string; sourceMode?: string; customSources?: CustomSource[];
     planningData?: unknown; clientCustomPrompt?: string; byokProvider?: string;
     modelId?: string;
+    recommendationContext?: unknown;
   };
   try {
     body = await req.json();
@@ -66,6 +68,12 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
+
+  const parsedContext = parseRecommendationContext(body.recommendationContext);
+  if (!parsedContext.ok) {
+    return NextResponse.json({ error: parsedContext.error }, { status: 400 });
+  }
+  const recommendationContext = parsedContext.value;
 
   // 3. Load user profile + settings
   let isPro = false;
@@ -233,6 +241,7 @@ export async function POST(req: NextRequest) {
     const message = err instanceof Error ? err.message : "Weather fetch failed";
     return NextResponse.json({ error: message }, { status: 502 });
   }
+  const eventForecast = matchEventForecast(weather.hourly, recommendationContext?.event?.at);
 
   // 6. Get AI recommendation (use BYOK if provided and user is Pro/Dev)
   let recommendation;
@@ -267,6 +276,8 @@ export async function POST(req: NextRequest) {
       isDev,
       customContext: weather.customContext,
       planningData,
+      recommendationContext,
+      eventForecast,
       modelId: modelId as ModelID | undefined,
     });
   } catch (err) {
@@ -297,6 +308,8 @@ export async function POST(req: NextRequest) {
       creditsRemaining: isPro ? (await getCredits(userId)) : null,
       dailyLimits,
       modelUsed: recommendation.modelUsed ?? "unknown",
+      recommendationContext,
+      eventForecastStatus: eventForecast.status,
     },
   });
 }

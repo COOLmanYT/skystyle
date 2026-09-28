@@ -10,11 +10,13 @@ export const dynamic = "force-dynamic";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { auth, DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getFollowUpRecommendation, ModelID, getDefaultModel, getModelById } from "@/lib/ai";
 import { canUseFeature, incrementUsage, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
+import { matchEventForecast, parseRecommendationContext } from "@/lib/recommendation-context";
+import type { WeatherData } from "@/lib/weather";
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -23,9 +25,10 @@ export async function POST(req: NextRequest) {
   }
 
   const userId = session.user.id;
+  const isDemo = userId === DEMO_USER_ID || (session.user as unknown as Record<string, unknown>).plan === "demo";
 
   // Sync NextAuth user to public.users (required for FK references in app tables)
-  await syncPublicUser(session);
+  if (!isDemo) await syncPublicUser(session);
 
   let body: {
     message?: string;
@@ -34,6 +37,7 @@ export async function POST(req: NextRequest) {
     weather?: Record<string, unknown>;
     userApiKey?: string;
     modelId?: string;
+    recommendationContext?: unknown;
   };
   try {
     body = await req.json();
@@ -55,21 +59,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "previousOutfit and weather are required" }, { status: 400 });
   }
 
-  // Check Pro/Dev status
-  const [profileResult, accessControlResult] = await Promise.all([
-    supabaseAdmin.from("users").select("*").eq("id", userId).single(),
-    supabaseAdmin.from("user_access_controls").select("*").eq("user_id", userId).maybeSingle(),
-  ]);
-  if (accessControlResult.error) return NextResponse.json({ error: "Unable to load account access controls." }, { status: 500 });
-  if (accessControlResult.data?.banned_at || (accessControlResult.data?.app_blocked && (!accessControlResult.data?.app_blocked_until || Date.parse(accessControlResult.data.app_blocked_until) > Date.now()))) return NextResponse.json({ error: "App access has been disabled for this account." }, { status: 403 });
-  const profile = profileResult.data;
+  const parsedContext = parseRecommendationContext(body.recommendationContext);
+  if (!parsedContext.ok) {
+    return NextResponse.json({ error: parsedContext.error }, { status: 400 });
+  }
+  const recommendationContext = parsedContext.value;
+  const typedWeather = weather as unknown as WeatherData;
+  const eventForecast = matchEventForecast(typedWeather.hourly, recommendationContext?.event?.at);
 
-  const isPro = profile?.is_pro ?? false;
-  const isDev = profile?.is_dev ?? false;
+  // Check Pro/Dev status
+  let isPro = false;
+  let isDev = false;
+  if (!isDemo) {
+    const [profileResult, accessControlResult] = await Promise.all([
+      supabaseAdmin.from("users").select("*").eq("id", userId).single(),
+      supabaseAdmin.from("user_access_controls").select("*").eq("user_id", userId).maybeSingle(),
+    ]);
+    if (accessControlResult.error) return NextResponse.json({ error: "Unable to load account access controls." }, { status: 500 });
+    if (accessControlResult.data?.banned_at || (accessControlResult.data?.app_blocked && (!accessControlResult.data?.app_blocked_until || Date.parse(accessControlResult.data.app_blocked_until) > Date.now()))) return NextResponse.json({ error: "App access has been disabled for this account." }, { status: 403 });
+    isPro = profileResult.data?.is_pro ?? false;
+    isDev = profileResult.data?.is_dev ?? false;
+  }
 
   // Check daily follow-up limit (devs bypass)
   if (!isDev) {
-    const { allowed, used, limit } = await canUseFeature(userId, "follow_ups", isPro, isDev);
+    const { allowed, used, limit } = await canUseFeature(userId, "follow_ups", isPro, isDev, isDemo);
     if (!allowed) {
       return NextResponse.json(
         { error: `Daily follow-up limit reached (${used}/${limit}). ${isPro ? "Try again tomorrow." : "Upgrade to Pro for 100 follow-ups per day."}` },
@@ -79,11 +93,11 @@ export async function POST(req: NextRequest) {
   }
 
   // Load settings
-  const { data: settings } = await supabaseAdmin
+  const settings = isDemo ? null : (await supabaseAdmin
     .from("settings")
     .select("*")
     .eq("user_id", userId)
-    .single();
+    .single()).data;
 
   const unitPreference = settings?.unit_preference === "imperial" ? "imperial" as const : "metric" as const;
   const customSystemPrompt = (isPro || isDev) ? settings?.custom_system_prompt : undefined;
@@ -95,7 +109,7 @@ export async function POST(req: NextRequest) {
     
     // For free users, check model switch limit (2/week)
     if (!isPro && !isDev && isModelSwitch) {
-      const { allowed, used, limit } = await canUseFeature(userId, "model_switches", isPro, isDev);
+      const { allowed, used, limit } = await canUseFeature(userId, "model_switches", isPro, isDev, isDemo);
       if (!allowed) {
         return NextResponse.json(
           { error: `Model switch limit reached (${used}/${limit}). Upgrade to Pro for unlimited model switching.` },
@@ -103,19 +117,20 @@ export async function POST(req: NextRequest) {
         );
       }
       // Deduct model switch
-      await incrementUsage(userId, "model_switches", isPro, isDev);
+      await incrementUsage(userId, "model_switches", isPro, isDev, isDemo);
     }
     
     recommendation = await getFollowUpRecommendation({
       previousOutfit: String(previousOutfit),
       previousReasoning: String(previousReasoning ?? ""),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      weather: weather as any,
+      weather: typedWeather,
       followUpMessage: message.trim(),
       unitPreference,
       customSystemPrompt,
       userApiKey: (isPro || isDev) ? userApiKey : undefined,
       isDev,
+      recommendationContext,
+      eventForecast,
       modelId: modelId as ModelID | undefined,
     });
   } catch (err) {
@@ -125,13 +140,19 @@ export async function POST(req: NextRequest) {
 
   // Increment follow-up usage (devs bypass)
   if (!isDev) {
-    await incrementUsage(userId, "follow_ups", isPro, isDev);
+    await incrementUsage(userId, "follow_ups", isPro, isDev, isDemo);
   }
 
-  const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
+  const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev, isDemo);
 
   return NextResponse.json({
     recommendation,
-    meta: { isPro, isDev, dailyLimits },
+    meta: {
+      isPro,
+      isDev,
+      dailyLimits,
+      recommendationContext,
+      eventForecastStatus: eventForecast.status,
+    },
   });
 }
