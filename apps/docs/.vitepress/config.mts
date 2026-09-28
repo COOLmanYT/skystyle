@@ -54,6 +54,7 @@ export default defineConfig({
               { text: 'POST /recweather', link: '/api/recweather' },
               { text: 'GET /weather', link: '/api/weather' },
               { text: 'GET /closet', link: '/api/closet' },
+              { text: 'GET /health*', link: '/api/health' },
             ]
           },
           { text: 'Errors & Credits', link: '/api/errors' },
