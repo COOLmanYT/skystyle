@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { sanitizeUrl } from "@/lib/sanitize-url";
+import { parseRecommendationAction } from "@/lib/recommendation-links";
 
 interface Props {
   content: string;
@@ -9,18 +10,26 @@ interface Props {
   style?: React.CSSProperties;
   /** If provided, matching closet item names become links to /closet */
   closetItems?: string[];
+  /** Enable validated AI clothing actions only in recommendation output. */
+  recommendationLinks?: boolean;
+  onShopItem?: (item: string) => void;
 }
+
+interface InlineContext { closetItems: string[]; recommendationLinks?: boolean; onShopItem?: (item: string) => void }
 
 // ── Closet link helper ────────────────────────────────────────────────────────
 
-function applyClosetLinks(text: string, closetItems: string[]): React.ReactNode[] {
+function applyClosetLinks(text: string, { closetItems }: InlineContext): React.ReactNode[] {
   if (!closetItems.length) return [text];
-  const sorted = [...closetItems].sort((a, b) => b.length - a.length);
+  const sorted = [...new Set(closetItems.filter((item) => item.trim()))].sort((a, b) => b.length - a.length);
+  if (!sorted.length) return [text];
   const escaped = sorted.map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   const regex = new RegExp(`(${escaped.join("|")})`, "gi");
   const parts = text.split(regex);
   return parts.map((part, i) => {
-    const isMatch = sorted.some((item) => item.toLowerCase() === part.toLowerCase());
+    const isMatch = sorted.some((item) => item.toLowerCase() === part.toLowerCase())
+      && (i === 0 || !/[\p{L}\p{N}]/u.test(parts[i - 1].slice(-1)))
+      && (i === parts.length - 1 || !/[\p{L}\p{N}]/u.test(parts[i + 1].slice(0, 1)));
     if (isMatch) {
       return (
         <Link
@@ -43,7 +52,7 @@ function applyClosetLinks(text: string, closetItems: string[]): React.ReactNode[
 const INLINE_RE =
   /(\*\*(?:[^*]|\*(?!\*))+\*\*|~~[^~]+~~|\*(?:[^*])+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
 
-function renderInline(text: string, closetItems: string[], keyPrefix: string): React.ReactNode[] {
+function renderInline(text: string, context: InlineContext, keyPrefix: string): React.ReactNode[] {
   const parts = text.split(INLINE_RE);
   const nodes: React.ReactNode[] = [];
 
@@ -52,11 +61,11 @@ function renderInline(text: string, closetItems: string[], keyPrefix: string): R
     if (!seg) return;
 
     if (seg.startsWith("**") && seg.endsWith("**") && seg.length > 4) {
-      nodes.push(<strong key={k}>{seg.slice(2, -2)}</strong>);
+      nodes.push(<strong key={k}>{renderInline(seg.slice(2, -2), context, `${k}-bold`)}</strong>);
     } else if (seg.startsWith("~~") && seg.endsWith("~~") && seg.length > 4) {
-      nodes.push(<del key={k}>{seg.slice(2, -2)}</del>);
+      nodes.push(<del key={k}>{renderInline(seg.slice(2, -2), context, `${k}-del`)}</del>);
     } else if (seg.startsWith("*") && seg.endsWith("*") && seg.length > 2) {
-      nodes.push(<em key={k}>{seg.slice(1, -1)}</em>);
+      nodes.push(<em key={k}>{renderInline(seg.slice(1, -1), context, `${k}-em`)}</em>);
     } else if (seg.startsWith("`") && seg.endsWith("`") && seg.length > 2) {
       nodes.push(
         <code
@@ -76,6 +85,20 @@ function renderInline(text: string, closetItems: string[], keyPrefix: string): R
       const m = seg.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
       if (m) {
         const [, linkText, rawUrl] = m;
+        const action = context.recommendationLinks ? parseRecommendationAction(rawUrl, context.closetItems) : null;
+        if (action) {
+          nodes.push(<Link key={k} href={action.href}
+            aria-label={action.kind === "closet" ? `View ${action.item} in your closet` : `Find ${action.item} in Shop`}
+            onClick={action.kind === "shop" && context.onShopItem ? (event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault(); context.onShopItem?.(action.item);
+            } : undefined}
+            style={{ color: "var(--accent)", textDecoration: "underline" }}>{linkText}</Link>);
+          return;
+        }
+        if (context.recommendationLinks && /^\/(?:closet|dashboard)(?:[?#]|$)/.test(rawUrl)) {
+          nodes.push(<span key={k}>{linkText}</span>); return;
+        }
         const safeUrl = sanitizeUrl(rawUrl);
         if (safeUrl) {
           const isExternal = /^https?:\/\//i.test(safeUrl);
@@ -96,12 +119,12 @@ function renderInline(text: string, closetItems: string[], keyPrefix: string): R
         }
       } else {
         // Malformed link — render as plain text with closet links
-        applyClosetLinks(seg, closetItems).forEach((n, j) =>
+        applyClosetLinks(seg, context).forEach((n, j) =>
           nodes.push(<span key={`${k}-cl-${j}`}>{n}</span>)
         );
       }
     } else {
-      applyClosetLinks(seg, closetItems).forEach((n, j) =>
+      applyClosetLinks(seg, context).forEach((n, j) =>
         nodes.push(<span key={`${k}-cl-${j}`}>{n}</span>)
       );
     }
@@ -146,7 +169,7 @@ function buildList(
   startIdx: number,
   baseIndent: number,
   ordered: boolean,
-  closetItems: string[],
+  context: InlineContext,
   keyPrefix: string
 ): [React.ReactNode, number] {
   const items: React.ReactNode[] = [];
@@ -169,7 +192,7 @@ function buildList(
       const nextIndent = getIndent(nextLine);
       if ((isUnorderedItem(nextLine) || isOrderedItem(nextLine)) && nextIndent > baseIndent) {
         const nextOrdered = isOrderedItem(nextLine);
-        const [nested, newI] = buildList(lines, i, nextIndent, nextOrdered, closetItems, `${keyPrefix}-n-${i}`);
+        const [nested, newI] = buildList(lines, i, nextIndent, nextOrdered, context, `${keyPrefix}-n-${i}`);
         nestedList = nested;
         i = newI;
       }
@@ -177,7 +200,7 @@ function buildList(
 
     items.push(
       <li key={`${keyPrefix}-li-${i}`} style={{ marginBottom: 2 }}>
-        {renderInline(text, closetItems, `${keyPrefix}-lt-${i}`)}
+        {renderInline(text, context, `${keyPrefix}-lt-${i}`)}
         {nestedList}
       </li>
     );
@@ -366,7 +389,10 @@ export default function MarkdownRenderer({
   className,
   style,
   closetItems = [],
+  recommendationLinks = false,
+  onShopItem,
 }: Props) {
+  const context: InlineContext = { closetItems, recommendationLinks, onShopItem };
   if (!content) return null;
 
   // Some model providers return Markdown newlines double-escaped ("\\n").
@@ -424,7 +450,7 @@ export default function MarkdownRenderer({
     if (trimmed.startsWith("#### ")) {
       elements.push(
         <h4 key={i} className="text-xs font-semibold mt-1.5 mb-0.5" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-          {renderInline(trimmed.slice(5).trim(), closetItems, `h4-${i}`)}
+          {renderInline(trimmed.slice(5).trim(), context, `h4-${i}`)}
         </h4>
       );
       i++;
@@ -445,13 +471,13 @@ export default function MarkdownRenderer({
       i += 2;
       const rows: string[][] = [];
       while (i < lines.length && lines[i].includes("|") && lines[i].trim()) { rows.push(splitTableRow(lines[i])); i++; }
-      elements.push(<div key={`table-${i}`} style={{ overflowX: "auto", margin: "8px 0" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9em" }}><thead><tr>{headers.map((header, index) => <th key={index} style={{ textAlign: alignments[index], padding: "7px 9px", borderBottom: "2px solid var(--card-border)" }}>{renderInline(header, closetItems, `th-${i}-${index}`)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex} style={{ textAlign: alignments[cellIndex], padding: "7px 9px", borderBottom: "1px solid var(--card-border)" }}>{renderInline(row[cellIndex] ?? "", closetItems, `td-${i}-${rowIndex}-${cellIndex}`)}</td>)}</tr>)}</tbody></table></div>);
+      elements.push(<div key={`table-${i}`} style={{ overflowX: "auto", margin: "8px 0" }}><table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.9em" }}><thead><tr>{headers.map((header, index) => <th key={index} style={{ textAlign: alignments[index], padding: "7px 9px", borderBottom: "2px solid var(--card-border)" }}>{renderInline(header, context, `th-${i}-${index}`)}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={rowIndex}>{headers.map((_, cellIndex) => <td key={cellIndex} style={{ textAlign: alignments[cellIndex], padding: "7px 9px", borderBottom: "1px solid var(--card-border)" }}>{renderInline(row[cellIndex] ?? "", context, `td-${i}-${rowIndex}-${cellIndex}`)}</td>)}</tr>)}</tbody></table></div>);
       continue;
     }
     if (trimmed.startsWith("### ")) {
       elements.push(
         <h3 key={i} className="text-sm font-semibold mt-2 mb-0.5" style={{ color: "var(--foreground)", opacity: 0.8 }}>
-          {renderInline(trimmed.slice(4).trim(), closetItems, `h3-${i}`)}
+          {renderInline(trimmed.slice(4).trim(), context, `h3-${i}`)}
         </h3>
       );
       i++;
@@ -460,7 +486,7 @@ export default function MarkdownRenderer({
     if (trimmed.startsWith("## ")) {
       elements.push(
         <h2 key={i} className="text-base font-semibold mt-3 mb-1" style={{ color: "var(--foreground)" }}>
-          {renderInline(trimmed.slice(3).trim(), closetItems, `h2-${i}`)}
+          {renderInline(trimmed.slice(3).trim(), context, `h2-${i}`)}
         </h2>
       );
       i++;
@@ -469,7 +495,7 @@ export default function MarkdownRenderer({
     if (trimmed.startsWith("# ")) {
       elements.push(
         <h1 key={i} className="text-lg font-bold mt-3 mb-1" style={{ color: "var(--foreground)" }}>
-          {renderInline(trimmed.slice(2).trim(), closetItems, `h1-${i}`)}
+          {renderInline(trimmed.slice(2).trim(), context, `h1-${i}`)}
         </h1>
       );
       i++;
@@ -496,7 +522,7 @@ export default function MarkdownRenderer({
         >
           {quoteLines.map((ql, qi) => (
             <p key={qi} style={{ margin: "2px 0" }}>
-              {renderInline(ql, closetItems, `bq-${i}-${qi}`)}
+              {renderInline(ql, context, `bq-${i}-${qi}`)}
             </p>
           ))}
         </blockquote>
@@ -507,7 +533,7 @@ export default function MarkdownRenderer({
     // ── Ordered list ────────────────────────────────────────────────────────
     if (isOrderedItem(line)) {
       const baseIndent = getIndent(line);
-      const [listEl, newI] = buildList(lines, i, baseIndent, true, closetItems, `ol-${i}`);
+      const [listEl, newI] = buildList(lines, i, baseIndent, true, context, `ol-${i}`);
       elements.push(listEl);
       i = newI;
       continue;
@@ -516,7 +542,7 @@ export default function MarkdownRenderer({
     // ── Unordered list ──────────────────────────────────────────────────────
     if (isUnorderedItem(line)) {
       const baseIndent = getIndent(line);
-      const [listEl, newI] = buildList(lines, i, baseIndent, false, closetItems, `ul-${i}`);
+      const [listEl, newI] = buildList(lines, i, baseIndent, false, context, `ul-${i}`);
       elements.push(listEl);
       i = newI;
       continue;
@@ -550,7 +576,7 @@ export default function MarkdownRenderer({
       const paraContent: React.ReactNode[] = [];
       paraLines.forEach((pLine, pIdx) => {
         if (pIdx > 0) paraContent.push(<br key={`br-${pIdx}`} />);
-        paraContent.push(...renderInline(pLine, closetItems, `p-${i}-${pIdx}`));
+        paraContent.push(...renderInline(pLine, context, `p-${i}-${pIdx}`));
       });
       elements.push(
         <p key={`p-${i}`} style={{ margin: "4px 0", lineHeight: 1.6 }}>

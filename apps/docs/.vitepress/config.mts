@@ -5,7 +5,7 @@ export default defineConfig({
   title: "Sky Style Docs",
   description: "Official docs for Sky Style weather-based outfit intelligence",
   sitemap: { hostname: process.env.DOCS_SITE_URL ?? "https://docs.skystyle.app" },
-  ignoreDeadLinks: true,
+  ignoreDeadLinks: false,
   themeConfig: {
     logo: '/images/settings.png',
     // https://vitepress.dev/reference/default-theme-config
@@ -38,6 +38,7 @@ export default defineConfig({
           { text: 'Automatic Recommendations', link: '/web-app/automatic-recommendations' },
           { text: 'API Dashboard', link: '/web-app/api-dashboard' },
           { text: 'Custom Weather Sources', link: '/web-app/custom-weather-sources' },
+          { text: 'Dev Center', link: '/web-app/dev-center' },
           { text: 'Account & Support', link: '/web-app/account-and-support' },
           { text: 'FAQ & Troubleshooting', link: '/web-app/faq' },
         ]
@@ -55,7 +56,7 @@ export default defineConfig({
               { text: 'POST /recweather', link: '/api/recweather' },
               { text: 'GET /weather', link: '/api/weather' },
               { text: 'GET /closet', link: '/api/closet' },
-              { text: 'Health & Shop APIs', link: '/api/health' },
+              { text: 'Health checks', link: '/api/health' },
             ]
           },
           { text: 'Errors & Credits', link: '/api/errors' },
@@ -66,7 +67,6 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/development' },
           { text: 'Architecture', link: '/development/architecture' },
-          { text: 'V6 Accounting Status', link: '/development/v6-entitlements' },
           { text: 'Testing', link: '/development/testing' },
         ]
       }
@@ -81,9 +81,8 @@ export default defineConfig({
     },
 
     footer: {
-      message: 'Sky Style Docs — always in sync with skystyle.app/api/v1',
+      message: 'Sky Style Docs — Guides for the app and public API',
       copyright: 'Copyright 2026 Sky Style'
     }
   }
 })
-

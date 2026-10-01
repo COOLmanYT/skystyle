@@ -1,7 +1,7 @@
 # Dashboard & Closet
 
 ::: warning Accounting rollout
-The [approved V6 daily/monthly limits and shared-wallet policy](../development/v6-entitlements) are not active yet. Daily allowance descriptions below reflect legacy enforcement. Style, Shop and automatic AI generations will share recommendation caps after the verified cutover.
+Your account usage readout shows the allowance currently available to you. See [Usage limits](./how-it-works#usage-limits).
 :::
 
 The dashboard has a full-width **Style / Shop** navigation bar. **Style** is live weather, your preferences, and an outfit recommendation; **[Shop](./shop)** finds new clothes through an approved product source.

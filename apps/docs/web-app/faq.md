@@ -26,7 +26,7 @@ Sky Style picks the first **available** model in your plan's priority list (see 
 
 ## Usage & limits
 
-The [approved V6 caps and credit rules](../development/v6-entitlements) are staged, not yet active. Until cutover, the account/dashboard usage readouts reflect legacy limits. Checkout and credit purchases are unavailable.
+Your account and dashboard show current usage and available credits. Checkout and credit purchases are unavailable.
 
 ### I hit my daily limit — when does it reset?
 
@@ -66,7 +66,7 @@ Each plan has a limit on **active** (non-revoked) keys: Free 3, Pro 20, Dev unli
 
 ### My API key has no credits
 
-Legacy key creation uses a configured per-key allowance (50 by default), and legacy middleware may fall back to one available App Credit. The approved V6 policy replaces this with account-level credits, zero new per-key grants and no silent fallback, but is not activated. Legacy money-wallet allocation is unavailable on the verified schema; do not assume a monthly money grant or a working top-up. See [API Dashboard](./api-dashboard#legacy-credits-v6-accounting-inactive).
+Check the key balance in the API Dashboard. If it is empty, a request may use one available App Credit and return a warning header. Credit purchases and money-wallet top-ups are unavailable. See [API credits](./api-dashboard#credits-and-usage).
 
 ::: tip Credit purchases
 API credit purchases are not live yet. The "Get credits" button opens an informational donation prompt — it doesn't process a purchase.
@@ -106,6 +106,6 @@ Theme is controlled in [Settings → Appearance](./settings#appearance): system,
 
 ## Still stuck?
 
-- Browse the full [Web App Guide](./web-app) for detailed references.
+- Browse the full [Web App Guide](/web-app) for detailed references.
 - Send a message from the [Feedback](./account-and-support#feedback) page — every message is read personally.
 - Check the [COOLman service status page](https://status.coolmanyt.com/) for outages.

@@ -4,6 +4,8 @@ Sky Style gives you full control over your account security and your data.
 
 ## Style and shopping requests
 
+GitHub and Google are the available sign-in methods. Accounts are not merged automatically by email. Clothing names in links can remain in browser history; a link prepares context without starting a search. Submitting Shop sends that editable context to connected services. Essential authentication cookies include session and short-lived sign-in verification cookies.
+
 Style uses the weather/context and wardrobe details needed for your request. Sharing location text with AI is optional. A saved private preference summary can be included in both Style and Shop requests.
 
 Shop sends search/fit terms to the approved product API, then candidate metadata and preferences to the selected AI provider for ranking. No Sky Style product-impression, shopping-query or click analytics is added; no affiliate/referral parameters are used. Usage counters enforce the existing allowance without storing shopping queries/products. Retailers and AI providers apply their own privacy rules to the requests they receive.

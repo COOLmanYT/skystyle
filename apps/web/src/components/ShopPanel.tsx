@@ -10,22 +10,30 @@ interface ShopPanelProps {
   userId: string; isPro: boolean; isDev: boolean; userApiKey: string; byokProvider: ByokProvider;
   onApiKeyChange: (key: string) => void; onProviderChange: (provider: ByokProvider) => void;
   feedbackSummary: string; outfitIdea?: string; onSwitchToStyle: () => void; canSwitchToStyle?: boolean; hidden?: boolean;
+  contextItem?: { item: string; sequence: number } | null;
 }
 interface ShopResult { status: string; products: ShopProduct[]; message: string; budgetNote?: string; model: string | null; generatedAt: string; }
-export default function ShopPanel({ isPro, isDev, userApiKey, byokProvider, onApiKeyChange, onProviderChange, feedbackSummary, outfitIdea, onSwitchToStyle, canSwitchToStyle = true, hidden }: ShopPanelProps) {
-  const [query, setQuery] = useState(""), [size, setSize] = useState(""), [gender, setGender] = useState("");
+export default function ShopPanel({ isPro, isDev, userApiKey, byokProvider, onApiKeyChange, onProviderChange, feedbackSummary, outfitIdea, onSwitchToStyle, canSwitchToStyle = true, hidden, contextItem }: ShopPanelProps) {
+  const contextSequence = contextItem?.sequence ?? -1;
+  const [draft, setDraft] = useState({ sequence: -1, query: "" });
+  const query = draft.sequence === contextSequence ? draft.query : contextItem?.item ?? "";
+  const setQuery = (value: string) => setDraft({ sequence: contextSequence, query: value });
+  const [size, setSize] = useState(""), [gender, setGender] = useState("");
   const [min, setMin] = useState(""), [max, setMax] = useState(""), [currency, setCurrency] = useState<BudgetCurrency>("AUD");
   const [occasion, setOccasion] = useState<Occasion>("everyday"), [customPrompt, setCustomPrompt] = useState("");
   const [model, setModel] = useState<ModelID | "">(""), [busy, setBusy] = useState(false);
   const [error, setError] = useState(""), [result, setResult] = useState<ShopResult | null>(null);
+  const [resultSequence, setResultSequence] = useState(-1);
   const fieldStyle = { background: "var(--background)", borderColor: "var(--card-border)" };
   const fieldClass = "mt-1 w-full rounded-xl border px-3 py-2.5 text-sm";
   async function search(event: React.FormEvent) {
     event.preventDefault(); if (busy) return;
+    setResultSequence(contextSequence);
     if (min && (!max || Number(min) > Number(max))) { setError("Enter a maximum that is not below your minimum."); return; }
-    setBusy(true); setError(""); setResult(null);
+    setBusy(true); setError(""); setResult(null); setResultSequence(contextSequence);
     try {
       const response = await fetch("/api/shop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ query, size, gender, region: "AU",
+        ...(contextItem && query.trim() ? { styleContext: { item: query.trim(), outfit: outfitIdea?.slice(0, 1500) ?? "" } } : {}),
         recommendationContext: { occasion: { kind: occasion }, ...(feedbackSummary.trim() ? { feedbackSummary } : {}),
           ...(max ? { budget: { maxAmount: Number(max), ...(min ? { minAmount: Number(min) } : {}), currency } } : {}) },
         ...(model ? { modelId: model } : {}), ...(userApiKey ? { userApiKey, byokProvider } : {}),
@@ -45,8 +53,9 @@ export default function ShopPanel({ isPro, isDev, userApiKey, byokProvider, onAp
     </div>
     <form onSubmit={(event) => void search(event)} data-tour="shop-config" className="grid gap-5 rounded-3xl border p-5 sm:p-7 lg:grid-cols-2" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
       <label className="text-sm font-medium lg:col-span-2">What are you looking for?
-        <input required maxLength={200} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="e.g. breathable linen shirt and trousers for a summer lunch" className={fieldClass} style={fieldStyle} />
+        <input id="shop-query" required maxLength={200} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="e.g. breathable linen shirt and trousers for a summer lunch" className={fieldClass} style={fieldStyle} />
       </label>
+      {contextItem && query && <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-sm lg:col-span-2" style={{ borderColor: "var(--card-border)" }}><p>From Style: <strong>{query}</strong>. Edit your search before continuing.</p><button type="button" onClick={() => { setQuery(""); setResult(null); setError(""); }} className="text-xs underline">Clear item context</button></div>}
       <label className="text-sm font-medium">Size / fit<input maxLength={40} value={size} onChange={(event) => setSize(event.target.value)} placeholder="e.g. AU 10, relaxed fit" className={fieldClass} style={fieldStyle} /></label>
       <label className="text-sm font-medium">Clothing preference<input maxLength={40} value={gender} onChange={(event) => setGender(event.target.value)} placeholder="e.g. unisex, womenswear, menswear" className={fieldClass} style={fieldStyle} /></label>
       <fieldset className="space-y-2"><legend className="text-sm font-medium">Total item budget range (optional)</legend>
@@ -77,8 +86,8 @@ export default function ShopPanel({ isPro, isDev, userApiKey, byokProvider, onAp
       <p className="text-xs opacity-60 lg:col-span-2">A successful AI selection uses the same recommendation allowance or App Credit as Style. No charge for unavailable sources or empty results. Private preference summaries are included in the AI request.</p>
       {outfitIdea && <details className="lg:col-span-2"><summary className="cursor-pointer text-xs opacity-70">Reference your latest Style outfit</summary><p className="mt-2 whitespace-pre-line text-xs opacity-60">{outfitIdea.slice(0, 1500)}</p></details>}
     </form>
-    {error && <p role="alert" className="rounded-xl border border-red-400 p-4 text-sm">{error}</p>}
-    {result && <div className="space-y-4" aria-live="polite"><p className="text-sm opacity-75">{result.message}</p>{result.budgetNote && <p className="text-xs opacity-65">{result.budgetNote}</p>}
+    {error && resultSequence === contextSequence && <p role="alert" className="rounded-xl border border-red-400 p-4 text-sm">{error} <a href={iconicSearchUrl(query)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className="underline">Search directly at the retailer</a></p>}
+    {result && resultSequence === contextSequence && <div className="space-y-4" aria-live="polite"><p className="text-sm opacity-75">{result.message}</p>{result.status !== "ok" && <a href={iconicSearchUrl(query)} target="_blank" rel="noopener noreferrer" referrerPolicy="no-referrer" className="inline-block rounded-xl border px-4 py-3 text-sm underline" style={{ borderColor: "var(--card-border)" }}>Continue with direct retailer search ↗</a>}{result.budgetNote && <p className="text-xs opacity-65">{result.budgetNote}</p>}
       {result.model && <p className="text-xs opacity-60">Ranked by {result.model}</p>}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{result.products.map((item) => <article key={item.id} className="overflow-hidden rounded-3xl border" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <div className="relative aspect-[4/5]" style={{ background: "var(--background)" }}>{item.image ? <Image src={item.image} alt={item.name} fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw" className="object-contain" /> : <div className="flex h-full items-center justify-center text-sm opacity-50">Image unavailable</div>}</div>

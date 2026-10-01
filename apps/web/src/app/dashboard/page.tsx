@@ -7,8 +7,9 @@ import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 import { getOnboardingState } from "@/lib/onboarding";
 import { getActiveAccounting } from "@/lib/accounting";
+import { clothingItemName } from "@/lib/recommendation-links";
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ tour?: string; section?: string }> }) {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ tour?: string; section?: string; item?: string }> }) {
   const params = await searchParams;
   const session = await auth();
   if (!session?.user) redirect("/login");
@@ -112,6 +113,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         startTour={params.tour === "1"}
         onboardingPersistenceAvailable={onboardingPersistenceAvailable}
         initialSection={params.section === "shop" ? "shop" : "style"}
+        initialShopItem={params.section === "shop" ? clothingItemName(params.item) : null}
       />
     </>
   );

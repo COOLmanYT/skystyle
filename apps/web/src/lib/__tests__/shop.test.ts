@@ -23,6 +23,12 @@ describe("Grounded Shop sourcing", () => {
   it("does not invent product details when missing", () => {
     const [product] = parseEbayProducts({ itemSummaries: [{ ...item, price: { value: "invalid", currency: "AUD" }, image: {} }] }, "now");
     expect(product.price).toBeNull(); expect(product.image).toBeNull(); expect(product.rating).toBeNull();
+    expect(parseEbayProducts({ itemSummaries: [{ ...item, price: { value: "", currency: "AUD" } }] }, "now")[0].price).toBeNull();
+  });
+  it("preserves bounded Style context and rejects malformed or excessive excerpts", () => {
+    const context = { item: "linen shirt", outfit: "Pair with navy trousers" };
+    expect(parseShopInput({ query: "shirt", styleContext: context }).styleContext).toEqual(context);
+    for (const styleContext of [null, [], { item: "", outfit: "x" }, { item: "shirt", outfit: "x".repeat(1501) }]) expect(() => parseShopInput({ query: "shirt", styleContext })).toThrow();
   });
   it("fails closed without approved source credentials and never calls AI", async () => {
     const result = await searchShop(parseShopInput({ query: "shirt" }), { isPro: false, isDev: false });

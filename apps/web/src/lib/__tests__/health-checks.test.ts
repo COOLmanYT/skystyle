@@ -1,8 +1,13 @@
-import { aggregateHealth, getCategoryHealth } from "../health-checks";
+import { aggregateHealth, aggregateServiceHealth, getCategoryHealth } from "../health-checks";
 import { categoryHealthResponse } from "../health-response";
 import { NextRequest } from "next/server";
 jest.mock("../supabase", () => ({ supabaseAdmin: { from: jest.fn() } }));
 describe("Bounded public health checks", () => {
+  it("never calls a missing required service healthy", () => {
+    expect(aggregateServiceHealth(["ok", "ok", "unconfigured"])).toBe("degraded");
+    expect(aggregateServiceHealth(["unconfigured", "unconfigured"])).toBe("unconfigured");
+    expect(aggregateServiceHealth(["ok", "ok", "ok"])).toBe("ok");
+  });
   it("does not treat unconfigured providers as failures", () => {
     expect(aggregateHealth([{ provider: "a", status: "unconfigured", latencyMs: null }])).toBe("unconfigured");
     expect(aggregateHealth([{ provider: "a", status: "ok", latencyMs: 1 }, { provider: "b", status: "unconfigured", latencyMs: null }])).toBe("ok");

@@ -32,7 +32,7 @@ The **Recent results** section shows the outcome of each scheduled run:
 
 Completed recommendations are also copied to your **[Inbox](./account-and-support#inbox)**. If that copy fails, the completed result remains in run history.
 
-Runs enforce account access and the current Free recommendation allowance or Pro App Credit balance before generation, and use the same account-default AI model as Style. These are existing limits, not activation of the planned V6 entitlement table. Demo sessions cannot save schedules.
+Runs enforce account access and the current Free recommendation allowance or Pro App Credit balance before generation, and use the same account-default AI model as Style. Demo sessions cannot save schedules.
 
 ## How scheduling works
 
@@ -40,4 +40,4 @@ Runs enforce account access and the current Free recommendation allowance or Pro
 The scheduler runs via **Supabase Cron** (not Vercel Cron) and invokes the secure worker each minute. A bounded worker claims one job per invocation, so provider latency and queued jobs can delay delivery. Daily/weekly schedules preserve local wall-clock time across daylight-saving changes. Missed occurrences are skipped after one run, not backfilled with repeated charges. Failed recurring runs advance to a future occurrence; failed one-offs are disabled instead of repeatedly calling providers.
 :::
 
-Setup is documented for developers in [Development → Automatic recommendation scheduler](../development#automatic-recommendation-scheduler).
+See the [contributor guide](../development/#hosting-and-background-jobs) for background-job setup.

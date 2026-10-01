@@ -1,8 +1,10 @@
 {
   "name": "skystyle",
-  "version": "6.1.0",
+  "version": "6.2.2",
   "private": true,
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "next dev apps/web",
     "build": "next build apps/web",

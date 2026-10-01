@@ -1,6 +1,9 @@
 import NextAuth from "next-auth";
 import GitHub from "next-auth/providers/github";
 import Google from "next-auth/providers/google";
+import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
+import Apple from "next-auth/providers/apple";
+import { getOptionalOAuthReadiness } from "@/lib/oauth-readiness";
 import Credentials from "next-auth/providers/credentials";
 import { SupabaseAdapter } from "@auth/supabase-adapter";
 import type { Adapter } from "next-auth/adapters";
@@ -62,12 +65,20 @@ const rawAdapter =
     ? SupabaseAdapter({ url: supabaseUrl, secret: supabaseServiceKey })
     : undefined;
 
+const optionalOAuth = getOptionalOAuthReadiness();
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
   trustHost: true,
   providers: [
     GitHub,
     Google,
+    ...(optionalOAuth.microsoft ? [MicrosoftEntraID({
+      clientId: process.env.AUTH_MICROSOFT_ENTRA_ID_ID,
+      clientSecret: process.env.AUTH_MICROSOFT_ENTRA_ID_SECRET,
+      issuer: process.env.AUTH_MICROSOFT_ENTRA_ID_ISSUER || "https://login.microsoftonline.com/common/v2.0/",
+    })] : []),
+    ...(optionalOAuth.apple ? [Apple({ clientId: process.env.AUTH_APPLE_ID, clientSecret: process.env.AUTH_APPLE_SECRET })] : []),
     /**
      * Demo credentials provider — active in preview environments only.
      * The authorize() function acts as an additional server-side hard-stop:
@@ -98,6 +109,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   adapter: rawAdapter ? safeAdapter(rawAdapter) : undefined,
   session: { strategy: "jwt" },
+  // Apple's cross-site form_post callback needs the short-lived verification cookies.
+  // Session cookies keep Auth.js defaults; no insecure email-based account linking.
+  ...(optionalOAuth.apple ? { cookies: {
+    state: { name: "__Secure-authjs.state", options: { httpOnly: true, sameSite: "none" as const, path: "/", secure: true, maxAge: 900 } },
+    nonce: { name: "__Secure-authjs.nonce", options: { httpOnly: true, sameSite: "none" as const, path: "/", secure: true, maxAge: 900 } },
+  } } : {}),
   callbacks: {
     async jwt({ token, user }) {
       // Attach demo plan flag to the token when a demo user first signs in

@@ -117,6 +117,9 @@ export async function POST(req: NextRequest) {
 
   let recommendation;
   try {
+    // Read the signed-in owner's current closet; never trust client-supplied ownership.
+    const closet = isDemo ? null : await supabaseAdmin.from("closet").select("items").eq("user_id", userId).maybeSingle();
+    const closetItems = Array.isArray(closet?.data?.items) ? closet.data.items.filter((item: unknown): item is string => typeof item === "string") : [];
     // Check if user is trying to use a model switch (different from default)
     const isModelSwitch = Boolean(modelId && modelId !== getDefaultModel(isPro, isDev).id);
     
@@ -134,6 +137,7 @@ export async function POST(req: NextRequest) {
     }
     
     const generate = () => getFollowUpRecommendation({
+      closetItems,
       previousOutfit: String(previousOutfit),
       previousReasoning: String(previousReasoning ?? ""),
       weather: typedWeather,

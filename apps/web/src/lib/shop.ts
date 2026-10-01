@@ -5,6 +5,7 @@ import { parseRecommendationContext, type RecommendationContext } from "./recomm
 export interface ShopInput {
   query: string; size?: string; gender?: string; region: "AU";
   recommendationContext?: RecommendationContext;
+  styleContext?: { item: string; outfit: string };
 }
 export interface ShopProduct {
   id: string; name: string; url: string; image: string | null;
@@ -24,7 +25,14 @@ export function parseShopInput(raw: unknown): ShopInput {
   for (const field of ["size", "gender"] as const) if (body[field] !== undefined && (typeof body[field] !== "string" || body[field].length > 40)) throw new ShopError(`Invalid ${field}.`);
   const context = parseRecommendationContext(body.recommendationContext);
   if (!context.ok) throw new ShopError(context.error);
-  return { query: body.query.trim(), size: (body.size as string | undefined)?.trim(), gender: (body.gender as string | undefined)?.trim(), region: "AU", recommendationContext: context.value };
+  let styleContext: ShopInput["styleContext"];
+  if (body.styleContext !== undefined) {
+    if (!body.styleContext || typeof body.styleContext !== "object" || Array.isArray(body.styleContext)) throw new ShopError("Invalid Style context.");
+    const value = body.styleContext as Record<string, unknown>;
+    if (typeof value.item !== "string" || !value.item.trim() || value.item.length > 200 || typeof value.outfit !== "string" || value.outfit.length > 1500) throw new ShopError("Invalid Style context.");
+    styleContext = { item: value.item.trim(), outfit: value.outfit };
+  }
+  return { query: body.query.trim(), size: (body.size as string | undefined)?.trim(), gender: (body.gender as string | undefined)?.trim(), region: "AU", recommendationContext: context.value, ...(styleContext ? { styleContext } : {}) };
 }
 
 /** Only direct, source-supplied item links. Drop all affiliate, referral and tracking parameters. */
@@ -56,7 +64,7 @@ export function parseEbayProducts(raw: unknown, checkedAt: string): ShopProduct[
     if (!url || typeof row.title !== "string" || !row.title.trim() || typeof row.itemId !== "string" || seen.has(url)) return [];
     seen.add(url);
     const price = row.price as { value?: unknown; currency?: unknown } | undefined;
-    const amount = typeof price?.value === "string" ? Number(price.value) : NaN;
+    const amount = typeof price?.value === "string" && /^\d+(?:\.\d+)?$/.test(price.value.trim()) ? Number(price.value) : NaN;
     return [{ id: row.itemId.slice(0, 100), name: row.title.slice(0, 200), url,
       image: cleanEbayImageUrl((row.image as { imageUrl?: unknown } | undefined)?.imageUrl),
       price: Number.isFinite(amount) && amount >= 0 && typeof price?.currency === "string" && /^[A-Z]{3}$/.test(price.currency) ? { amount, currency: price.currency } : null,
@@ -80,7 +88,7 @@ async function getEbayToken(): Promise<string | null> {
     });
     if (!response.ok) throw new ShopError("The product source is temporarily unavailable.", 503);
     const token = await response.json() as { access_token?: string; expires_in?: number };
-    if (!token.access_token || !Number.isFinite(token.expires_in)) throw new ShopError("The product source is temporarily unavailable.", 503);
+    if (typeof token.access_token !== "string" || !token.access_token.trim() || !Number.isFinite(token.expires_in) || Number(token.expires_in) <= 0) throw new ShopError("The product source is temporarily unavailable.", 503);
     tokenCache = { value: token.access_token, expires: Date.now() + Math.max(0, Number(token.expires_in) - 60) * 1000 };
     return tokenCache.value;
   })();

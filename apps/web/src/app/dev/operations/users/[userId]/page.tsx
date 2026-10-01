@@ -30,7 +30,7 @@ export default function UserProfilePage({ params }: { params: Promise<{ userId: 
     const amount = Number(window.prompt(`${label}: positive gifts, negative revokes${field === "moneyCreditDelta" ? " (cents)" : ""}.`, "0"));
     if (Number.isInteger(amount) && amount !== 0) void update({ [field]: amount });
   };
-  return <main className="min-h-screen p-4 md:p-8" style={{ background: "var(--background)", color: "var(--foreground)" }}><div className="mx-auto max-w-5xl space-y-5">
+  return <main className="space-y-6" style={{ background: "var(--background)", color: "var(--foreground)" }}><div className="mx-auto max-w-5xl space-y-5">
     <Link href="/dev/operations/users" className="text-sm" style={{ color: "var(--accent)" }}>← Users</Link>
     {error && <p style={{ color: "#ff453a" }}>{error}</p>}
     {!data ? <p>Loading profile…</p> : <>

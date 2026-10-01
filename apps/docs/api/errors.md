@@ -1,10 +1,10 @@
 # Errors & Credits
 
-This page describes legacy API middleware. Existing endpoint costs remain unchanged. The [approved V6 account-credit and usage policy](../development/v6-entitlements) is staged, not active; its server adapter fails closed, reserves before provider work and settles before serving output. Do not treat legacy per-key grants/fallbacks as the approved V6 design.
+This page describes public API errors, response headers and current credit costs. Check your API Dashboard for the available balance before making requests.
 
 ## Error responses
 
-All error responses return JSON with a single `error` field:
+Error responses return JSON with an `error` field. Some also include a `message` with additional detail:
 
 ```json
 { "error": "Description of what went wrong." }
@@ -77,7 +77,7 @@ Every v1 API response includes the following standard headers:
 
 ## Credits
 
-Each API key starts with **50 API Credit**. Credits are deducted after each successful request. You can name and group keys, see their individual balances, and allocate $ Credit in the [API Dashboard](https://skystyle.app/dashboard/api).
+Keys receive the configured starting API allowance (50 by default). Credits are deducted after successful requests. Use the [API Dashboard](https://skystyle.app/dashboard/api) to name and group keys and check their current balances. Credit purchases and money-wallet allocation are unavailable.
 
 When a key has no API Credit, Sky Style uses one available App Credit for the request and returns `X-Credit-Warning` so API clients can surface the fallback. Developers have unlimited API usage. Free accounts may keep 3 active keys; Pro accounts may keep 20.
 

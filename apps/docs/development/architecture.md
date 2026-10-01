@@ -1,159 +1,40 @@
 # Architecture
 
-## Overview
+Sky Style is an npm-workspace monorepo. Next.js serves the product and public API; VitePress builds the documentation independently.
 
-Sky Style is organized as a monorepo with multiple deployable applications.
+## Source layout
 
-The approved V6 accounting foundation is installed but inactive. `entitlement-policy.ts` holds the selected plan values; `entitlements.ts` is the staged reservation/settlement adapter. Admins can record exact Pro periods without changing legacy access or collecting payments. See [accounting status and cutover gates](./v6-entitlements) before connecting or activating any charging path.
+| Location | Responsibility |
+| --- | --- |
+| `apps/web/src/app` | Product pages, server actions and API route handlers |
+| `apps/web/src/components` | Style, Closet, Shop and shared interface components |
+| `apps/web/src/lib` | Weather/AI adapters, validation, usage and domain logic |
+| `apps/web/src/auth.ts` | Auth.js providers, adapter and JWT session callbacks |
+| `apps/docs` | Public documentation source and VitePress configuration |
+| `supabase` | Database SQL assets, migration records and database tests |
 
-## Monorepo Structure
+## Authentication and requests
 
-```
-.
-├── apps/
-│   ├── web/         # Next.js 16 production app
-│   │   ├── src/     # Application source
-│   │   │   ├── app/ # App router pages and API routes
-│   │   │   ├── lib/ # Shared library code
-│   │   │   └── components/ # React components
-│   │   ├── next.config.ts
-│   │   └── package.json
-│   │
-│   └── docs/        # VitePress documentation
-│       ├── .vitepress/
-│       └── api/     # API documentation
-│
-├── supabase/        # Database schema and migrations
-│   ├── schema.sql
-│   └── migrations/
-│
-└── package.json     # Root package with npm workspaces
-```
+Account pages use Auth.js JWT sessions. GitHub and Google are the available sign-in methods. Server pages use `auth()`; clients read `/api/auth/session`.
 
-## Web App (apps/web)
+Session routes such as `/api/style` and `/api/shop` authenticate the account, validate input and enforce its available usage before provider work. The [public API](../api/) lives under `/api/v1` and uses API-key authentication. [Health endpoints](../api/health) are public read-only diagnostics and require no key.
 
-### Framework
+## Providers and recommendations
 
-- **Next.js 16** with App Router
-- **React 19**
-- **TypeScript**
-- **Tailwind CSS v4**
+Weather adapters normalise provider data before the AI receives it. The AI module defines model priorities, plan access and bring-your-own-key support. Provider availability depends on deployment configuration; a static model list is not evidence that a provider is connected.
 
-### Key Dependencies
+Clothing actions resolve against the account's closet. Owned items open Closet; other items prepare an editable Shop search. Shop ranks source-supplied candidates and never uses AI text as a substitute for product prices, links or images.
 
-- `@google/generative-ai` - Gemini API client
-- `@mistralai/mistralai` - Mistral API client
-- `openai` - OpenAI API client
-- `@supabase/supabase-js` - Database client
-- `next-auth` - Authentication
-- `@simplewebauthn/browser` - WebAuthn support
+## Data and usage
 
-### Directory Structure
+Supabase stores account profiles, settings, closet items, usage, support records and changelog posts. Its admin client is server-only. Route-level account authorization and ownership checks remain necessary alongside database policies. Upserts declare their conflict target.
 
-```
-apps/web/
-├── src/
-│   ├── app/
-│   │   ├── api/              # API routes
-│   │   │   ├── style/        # Outfit recommendations
-│   │   │   ├── followup/     # Follow-up recommendations
-│   │   │   ├── weather/      # Weather data
-│   │   │   └── ...
-│   │   ├── (auth)/           # Authentication pages
-│   │   ├── dashboard/        # Main dashboard
-│   │   └── layout.tsx
-│   │
-│   ├── components/           # React components
-│   │   ├── Dashboard.tsx     # Main dashboard component
-│   │   ├── WeatherPlanningPanel.tsx
-│   │   └── ...
-│   │
-│   ├── lib/                 # Library code
-│   │   ├── ai.ts            # AI integration and model management
-│   │   ├── weather.ts       # Weather data fetching and caching
-│   │   ├── daily-usage.ts   # Rate limiting and usage tracking
-│   │   ├── credits.ts       # Credits system
-│   │   ├── api-keys.ts      # API key generation and verification
-│   │   └── ...
-│   │
-│   └── __tests__/           # Test files
-│       ├── setup.ts
-│       └── mocks.ts
-│
-├── next.config.ts
-├── package.json
-└── tsconfig.json
-```
+Usage helpers enforce the account's applicable allowance or credits. The UI should display the server's current usage readout rather than calculating access from marketing copy. Credit purchases and checkout are unavailable.
 
-## Data Flow
+Optional preferences and BYOK keys use browser storage with the `skystyle_` prefix. User-provided keys pass through the server for a requested provider call and are not saved in the database. See [Security & Privacy](../web-app/security-and-privacy).
 
-```
-User Request
-     ↓
-API Route (style/followup)
-     ↓
-Authentication Check
-     ↓
-Rate Limit Check (daily-usage.ts)
-     ↓
-Weather Data (weather.ts)
-     ↓
-AI Recommendation (ai.ts)
-     ↓
-Response with outfit suggestion
-```
+## Developer tools and background work
 
-## AI Integration
+The Dev Center uses a shared, server-protected layout with task-based navigation. Each workspace has its own URL. API handlers independently authorize developer actions. See the [Dev Center guide](../web-app/dev-center).
 
-### Supported Providers
-
-- OpenAI (GPT-4o, GPT-4o Mini)
-- Google Gemini (2.5 Flash, 2.5 Flash Lite)
-- Mistral AI (Large Latest, Small Latest, Ministral)
-- Gemma (served through the Gemini provider — no separate key required)
-
-### Model Tiering
-
-**Pro Users:**
-1. OpenAI models
-2. Gemini models
-3. Mistral Large
-4. Gemma
-5. Mistral Small
-6. Ministral
-
-**Free Users:**
-1. Gemini models
-2. Mistral Small
-3. Gemma
-4. Ministral
-
-### BYOK Support
-
-Bring Your Own Key (BYOK) is supported for all providers. Users can configure their own API keys for:
-
-- OpenAI
-- Gemini
-- Mistral
-
-## Database (Supabase)
-
-### Key Tables
-
-- `users` - User accounts
-- `daily_usage` - Usage tracking with rate limits
-- `credits` - Pro user credits
-- `settings` - User preferences
-- `closet` - User wardrobe items
-
-### Rate Limits
-
-The `demo` tier is only created automatically when the deployment is a preview/development environment; it multiplies the free limits by 10 for preview testing.
-
-| Feature | Free | Demo | Pro | Dev |
-|---------|------|------|-----|-----|
-| AI uses | 20/day | 200/day | ∞ | ∞ |
-| Follow-ups | 40/day | 400/day | 400/day | ∞ |
-| Closet uses | 4/day | 40/day | ∞ | ∞ |
-| Source picks | 4/day | 40/day | ∞ | ∞ |
-| Model switches | 2/day | 20/day | ∞ | ∞ |
+Automatic recommendations use a Supabase Cron worker. The [contributor overview](./index#hosting-and-background-jobs) describes scheduling. Jest tests live beside library, component and route code; use the [testing guide](./testing) to verify changes.

@@ -13,39 +13,31 @@ New here? Try the [no-login Live Demo](https://skystyle.app/#demo) first to see 
 
 ## Guides
 
+- **[Dev Center](/web-app/dev-center)** — task-based support, monitoring and account tools for authorised developers.
+
 **Start here:**
 
-- **[Getting Started](./getting-started)** — a step-by-step walkthrough from sign-up to your first refined recommendation.
-- **[How It Works](./how-it-works)** — the end-to-end flow, weather sources, AI models, accuracy scoring, and usage limits.
+- **[Getting Started](/web-app/getting-started)** — a step-by-step walkthrough from sign-up to your first refined recommendation.
+- **[How It Works](/web-app/how-it-works)** — the end-to-end flow, weather sources, AI models, accuracy scoring, and usage limits.
 
 **Feature reference:**
 
-- **[Dashboard & Closet](./dashboard)** — recommendation modes, weather planning panel, model switching, follow-up questions, BYOK, and your wardrobe.
-- **[Shop](./web-app/shop)** — your budget range, sourced product widgets, shared AI models, and product-source availability gates.
-- **[Settings](./settings)** — profile, units, appearance, preferences, dashboard behaviour, layout & spacing, and tutorials.
-- **[Security & Privacy](./security-and-privacy)** — 2FA, passkeys, API keys, security log, data export, and account deletion.
-- **[Automatic Recommendations](./automatic-recommendations)** — schedule exact-time outfit recommendations with a manual location.
-- **[API Dashboard](./api-dashboard)** — manage API keys, allocate credits, and view per-key balances.
-- **[Account & Support](./account-and-support)** — the account hub, plans, feedback, inbox, changelog, and service status.
+- **[Dashboard & Closet](/web-app/dashboard)** — recommendation modes, weather planning panel, model switching, follow-up questions, BYOK, and your wardrobe.
+- **[Shop](./web-app/shop)** — your budget range, sourced product widgets, shared AI models, and source availability.
+- **[Settings](/web-app/settings)** — profile, units, appearance, preferences, dashboard behaviour, layout & spacing, and tutorials.
+- **[Security & Privacy](/web-app/security-and-privacy)** — 2FA, passkeys, API keys, security log, data export, and account deletion.
+- **[Automatic Recommendations](/web-app/automatic-recommendations)** — schedule exact-time outfit recommendations with a manual location.
+- **[API Dashboard](/web-app/api-dashboard)** — manage API keys, allocate credits, and view per-key balances.
+- **[Account & Support](/web-app/account-and-support)** — the account hub, plans, feedback, inbox, changelog, and service status.
 
 **Advanced:**
 
-- **[Custom Weather Sources](./custom-weather-sources)** — (Pro) add your own HTTPS weather sources with SSRF-safe validation.
+- **[Custom Weather Sources](/web-app/custom-weather-sources)** — (Pro) add your own HTTPS weather sources with SSRF-safe validation.
 
 **Need help?**
 
-- **[FAQ & Troubleshooting](./faq)** — common questions, error explanations, and fixes.
+- **[FAQ & Troubleshooting](/web-app/faq)** — common questions, error explanations, and fixes.
 
-## Legacy credits — V6 accounting inactive
+## Usage and credits
 
-The [approved V6 policy](./development/v6-entitlements) uses one account balance with separate grant/purchased expiry rules, not new credits per key. It is **not active yet**. Current credit screens still use legacy accounting pending the coordinated cutover; checkout and purchases are unavailable.
-
-Sky Style keeps three balances distinct:
-
-| Balance | Use |
-| --- | --- |
-| $ Credit (AUD) | Legacy money-wallet conversion is unavailable on the verified schema; do not assume a monthly money grant or a working purchase flow. |
-| API Credit | Per-key balance consumed by public API requests. |
-| App Credit | In-app balance, including developer gifts and API fallback when a key's API Credit is empty. Pro receives 50 App Credits each day. |
-
-API credit purchases are not live yet; the app's donation prompt is intentionally informational. See [API Dashboard → Credits](./api-dashboard#credits) for details.
+Your account and dashboard show the current allowance and balance. Checkout and credit purchases are unavailable. See [usage limits](/web-app/how-it-works#usage-limits) and [API credits](/web-app/api-dashboard#credits-and-usage).

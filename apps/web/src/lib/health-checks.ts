@@ -10,6 +10,11 @@ export function aggregateHealth(providers: ProviderHealth[]): HealthStatus {
   if (providers.every((entry) => entry.status === "unconfigured")) return "unconfigured";
   return providers.some((entry) => entry.status === "degraded") ? "degraded" : "ok";
 }
+/** Each category is required for the consolidated service to be ready. */
+export function aggregateServiceHealth(statuses: HealthStatus[]): HealthStatus {
+  if (statuses.every((status) => status === "unconfigured")) return "unconfigured";
+  return statuses.every((status) => status === "ok") ? "ok" : "degraded";
+}
 async function ping(provider: string, url: string, headers?: Record<string, string>): Promise<ProviderHealth> {
   const start = Date.now();
   try {

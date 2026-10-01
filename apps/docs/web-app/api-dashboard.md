@@ -1,16 +1,13 @@
 # API Dashboard
 
-The **API Dashboard** (`/dashboard/api`) is the full key-management surface for the [public API](../api/). It sits at the intersection of the web app and the API — manage keys, group them, and allocate credits to them.
+Open **API Dashboard** from the app menu to manage keys for the [public API](../api/). Your API key identifies your account; keep it private and use separate keys for separate integrations.
 
-## Managing keys
+## Keys and folders
 
-- **Create** `sk_live_` API keys — the full key is shown **only once** at creation, so copy it immediately.
-- **Name** keys with a nickname for easy identification.
-- **Group** keys into folders to organise them (e.g. "Production", "Testing").
-- **Revoke** any key instantly. Revoked keys immediately stop authenticating.
-- View each key's preview, folder, creation date, and active/revoked status.
-
-## Active key limits
+- Create a `sk_live_` key and copy the full value immediately. It is shown only once.
+- Give each key a descriptive nickname and optionally group it in a folder.
+- Review its preview, creation date, status and available credits.
+- Revoke a key you no longer use to prevent further authentication.
 
 | Plan | Active keys |
 | --- | --- |
@@ -18,36 +15,14 @@ The **API Dashboard** (`/dashboard/api`) is the full key-management surface for 
 | Pro | 20 |
 | Dev | Unlimited |
 
-## Legacy credits — V6 accounting inactive
+Revoked keys do not occupy an active-key slot. See [Authentication](../api/authentication) for using a key safely.
 
-The [approved V6 policy](../development/v6-entitlements) is account-level: 10 signup credits once on Free and 50 per explicit monthly Pro period, with zero new per-key grants. It is staged, **not enforced yet**. The legacy screens below are pending replacement; no checkout or credit purchase is live.
+## Credits and usage
 
-Sky Style keeps three balances distinct. The API Dashboard is where you move value between them:
+The dashboard shows each key's available API credits. Public API requests consume credits according to the [endpoint costs](../api/errors#credits). An empty key balance may use an available App Credit and return `X-Credit-Warning`; surface that warning in your integration.
 
-| Balance | Use |
-| --- | --- |
-| **$ Credit (AUD)** | Legacy wallet/transfer UI. The verified live schema has no money wallet, so conversion and monthly money grants must not be assumed to work. |
-| **API Credit** | Per-key balance consumed by public API requests. |
-| **App Credit** | In-app balance, including developer gifts and API fallback when a key's API Credit is empty. Pro receives 50 App Credits each day. |
+API credit purchases and money-wallet top-ups are unavailable. A donation is not a credit purchase. Check the account's displayed balance before making requests; do not assume a future plan or purchase will add credits.
 
-### Allocating credit
+## Help
 
-This is a legacy UI description, **not an available top-up flow** on the verified schema. It requires the old money wallet, which is absent. The new shared-wallet policy has no per-key allocation step.
-
-Historically, when a deployment had at least **$1.00** in $ Credit and at least one active API key:
-
-1. Select a key from the dropdown (shown with its folder and nickname).
-2. Click **Allocate $1 → 50 API Credit**.
-3. The selected key's API Credit balance increases by 50.
-
-::: warning Purchases not live yet
-API credit purchases are not live yet. The app's "Get credits" button currently opens an informational donation prompt — it does not process a purchase. App Credit can be gifted by a developer in the meantime.
-:::
-
-## App Credit fallback
-
-When an API key's API Credit balance is empty, Sky Style automatically uses one available App Credit for the request and returns an `X-Credit-Warning` header so API clients can surface the fallback. See [Errors & Credits](../api/errors) for the full charging rules.
-
-## Tutorials
-
-The API Dashboard has its own guided tour — replay it from [Settings → Tutorials](./settings#tutorials).
+Replay the API Dashboard tour from [Settings → Tutorials](./settings#tutorials). For failed requests, check the API [errors and response headers](../api/errors).

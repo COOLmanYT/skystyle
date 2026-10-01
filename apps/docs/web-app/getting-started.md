@@ -1,7 +1,7 @@
 # Getting Started
 
 ::: warning Approved policy, inactive rollout
-The [approved V6 plan values](../development/v6-entitlements#authoritative-values) are staged, not yet enforced. Existing account limits remain legacy until the coordinated cutover. No live checkout or credit purchase is available.
+Your account shows its current usage allowance. Checkout and credit purchases are unavailable.
 :::
 
 New to Sky Style? This walkthrough takes you from sign-up to your first refined recommendation in a few minutes.

@@ -14,6 +14,7 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Mistral } from "@mistralai/mistralai";
 import { WeatherData } from "./weather";
+import { recommendationLinkInstructions } from "./recommendation-links";
 import {
   type EventForecastMatch,
   type RecommendationContext,
@@ -203,6 +204,7 @@ export interface StyleInput {
 }
 
 export interface FollowUpInput {
+  closetItems?: string[];
   previousOutfit: string;
   previousReasoning: string;
   weather: WeatherData;
@@ -676,7 +678,7 @@ export async function getStyleRecommendation(
   }
 
   // Client-side custom prompt takes precedence over DB-stored one (Pro/Dev only)
-  const systemPrompt = clientCustomPrompt ?? customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+  const systemPrompt = (clientCustomPrompt ?? customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT) + recommendationLinkInstructions(closetItems);
 
   const closetSection =
     closetItems.length > 0
@@ -865,7 +867,7 @@ export async function getFollowUpRecommendation(
     customSystemPrompt, userApiKey, byokProvider, recommendationContext, eventForecast, modelId,
   } = input;
   const isDev = input.isDev === true;
-  const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+  const systemPrompt = (customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT) + recommendationLinkInstructions(input.closetItems ?? []);
 
   const recommendationContextSection = formatRecommendationContext(recommendationContext);
   const eventForecastSection = recommendationContext?.event && eventForecast?.status === "unavailable"

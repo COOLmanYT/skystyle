@@ -1,21 +1,25 @@
-# Shop — Sky Style 6.1.0
+# Shop
 
-Shop is a separate Dashboard workspace for buying new clothes. Style remains for weather-aware outfit advice and your existing wardrobe. The full-width bar and shared sidebar use the same enabled sections: **Style and Shop**, **Style only**, or **Shop only**. Choose during onboarding or in Settings; the preference is scoped to your account in this browser, not cloud-synced. With browser storage blocked it lasts only for the current visit.
+Shop helps you find clothing for an outfit. Choose **Shop** in the dashboard, or follow a clothing link from a Style recommendation. Use [Settings](./settings) to choose which dashboard sections you normally see.
 
-## Search controls
+## Move from Style to Shop
 
-Describe what you want, add a size/fit, clothing preference and occasion, and optionally enter a minimum/maximum outfit budget. Budget inputs now live in Shop, not Style. The minimum is a preference, not a requirement to spend more. Sourced item totals cannot exceed your maximum; delivery, taxes and size availability must be checked at the retailer.
+Clothing already in your closet opens **Closet**, scrolls to the matching item and briefly highlights it. Other clothing opens Shop with the item name ready to edit. The latest outfit can provide context for the search.
 
-Shop uses the same account model list/default and existing recommendation allowance as Style. Pro/Dev can use their own provider key or add custom AI preferences. OpenAI, Gemini, Mistral and Anthropic BYOK are supported; Anthropic uses Claude Haiku 4.5. Keys are browser-local and transmitted through Sky Style for your chosen provider, never stored in the database. Changing provider clears the previous key. Follow-ups in Style retain the BYOK provider.
+Opening a link does not search or use an AI allowance. Edit the description, check your filters, then submit when ready. A new clothing link hides results from the previous item. **Clear item context** starts a fresh search.
 
-## Product-source gate
+## Describe what you need
 
-The source adapter uses the official eBay Browse API for Australia, not website scraping. Live widget search requires approved production API access and credentials. Until connected, the app shows an explicit unavailable state with direct THE ICONIC search, and performs no AI generation or charge. THE ICONIC website scraping is not enabled: its terms require explicit authorization.
+Enter a clothing description, optional size/fit, clothing preference and occasion. You can set a minimum and maximum budget in the currency of your choice. Prices retain their source currency; currency conversion is unavailable. Nonmatching currencies are excluded from budget comparisons.
 
-Only source-supplied product ids, direct links, names, prices and images can appear in cards. AI ranks candidates but cannot supply replacements for source metadata. Product ratings are **unavailable** when the source supplies none; seller feedback is not a product rating. Invalid/duplicate links and affiliate/referral parameters are discarded. Images are delivered through Sky Style's image optimization endpoint rather than a direct browser request to the source.
+Shop uses the same model list and account allowance as Style. Pro and Dev accounts can supply a supported provider key or custom AI preferences. BYOK settings are shared with Style, remain in this browser, and are sent through the server only for your selected provider's request.
 
-Prices show their original currency and the source check time. There is no currency conversion or worldwide retailer-coverage claim. A budget in a different currency excludes nonmatching prices; choose the source currency to compare reliably. A listed item is not a verified guarantee of your size or current stock. Confirm price, delivery and availability at checkout.
+## Results and source availability
 
-No Sky Style shopping query, product, impression or click analytics is recorded. Shopping requests transmit the search/fit terms to the product API and preferences/candidate text to your selected AI provider. Account usage counters remain necessary to enforce the existing recommendation allowance. Neither affiliate programs nor live payments are enabled.
+Product cards require a connected clothing source. If it is unavailable or returns no suitable items, use **Direct retailer search** to continue at THE ICONIC. These unavailable or empty searches do not generate an AI selection or charge usage.
 
-Sources: [eBay Browse API](https://developer.ebay.com/api-docs/buy/browse/resources/item_summary/methods/search), [THE ICONIC terms](https://www.theiconic.com.au/terms-conditions/), [Anthropic API](https://platform.claude.com/docs/en/api/overview).
+Connected results show source-supplied product names, direct links, available images, prices and the time checked. AI explains why an item suits your request; it does not invent product metadata. Missing images, prices and product ratings are labelled unavailable.
+
+Current source coverage is Australia. Check size, stock, final price, shipping and returns with the retailer before buying. Sky Style does not operate checkout or add affiliate parameters or shopping click tracking. Retailers handle purchases under their own terms.
+
+Search descriptions and fit details go to the connected source. Preferences and candidate text go to the selected AI provider. See [Security & Privacy](./security-and-privacy) for data handling.

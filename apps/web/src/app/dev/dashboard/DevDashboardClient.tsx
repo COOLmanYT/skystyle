@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import DevNavBar from "@/components/DevNavBar";
+import DevHealthPanel from "@/components/DevHealthPanel";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { sanitizeUrl } from "@/lib/sanitize-url";
 
 interface DeletionRequest {
@@ -26,15 +28,23 @@ interface DevMessage {
 
 type Section = "triage" | "chat" | "changelog" | "health";
 
-export default function DevDashboardClient({ initialSection = "triage" }: { initialSection?: Section }) {
-  const [section, setSection] = useState<Section>(initialSection);
+export default function DevDashboardClient({ initialSection = "triage", initialUserId = null }: { initialSection?: Section; initialUserId?: string | null }) {
+  const router = useRouter();
+  const section = initialSection;
   const [deletionRequests, setDeletionRequests] = useState<DeletionRequest[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
+  const selectedUserId = initialUserId;
+  const selectedContact = deletionRequests.find((request) => request.user_id === selectedUserId)?.users;
   const [chatMessages, setChatMessages] = useState<DevMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [adminNote, setAdminNote] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState("");
+  const [requestsLoading, setRequestsLoading] = useState(true);
+  const [requestFilter, setRequestFilter] = useState("pending");
+  const [requestSearch, setRequestSearch] = useState("");
+  const matchingRequests = deletionRequests.filter((request) => (requestFilter === "all" || request.status === requestFilter)
+    && `${request.users?.name ?? ""} ${request.users?.email ?? ""} ${request.reason ?? ""}`.toLowerCase().includes(requestSearch.toLowerCase()));
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -42,17 +52,30 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
   };
 
   const fetchDeletion = useCallback(async () => {
-    const res = await fetch("/api/dev/deletion-requests");
-    if (res.ok) setDeletionRequests(await res.json());
+    setRequestsLoading(true); setLoadError("");
+    try {
+      const res = await fetch("/api/dev/deletion-requests", { cache: "no-store" });
+      if (!res.ok) throw new Error(`Unable to load requests (${res.status}).`);
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("The request list was incomplete.");
+      setDeletionRequests(data);
+    } catch (failure) { setLoadError(failure instanceof Error ? failure.message : "Unable to load requests."); }
+    finally { setRequestsLoading(false); }
   }, []);
 
   const fetchChat = useCallback(async (userId: string) => {
-    const res = await fetch(`/api/dev/messages?userId=${userId}`);
-    if (res.ok) setChatMessages(await res.json());
+    setChatMessages([]); setLoadError("");
+    try {
+      const res = await fetch(`/api/dev/messages?userId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Unable to load messages (${res.status}).`);
+      const data = await res.json();
+      if (!Array.isArray(data)) throw new Error("The message list was incomplete.");
+      setChatMessages(data);
+    } catch (failure) { setLoadError(failure instanceof Error ? failure.message : "Unable to load messages."); }
   }, []);
 
   useEffect(() => {
-    if (section === "triage") { void (async () => fetchDeletion())(); }
+    if (section === "triage" || section === "chat") { void (async () => fetchDeletion())(); }
   }, [section, fetchDeletion]);
 
   useEffect(() => {
@@ -61,83 +84,66 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
 
   async function handleTriage(id: string, action: "approve" | "decline") {
     setLoading(true);
+    try {
     const res = await fetch("/api/dev/deletion-requests", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, action, admin_note: adminNote[id] ?? null }),
     });
-    setLoading(false);
     if (res.ok) {
-      showToast(`Request ${action}d.`);
-      fetchDeletion();
+      await fetchDeletion();
+      showToast(action === "approve" ? "Request approved. Actual account deletion is a separate operation." : "Request declined.");
     } else {
-      showToast("Failed.");
+      showToast(`Request was not updated (${res.status}).`);
     }
+    } catch { showToast("Request could not be updated. Refresh before retrying."); }
+    finally { setLoading(false); }
   }
 
   async function sendMessage() {
-    if (!newMessage.trim() || !selectedUserId) return;
+    if (loading || !newMessage.trim() || !selectedUserId) return;
     setLoading(true);
-    await fetch("/api/dev/messages", {
+    try {
+    const response = await fetch("/api/dev/messages", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ content: newMessage.trim(), userId: selectedUserId }),
     });
-    setLoading(false);
+    if (!response.ok) { showToast(`Message was not sent (${response.status}). Your draft is kept.`); return; }
     setNewMessage("");
-    fetchChat(selectedUserId);
+    await fetchChat(selectedUserId);
+    } catch { showToast("Message could not be sent. Your draft is kept; refresh before retrying."); }
+    finally { setLoading(false); }
   }
 
-  const navItems: { id: Section; label: string; emoji: string }[] = [
-    { id: "triage", label: "Triage", emoji: "🗂️" },
-    { id: "chat", label: "Chat", emoji: "💬" },
-    { id: "changelog", label: "Changelog", emoji: "📝" },
-    { id: "health", label: "Health", emoji: "📊" },
-  ];
-
+  const sectionMeta = {
+    triage: { title: "Deletion requests", description: "Review each request, add a note, then approve or decline." },
+    chat: { title: "User messages", description: "Continue a conversation with an account holder. Feedback tickets have their own workspace." },
+    changelog: { title: "Changelog", description: "Write an update, check the preview, then publish when ready." },
+    health: { title: "Service health", description: "Check provider connectivity. Open API activity to investigate individual requests." },
+  }[section];
   return (
-    <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <DevNavBar email="" />
-
-      <div className="max-w-6xl mx-auto px-4 py-6">
-        <div className="flex gap-6 items-start">
-        <aside className="hidden md:block sticky top-20 w-40 shrink-0" aria-label="Dev Dashboard sections">
-          <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>On this page</p>
-          <div className="space-y-1">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setSection(item.id)}
-              className="w-full text-left rounded-xl px-3 py-2 text-sm font-medium btn-interact"
-              style={{
-                background: section === item.id ? "var(--foreground)" : "var(--card)",
-                color: section === item.id ? "var(--background)" : "var(--foreground)",
-                border: "1px solid var(--card-border)",
-                opacity: section === item.id ? 1 : 0.7,
-              }}
-            >
-              {item.emoji} {item.label}
-            </button>
-          ))}
-          </div>
-        </aside>
-        <div className="flex-1 min-w-0">
-        <div className="md:hidden flex gap-2 flex-wrap mb-6">
-          {navItems.map((item) => <button key={item.id} onClick={() => setSection(item.id)} className="rounded-xl px-3 py-2 text-xs btn-interact" style={{ background: section === item.id ? "var(--foreground)" : "var(--card)", color: section === item.id ? "var(--background)" : "var(--foreground)", border: "1px solid var(--card-border)" }}>{item.emoji} {item.label}</button>)}
-        </div>
-
+    <main id="main-content" className="space-y-6">
+      <header className="rounded-3xl border p-6 sm:p-8" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <p className="text-xs font-semibold uppercase tracking-widest opacity-50">Dev Center</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">{sectionMeta.title}</h1>
+        <p className="mt-2 max-w-2xl text-sm leading-relaxed opacity-65">{sectionMeta.description}</p>
+      </header>
+      {loadError && <p role="alert" className="rounded-xl border border-red-400 p-4 text-sm">{loadError} <button onClick={() => selectedUserId && section === "chat" ? void fetchChat(selectedUserId) : void fetchDeletion()} className="underline">Retry</button></p>}
         {/* Triage */}
         {section === "triage" && (
           <div className="space-y-4">
             <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
               Deletion Requests
             </h2>
-            {deletionRequests.length === 0 ? (
+            <p className="text-xs opacity-65">{deletionRequests.filter((request) => request.status === "pending").length} pending · {deletionRequests.length} recent requests. Approval records a decision; it does not delete account data.</p>
+            <div className="flex flex-wrap gap-3"><input aria-label="Search deletion requests" value={requestSearch} onChange={(event) => setRequestSearch(event.target.value)} placeholder="Search name, email or reason" className="min-w-0 flex-1 rounded-xl border px-3 py-2 text-sm" style={{ background: "var(--card)", borderColor: "var(--card-border)" }} /><select aria-label="Request status" value={requestFilter} onChange={(event) => setRequestFilter(event.target.value)} className="rounded-xl border px-3 py-2 text-sm" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>{["pending", "approved", "declined", "all"].map((status) => <option key={status} value={status}>{status}</option>)}</select><button onClick={() => void fetchDeletion()} disabled={requestsLoading} className="rounded-xl border px-3 py-2 text-sm disabled:opacity-50" style={{ borderColor: "var(--card-border)" }}>Refresh</button></div>
+            {requestsLoading ? <p role="status" className="text-sm opacity-65">Loading requests…</p> : matchingRequests.length === 0 ? (
               <p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-                No pending deletion requests.
+                {loadError ? "Requests could not be loaded." : "No requests match this view."}
               </p>
             ) : (
-              deletionRequests.map((req) => (
+              matchingRequests.map((req) => (
                 <div
                   key={req.id}
                   className="rounded-2xl p-5 space-y-3"
@@ -176,6 +182,7 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
                   {req.status === "pending" && (
                     <div className="space-y-2">
                       <textarea
+                        aria-label={`Admin note for ${req.users?.name ?? req.user_id}`}
                         value={adminNote[req.id] ?? ""}
                         onChange={(e) => setAdminNote((p) => ({ ...p, [req.id]: e.target.value }))}
                         placeholder="Admin note (optional)..."
@@ -207,8 +214,7 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
                         </button>
                         <button
                           onClick={() => {
-                            setSelectedUserId(req.user_id);
-                            setSection("chat");
+                            router.push(`/dev/chat?userId=${encodeURIComponent(req.user_id)}`);
                           }}
                           className="rounded-xl px-4 py-2 text-xs font-medium btn-interact"
                           style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
@@ -233,14 +239,15 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
             {!selectedUserId ? (
               <div className="space-y-2">
                 <p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-                  Select a user from the Triage tab to open their chat.
+                  Choose an account below, or open Users to find another account.
                 </p>
+                <Link href="/dev/operations/users" className="inline-block rounded-xl border px-4 py-2 text-sm" style={{ borderColor: "var(--card-border)" }}>Find an account in Users →</Link>
                 {deletionRequests.length > 0 && (
                   <div className="space-y-2">
                     {deletionRequests.map((req) => (
                       <button
                         key={req.user_id}
-                        onClick={() => { setSelectedUserId(req.user_id); fetchChat(req.user_id); }}
+                        onClick={() => router.push(`/dev/chat?userId=${encodeURIComponent(req.user_id)}`)}
                         className="block text-left w-full rounded-xl p-3 btn-interact"
                         style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
                       >
@@ -255,12 +262,16 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
             ) : (
               <div className="space-y-3">
                 <button
-                  onClick={() => setSelectedUserId(null)}
+                  onClick={() => router.push("/dev/chat")}
                   className="text-xs btn-interact"
                   style={{ color: "var(--foreground)", opacity: 0.5 }}
                 >
-                  ← Back
+                  ← Choose another account
                 </button>
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border p-4" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+                  <div><h3 className="text-sm font-semibold">{selectedContact?.name ?? selectedContact?.email ?? "Account conversation"}</h3>{selectedContact?.name && selectedContact.email && <p className="mt-1 text-xs opacity-60">{selectedContact.email}</p>}</div>
+                  <Link href={`/dev/operations/users/${selectedUserId}`} className="text-sm underline">View account →</Link>
+                </div>
                 <div
                   className="rounded-2xl p-4 space-y-3 max-h-96 overflow-y-auto"
                   style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
@@ -293,6 +304,7 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
                 </div>
                 <div className="flex gap-2">
                   <input
+                    aria-label="Reply to user"
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && sendMessage()}
@@ -323,21 +335,19 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
         {section === "changelog" && <ChangelogCMS />}
 
         {/* Health */}
-        {section === "health" && <HealthPanel />}
-        </div>
-        </div>
-      </div>
+        {section === "health" && <DevHealthPanel />}
 
       {/* Toast */}
       {toast && (
         <div
+          role="status"
           className="fixed bottom-6 left-1/2 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-medium shadow-lg"
           style={{ background: "var(--foreground)", color: "var(--background)", zIndex: 100 }}
         >
           {toast}
         </div>
       )}
-    </div>
+    </main>
   );
 }
 
@@ -411,8 +421,8 @@ function ChangelogCMS() {
   const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
-    fetch("/api/dev/changelog")
-      .then((r) => r.json())
+    fetch("/api/dev/changelog", { cache: "no-store" })
+      .then((r) => { if (!r.ok) throw new Error(`Unable to load changelog (${r.status}).`); return r.json(); })
       .then((d) => { setEntries(Array.isArray(d) ? d : []); setLoading(false); })
       .catch((e) => { setLoadError(String(e)); setLoading(false); });
   }, []);
@@ -459,17 +469,16 @@ function ChangelogCMS() {
       ...form,
     };
     const method = editingVersion ? "PUT" : "POST";
-    const res = await fetch("/api/dev/changelog", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(entry) });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setSaveError((body as { error?: string }).error ?? "Failed to save.");
-      setSaving(false);
-      return;
-    }
-    const updated = await fetch("/api/dev/changelog").then(r => r.json());
-    setEntries(Array.isArray(updated) ? updated : entries);
-    startNew();
-    setSaving(false);
+    try {
+      const res = await fetch("/api/dev/changelog", { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(entry) });
+      if (!res.ok) throw new Error(`Save failed (${res.status}). Your draft is kept.`);
+      const readback = await fetch("/api/dev/changelog", { cache: "no-store" });
+      if (!readback.ok) throw new Error("Save returned success but could not be verified. Refresh before retrying; your draft is kept.");
+      const updated = await readback.json();
+      if (!Array.isArray(updated) || !updated.some((item: ChangelogEntry) => item.version === entry.version && item.title === entry.title && item.description === entry.description)) throw new Error("Saved entry was not verified. Refresh before retrying; your draft is kept.");
+      setEntries(updated); startNew();
+    } catch (failure) { setSaveError(failure instanceof Error ? failure.message : "Save failed. Your draft is kept."); }
+    finally { setSaving(false); }
   }
 
   async function handleDelete(version: string) {
@@ -669,229 +678,6 @@ function ChangelogCMS() {
         ))}
         {!loading && !entries.length && <p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.4 }}>No entries yet.</p>}
       </div>
-    </div>
-  );
-}
-
-function HealthPanel() {
-  interface ServiceCheck {
-    status: "ok" | "degraded" | "error" | "unconfigured";
-    latencyMs: number | null;
-    detail: string;
-  }
-  interface HealthData {
-    checkedAt: string;
-    supabase: ServiceCheck;
-    weather: ServiceCheck;
-    ai: ServiceCheck & { provider: string };
-    mistral: ServiceCheck;
-    env: {
-      openaiConfigured: boolean;
-      geminiConfigured: boolean;
-      mistralConfigured: boolean;
-      openweatherConfigured: boolean;
-      supabaseConfigured: boolean;
-      nodeEnv: string;
-    };
-  }
-
-  const [health, setHealth] = useState<HealthData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [fetchedAt, setFetchedAt] = useState<string | null>(null);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-
-  const runChecks = useCallback(async () => {
-    setLoading(true);
-    setFetchError(null);
-    try {
-      const res = await fetch("/api/dev/health");
-      if (!res.ok) {
-        setFetchError(`Health API returned ${res.status}`);
-      } else {
-        const data = await res.json() as HealthData;
-        setHealth(data);
-        setFetchedAt(new Date().toISOString());
-      }
-    } catch {
-      setFetchError("Failed to reach health endpoint.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    runChecks();
-  }, [runChecks]);
-
-  const statusColor = (s: ServiceCheck["status"]) => {
-    if (s === "ok") return "#30d158";
-    if (s === "degraded") return "#ff9500";
-    if (s === "error") return "#ff3b30";
-    return "var(--foreground)";
-  };
-  const statusLabel = (s: ServiceCheck["status"]) => {
-    if (s === "ok") return "✅ Operational";
-    if (s === "degraded") return "⚠️ Degraded";
-    if (s === "error") return "❌ Error";
-    return "— Not configured";
-  };
-
-  return (
-    <div className="space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-lg font-semibold" style={{ color: "var(--foreground)" }}>
-          System Health
-        </h2>
-        <div className="flex items-center gap-3">
-          {fetchedAt && (
-            <span className="text-xs" style={{ color: "var(--foreground)", opacity: 0.45 }}>
-              Last checked: {new Date(fetchedAt).toLocaleTimeString()}
-            </span>
-          )}
-          <button
-            onClick={runChecks}
-            disabled={loading}
-            className="rounded-xl px-4 py-2 text-xs font-medium btn-interact disabled:opacity-40"
-            style={{ background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
-          >
-            {loading ? "Checking…" : "↻ Refresh"}
-          </button>
-        </div>
-      </div>
-
-      {fetchError && (
-        <p className="text-sm text-red-500">{fetchError}</p>
-      )}
-
-      {health ? (
-        <>
-          {/* Service Status Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            {(
-              [
-                {
-                  label: "Weather API",
-                  svc: health.weather,
-                  sub: health.env.openweatherConfigured
-                    ? "OpenWeatherMap"
-                    : "OpenWeatherMap · Not configured",
-                },
-                { label: "AI Provider", svc: health.ai, sub: health.ai.provider !== "none" ? health.ai.provider : "—" },
-                { label: "Mistral", svc: health.mistral, sub: health.env.mistralConfigured ? "Fallback provider" : "Not configured" },
-                { label: "Supabase DB", svc: health.supabase, sub: "PostgreSQL" },
-              ] as { label: string; svc: ServiceCheck; sub: string }[]
-            ).map((item) => (
-              <div
-                key={item.label}
-                className="rounded-2xl p-5 space-y-2"
-                style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
-              >
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-                  {item.label}
-                </p>
-                <p className="text-sm font-semibold" style={{ color: statusColor(item.svc.status) }}>
-                  {statusLabel(item.svc.status)}
-                </p>
-                <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.55 }}>
-                  {item.sub}
-                </p>
-                {item.svc.latencyMs !== null && (
-                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-                    {item.svc.latencyMs} ms
-                  </p>
-                )}
-                {item.svc.detail && item.svc.status !== "ok" && (
-                  <p className="text-xs rounded-lg px-2 py-1 break-all" style={{ background: "var(--background)", color: "#ff3b30", border: "1px solid var(--card-border)" }}>
-                    {item.svc.detail}
-                  </p>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Latency Summary */}
-          <div
-            className="rounded-2xl p-5 space-y-3"
-            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
-          >
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-              API Response Latency
-            </p>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              {[
-                { label: "Weather", ms: health.weather.latencyMs },
-                { label: "AI Provider", ms: health.ai.latencyMs },
-                { label: "Mistral", ms: health.mistral.latencyMs },
-                { label: "Supabase", ms: health.supabase.latencyMs },
-              ].map((r) => (
-                <div key={r.label} className="text-center">
-                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>{r.label}</p>
-                  <p
-                    className="text-xl font-bold mt-1"
-                    style={{
-                      color: r.ms === null ? "var(--foreground)"
-                        : r.ms < 300 ? "#30d158"
-                        : r.ms < 800 ? "#ff9500"
-                        : "#ff3b30",
-                      opacity: r.ms === null ? 0.3 : 1,
-                    }}
-                  >
-                    {r.ms === null ? "—" : `${r.ms}ms`}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Environment Config */}
-          <div
-            className="rounded-2xl p-5 space-y-3"
-            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
-          >
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-              Environment
-            </p>
-            <div className="flex flex-wrap gap-2">
-              {[
-                { label: "OpenAI", ok: health.env.openaiConfigured },
-                { label: "Gemini", ok: health.env.geminiConfigured },
-                { label: "Mistral", ok: health.env.mistralConfigured },
-                { label: "OpenWeather", ok: health.env.openweatherConfigured },
-                { label: "Supabase", ok: health.env.supabaseConfigured },
-              ].map((e) => (
-                <span
-                  key={e.label}
-                  className="text-xs px-3 py-1 rounded-full font-medium"
-                  style={{
-                    background: e.ok ? "rgba(48,209,88,0.12)" : "rgba(255,59,48,0.1)",
-                    color: e.ok ? "#30d158" : "#ff3b30",
-                    border: `1px solid ${e.ok ? "rgba(48,209,88,0.25)" : "rgba(255,59,48,0.2)"}`,
-                  }}
-                >
-                  {e.ok ? "✓" : "✗"} {e.label}
-                </span>
-              ))}
-              <span
-                className="text-xs px-3 py-1 rounded-full font-medium"
-                style={{
-                  background: "rgba(191,90,242,0.1)",
-                  color: "#bf5af2",
-                  border: "1px solid rgba(191,90,242,0.2)",
-                }}
-              >
-                {health.env.nodeEnv}
-              </span>
-            </div>
-            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.35 }}>
-              Checked at {new Date(health.checkedAt).toLocaleString()}
-            </p>
-          </div>
-        </>
-      ) : !loading && (
-        <p className="text-sm text-center py-8" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-          No health data yet — click Refresh to run checks.
-        </p>
-      )}
     </div>
   );
 }

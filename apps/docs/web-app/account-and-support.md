@@ -13,16 +13,16 @@ Use it as the entry point for security settings, privacy controls, and API acces
 
 ### Credit Center
 
-The Credit Center (embedded in the Account page for Pro/Dev users) shows your three balances and lets you allocate `$1.00 → 50 API Credit` to a chosen key. See [API Dashboard → Credits](./api-dashboard#credits) for the full breakdown.
+The Credit Center shows available account balances. Credit purchases and money-wallet allocation are unavailable. See [API credits](./api-dashboard#credits-and-usage).
 
 ## Plans {#plans}
 
-Approved V6 values are [documented centrally](../development/v6-entitlements#authoritative-values) and shown with an inactive-rollout notice on the homepage, Pricing and Account. They include A$6.99/month Pro and daily **and** monthly caps. The current account allowance is still governed by legacy accounting until cutover; do not interpret the new plan cards as an activated entitlement or a purchase offer.
+Use the Account page to see your current plan, usage allowance and available credits. Checkout and credit purchases are unavailable; donations do not purchase subscriptions or credits.
 
 - The **Dev** tier bypasses all limits and is only provisioned to developer accounts.
-- The **Demo** tier retains fixed preview limits (200 recommendations and 400 follow-ups/day), not ten times the new Free caps.
+- The **Demo** tier retains fixed preview limits (200 recommendations and 400 follow-ups/day), in the preview environment.
 
-PAYG values are approved but purchases are unavailable. Pro periods can be explicitly configured by a whitelisted Dev administrator without collecting a payment; staging them does not change legacy access. Donations are not subscriptions or credit top-ups.
+Account access and credits are shown in the app. Contact support if those readouts do not match the access you expect.
 
 ## Live Demo {#live-demo}
 

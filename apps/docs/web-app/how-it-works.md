@@ -106,7 +106,7 @@ See [Dashboard → BYOK](./dashboard#bring-your-own-key-pro-dev).
 
 ## Usage limits {#usage-limits}
 
-The table below describes **legacy enforcement while V6 rollout is off**, not the approved V6 policy. The [approved daily/monthly caps and credit rules](../development/v6-entitlements#authoritative-values) are staged and not active. Current daily counters reset at midnight UTC:
+The table below describes current account allowances. Daily counters reset at midnight UTC:
 
 | Feature | Free | Demo | Pro | Dev |
 | --- | --- | --- | --- | --- |
@@ -120,4 +120,4 @@ The table below describes **legacy enforcement while V6 rollout is off**, not th
 **Model switches** (changing which AI model is used) are a separate daily counter from **AI uses**. On the Free plan you can switch models 2 times per day, independent of your 20 AI uses. Pro and Dev have unlimited switches.
 :::
 
-The **Demo** tier is only created automatically in a preview/development environment. Its fixed 200/400 limits are preserved, not recalculated from the approved V6 Free caps.
+The **Demo** tier is only created automatically in a preview/development environment. It provides 200 recommendations and 400 follow-ups per day.

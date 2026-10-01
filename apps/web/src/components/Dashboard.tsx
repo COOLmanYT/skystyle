@@ -156,6 +156,7 @@ interface DashboardProps {
   startTour?: boolean;
   onboardingPersistenceAvailable?: boolean;
   initialSection?: DashboardSection;
+  initialShopItem?: string | null;
 }
 
 export default function Dashboard({
@@ -169,6 +170,7 @@ export default function Dashboard({
   startTour = false,
   onboardingPersistenceAvailable = true,
   initialSection = "style",
+  initialShopItem = null,
 }: DashboardProps) {
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -208,8 +210,16 @@ export default function Dashboard({
   const [feedbackCategory, setFeedbackCategory] = useState<string | undefined>(undefined);
   const [simpleMode, setSimpleMode] = useState(initialExperienceMode !== "advanced");
   const [selectedSection, setActiveSection] = useState<DashboardSection>(initialSection);
+  const [shopContext, setShopContext] = useState<{ item: string; sequence: number } | null>(initialShopItem ? { item: initialShopItem, sequence: 0 } : null);
   const { mode: sectionMode } = useDashboardSections(userId);
-  const activeSection = sectionMode === "both" ? selectedSection : sectionMode;
+  // A deliberate clothing action can open Shop even in a Style-only workspace.
+  const displayedSectionMode = shopContext ? "both" : sectionMode;
+  const activeSection = displayedSectionMode === "both" ? selectedSection : displayedSectionMode;
+  function openShopItem(item: string) {
+    setShopContext((previous) => ({ item, sequence: (previous?.sequence ?? 0) + 1 }));
+    setActiveSection("shop");
+    requestAnimationFrame(() => document.getElementById("shop-query")?.focus());
+  }
   const [feedbackSummary, setFeedbackSummary] = useState("");
   const [occasion, setOccasion] = useState<Occasion>("everyday");
   const [customOccasion, setCustomOccasion] = useState("");
@@ -1049,7 +1059,7 @@ export default function Dashboard({
       {/* ── Main Content ── */}
       <nav aria-label="Dashboard sections" data-tour="sections" className="w-full border-b p-2 sm:px-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <div className="flex w-full gap-2">
-          {visibleDashboardSections(sectionMode).map((section) => <button key={section} id={`dashboard-${section}-tab`} type="button"
+          {visibleDashboardSections(displayedSectionMode).map((section) => <button key={section} id={`dashboard-${section}-tab`} type="button"
             aria-pressed={activeSection === section} aria-controls={`dashboard-${section}-panel`} onClick={() => setActiveSection(section)}
             className="flex-1 rounded-xl px-5 py-3 text-sm font-semibold transition-colors btn-interact"
             style={{ background: activeSection === section ? "var(--accent)" : "transparent", color: activeSection === section ? "#fff" : "var(--foreground)" }}>
@@ -1657,6 +1667,7 @@ export default function Dashboard({
                     <MarkdownRenderer
                       content={rec!.outfit}
                       closetItems={closetItems}
+                      recommendationLinks onShopItem={openShopItem}
                       className="text-base leading-relaxed"
                       style={{ color: "var(--foreground)" }}
                     />
@@ -1679,6 +1690,7 @@ export default function Dashboard({
                         </h3>
                         <MarkdownRenderer
                           content={rec!.reasoning}
+                          closetItems={closetItems} recommendationLinks onShopItem={openShopItem}
                           className="text-sm leading-relaxed"
                           style={{ color: "var(--foreground)", opacity: 0.7 }}
                         />
@@ -1906,7 +1918,7 @@ export default function Dashboard({
                               className="rounded-xl px-3 py-2 text-xs leading-relaxed"
                               style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
                             >
-                              {item.outfit}
+                              <MarkdownRenderer content={item.outfit} closetItems={closetItems} recommendationLinks onShopItem={openShopItem} />
                             </div>
                           </div>
                         ))}
@@ -2812,12 +2824,13 @@ export default function Dashboard({
           </div>
         </section>
         <ShopPanel
+          contextItem={shopContext}
           outfitIdea={rec?.outfit}
           userId={userId} isPro={isPro} isDev={isDev} userApiKey={userApiKey} byokProvider={byokProvider}
           onApiKeyChange={setUserApiKey} onProviderChange={setByokProvider}
           feedbackSummary={feedbackSummary}
           onSwitchToStyle={() => setActiveSection("style")}
-          canSwitchToStyle={sectionMode !== "shop"}
+          canSwitchToStyle={displayedSectionMode !== "shop"}
           hidden={activeSection !== "shop"}
         />
       </main>

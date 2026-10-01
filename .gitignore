@@ -46,3 +46,7 @@ next-env.d.ts
 apps/web/node_modules
 apps/web/.next
 .env*.local
+
+# generated documentation
+/apps/docs/.vitepress/dist/
+/apps/docs/.vitepress/cache/
