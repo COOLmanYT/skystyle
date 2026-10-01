@@ -52,6 +52,7 @@ jest.mock('@/lib/ai', () => {
   const actualMocks = jest.requireActual('../../../__tests__/mocks') as typeof import('../../../__tests__/mocks');
   return {
   getStyleRecommendation: jest.fn().mockResolvedValue(actualMocks.mockStyleRecommendation),
+  BYOK_PROVIDERS: ['openai', 'gemini', 'mistral', 'anthropic'],
   getDevChatResponse: jest.fn().mockResolvedValue(actualMocks.mockStyleRecommendation),
   getDefaultModel: jest.fn((isPro: boolean, isDev: boolean) => ({
     id: isPro || isDev ? 'gpt-4o' : 'gemini-2.5-flash',

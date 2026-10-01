@@ -1,6 +1,5 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import OnboardingClient from "./OnboardingClient";
 import { getOnboardingState } from "@/lib/onboarding";
 
 export default async function OnboardingPage({ searchParams }: { searchParams: Promise<{ replay?: string }> }) {
@@ -11,5 +10,5 @@ export default async function OnboardingPage({ searchParams }: { searchParams: P
     getOnboardingState(session.user.id),
   ]);
   if (onboarding.complete && params.replay !== "1") redirect("/dashboard");
-  return <OnboardingClient userId={session.user.id} allowBrowserCompletionFallback={!onboarding.persistenceAvailable} />;
+  redirect(`/dashboard?tour=1${params.replay === "1" ? "&replay=1" : ""}`);
 }

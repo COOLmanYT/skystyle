@@ -112,6 +112,7 @@ export default function ApiDashboardClient() {
   const [newKeyNickname, setNewKeyNickname] = useState("");
   const [newKeyFolder, setNewKeyFolder] = useState("");
   const [toast, setToast] = useState<string | null>(null);
+  const [accountingActive, setAccountingActive] = useState<boolean | null>(null);
 
   const showToast = (message: string) => {
     setToast(message);
@@ -234,7 +235,7 @@ export default function ApiDashboardClient() {
   }
 
   return (<>
-    <Tutorial id="api-dashboard" title="API Dashboard tour" steps={[{ title: "Create a key", body: "Generate a key and copy it immediately; the full key is only shown once." }, { title: "Track usage", body: "Review requests, error responses, latency, and sanitized request diagnostics." }, { title: "Control access", body: "Revoke keys when they are no longer needed." }]} />
+    <Tutorial id="api-dashboard" title="API Dashboard tour" steps={[{ title: "Create a key", body: "Generate a key and copy it immediately; the full key is only shown once.", target: '[data-tour="api-create-key"]' }, { title: "Track usage", body: "Review requests, error responses, latency, and sanitized request diagnostics.", target: '[data-tour="api-analytics"]' }, { title: "Control access", body: "Revoke keys when they are no longer needed.", target: '[data-tour="api-keys"]' }]} />
 
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
       <HamburgerNav
@@ -249,7 +250,7 @@ export default function ApiDashboardClient() {
       />
 
       <main id="main-content" className="max-w-5xl mx-auto px-4 py-8 space-y-6">
-        <CreditCenter keys={apiKeys} onChanged={refreshAll} />
+        <CreditCenter keys={apiKeys} onChanged={refreshAll} onAccountingLoaded={setAccountingActive} />
         {error && (
           <div
             role="alert"
@@ -261,7 +262,7 @@ export default function ApiDashboardClient() {
         )}
 
         {/* ── API Key Management ─────────────────────────────────────────── */}
-        <section className="rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+        <section data-tour="api-keys" className="rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
@@ -274,6 +275,7 @@ export default function ApiDashboardClient() {
             <div className="flex flex-col sm:flex-row gap-2"><input value={newKeyNickname} onChange={(event) => setNewKeyNickname(event.target.value)} maxLength={80} placeholder="Key nickname (optional)" className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }} /><input value={newKeyFolder} onChange={(event) => setNewKeyFolder(event.target.value)} maxLength={80} placeholder="Folder/group (optional)" className="rounded-xl px-3 py-2 text-xs" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }} /></div>
             <button
               onClick={createApiKey}
+              data-tour="api-create-key"
               disabled={busyAction}
               className="rounded-xl px-4 py-2 text-xs font-semibold btn-interact"
               style={{ background: "var(--accent)", color: "#fff", opacity: busyAction ? 0.7 : 1 }}
@@ -335,7 +337,7 @@ export default function ApiDashboardClient() {
                       Status: <span aria-label={`API key status ${key.revoked ? "revoked" : "active"}`}>{key.revoked ? "Revoked" : "Active"}</span>
                     </p>
                     <p className="text-xs mt-0.5" style={{ color: "var(--foreground)", opacity: 0.45 }}>
-                      Credits: {Math.max(0, Number(key.credits_remaining ?? 0))} remaining · {Math.max(0, Number(key.credits_used ?? 0))} used
+                      {accountingActive === true ? "Uses shared account credits; per-key legacy counters are frozen." : accountingActive === false ? `Legacy credits: ${Math.max(0, Number(key.credits_remaining ?? 0))} remaining · ${Math.max(0, Number(key.credits_used ?? 0))} used` : "Credit accounting not yet verified."}
                     </p>
                   </div>
                   {!key.revoked && (
@@ -355,7 +357,7 @@ export default function ApiDashboardClient() {
         </section>
 
         {/* ── Analytics ──────────────────────────────────────────────────── */}
-        <section className="rounded-2xl p-6 space-y-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+        <section data-tour="api-analytics" className="rounded-2xl p-6 space-y-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
               Analytics

@@ -1,6 +1,6 @@
 # Automatic Recommendations
 
-The **Automatic recommendations** page (`/automatic-recommendations`) schedules an exact-time outfit recommendation using a manual location. This is useful for planning ahead — a morning commute, a weekend hike, or an event — and reviewing the result later.
+The **Automatic recommendations** page (`/automatic-recommendations`) schedules an outfit recommendation using a manual location. This is useful for planning ahead — a morning commute, a weekend hike, or an event — and reviewing the result later. Delivery is best-effort, not a guarantee of an exact minute.
 
 ## Creating a schedule
 
@@ -14,7 +14,7 @@ Each schedule includes:
 | **Recurrence** | `Once`, `Daily`, or `Weekly`. |
 | **Unit preference** | `metric` (°C, km/h) or `imperial` (°F, mph). |
 | **Timezone** | Detected automatically from your browser. |
-| **Styling prompt** | Optional free-text guidance (max 1000 characters). |
+| **Styling prompt** | Optional Pro/Dev guidance (max 1000 characters); ignored for Free schedules. |
 
 ## Managing schedules
 
@@ -30,12 +30,14 @@ The **Recent results** section shows the outcome of each scheduled run:
 - **Time** — when the run executed.
 - **Output** — the saved outfit recommendation, or an error message if it failed.
 
-Completed recommendations are also delivered to your **[Inbox](./account-and-support#inbox)**, so you can review them alongside your other notices.
+Completed recommendations are also copied to your **[Inbox](./account-and-support#inbox)**. If that copy fails, the completed result remains in run history.
+
+Runs enforce account access and the current Free recommendation allowance or Pro App Credit balance before generation, and use the same account-default AI model as Style. These are existing limits, not activation of the planned V6 entitlement table. Demo sessions cannot save schedules.
 
 ## How scheduling works
 
 ::: tip Supabase Cron
-The scheduler runs via **Supabase Cron** (not Vercel Cron) and invokes the secure worker each minute. This means exact-time recommendations are delivered at the minute you schedule, and it keeps the worker compatible with Vercel Hobby (which only permits one cron invocation per day).
+The scheduler runs via **Supabase Cron** (not Vercel Cron) and invokes the secure worker each minute. A bounded worker claims one job per invocation, so provider latency and queued jobs can delay delivery. Daily/weekly schedules preserve local wall-clock time across daylight-saving changes. Missed occurrences are skipped after one run, not backfilled with repeated charges. Failed recurring runs advance to a future occurrence; failed one-offs are disabled instead of repeatedly calling providers.
 :::
 
 Setup is documented for developers in [Development → Automatic recommendation scheduler](../development#automatic-recommendation-scheduler).

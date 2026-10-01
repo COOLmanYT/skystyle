@@ -17,21 +17,12 @@ The Credit Center (embedded in the Account page for Pro/Dev users) shows your th
 
 ## Plans {#plans}
 
-| | Free | Pro |
-|---|---|---|
-| Price | A$0 | A$4/month |
-| AI uses | 20/day | 50 App Credits/day |
-| Follow-ups | 40/day | 400/day |
-| Closet | 4 uses/day | Unlimited |
-| Source picker | 4/day | Unlimited |
-| BYOK AI key | — | ✅ |
-| Custom prompts | — | ✅ |
-| Active API keys | 3 | 20 |
+Approved V6 values are [documented centrally](../development/v6-entitlements#authoritative-values) and shown with an inactive-rollout notice on the homepage, Pricing and Account. They include A$6.99/month Pro and daily **and** monthly caps. The current account allowance is still governed by legacy accounting until cutover; do not interpret the new plan cards as an activated entitlement or a purchase offer.
 
 - The **Dev** tier bypasses all limits and is only provisioned to developer accounts.
-- The **Demo** tier is created automatically in preview/development environments and multiplies the free limits by 10 for testing.
+- The **Demo** tier retains fixed preview limits (200 recommendations and 400 follow-ups/day), not ten times the new Free caps.
 
-A "Pay as you go" plan for flexible App Credit purchases is planned but not live yet.
+PAYG values are approved but purchases are unavailable. Pro periods can be explicitly configured by a whitelisted Dev administrator without collecting a payment; staging them does not change legacy access. Donations are not subscriptions or credit top-ups.
 
 ## Live Demo {#live-demo}
 

@@ -14,6 +14,11 @@ function getDevEmails(): Set<string> {
 export async function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // The worker authenticates with CRON_SECRET in its route handler, not an
+  // interactive NextAuth session. Redirecting cron to /login produces a false
+  // HTTP 200 without ever claiming a schedule.
+  if (pathname === "/api/cron/automatic-recommendations") return NextResponse.next();
+
   // Allow public paths through without touching the session
   if (PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(p + "/"))) {
     return NextResponse.next();

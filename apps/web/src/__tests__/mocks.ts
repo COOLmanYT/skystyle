@@ -99,7 +99,7 @@ export const mockModelConfigs: ModelConfig[] = [
   { id: 'ministral-8b-latest', provider: 'mistral', name: 'Ministral 8B' },
 ];
 
-export const mockByokModels: ModelConfig[] = [
+export const mockByokModels: { id: string; provider: string; name: string }[] = [
   { id: 'byok-openai', provider: 'openai', name: 'BYOK - OpenAI' },
   { id: 'byok-gemini', provider: 'gemini', name: 'BYOK - Gemini' },
   { id: 'byok-mistral', provider: 'mistral', name: 'BYOK - Mistral' },
@@ -175,7 +175,7 @@ export const mockErrorResponse = (message: string, status: number = 400) => ({
 // ============================================================================
 
 export const mockSupabaseAdmin = {
-  from: jest.fn(() => mockSupabaseAdmin),
+  from: jest.fn(),
   select: jest.fn().mockReturnThis(),
   eq: jest.fn().mockReturnThis(),
   single: jest.fn().mockReturnThis(),
@@ -189,6 +189,8 @@ export const mockSupabaseAdmin = {
 
 // ============================================================================
 // Utility Functions
+// Preserve the original chainable mock behavior without a self-referential initializer.
+mockSupabaseAdmin.from.mockImplementation(() => mockSupabaseAdmin);
 // ============================================================================
 
 export function createMockFetch(response: unknown, status: number = 200): jest.Mock {

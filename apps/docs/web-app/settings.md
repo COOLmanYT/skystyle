@@ -2,7 +2,7 @@
 
 The **Settings** page (`/settings`) controls appearance, dashboard behaviour, and layout.
 
-Most preferences are stored in your browser only; only your **unit preference** is saved to your account (so it applies across the dashboard and the public API).
+Most appearance/layout preferences stay in this browser. Unit preference and onboarding completion/guided mode are saved to your account; private feedback is local by default, with opt-in cloud storage.
 
 ## Profile {#profile}
 
@@ -34,6 +34,8 @@ Switch between **metric** (°C, km/h) and **imperial** (°F, mph). Saved to your
 
 ## Dashboard behaviour {#dashboard-behaviour}
 
+- **Dashboard sections**: Style and Shop, Style only, or Shop only. The full-width bar and sidebar use the same choice. Saved per account in this browser; storage-blocked sessions show a warning and use a visit-only fallback.
+
 - **Weather Planning Panel**: always open, closed by default, or disabled entirely.
 - **Default recommendation mode**: Simple, Simple+, Advanced, or Pro (see [Recommendation modes](./dashboard#recommendation-modes)).
 - **Follow-up mode**: Replace or Chat (see [Follow-up questions](./dashboard#follow-up-questions)).
@@ -50,6 +52,10 @@ Switch between **metric** (°C, km/h) and **imperial** (°F, mph). Saved to your
 
 Replay any guided tour whenever you need a refresher:
 
-- **Dashboard tour** — choosing a location, setting preferences, and using follow-ups.
+- **First-use tour** — the same onboarding flow shown after first sign-in: choose workspaces, follow highlighted controls, and learn how to request advice or find clothes. No recommendation is generated during the tour.
 - **API Dashboard tour** — managing API keys and credits.
 - **Dev Dashboard tour** — developer tooling (Dev users only).
+
+## Private style feedback
+
+The Settings panel retains storage, summary editing and deletion controls. Select **Record private style feedback** to open the recording modal, add a thumbs-up/down with a note, and save it. You explicitly choose whether to send feedback to Mistral for summarization; your editable summary can inform later Style and Shop AI requests.

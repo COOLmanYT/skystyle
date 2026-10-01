@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { supabaseAdmin } from "@/lib/supabase";
 import SettingsClient from "./SettingsClient";
+import { getDevEmails } from "@/lib/dev-auth";
 
 export default async function SettingsPage() {
   const session = await auth();
@@ -22,5 +23,5 @@ export default async function SettingsPage() {
     } catch { /* Non-fatal */ }
   }
 
-  return <SettingsClient initialUnitPreference={unitPreference} userId={session.user.id ?? "guest"} />;
+  return <SettingsClient initialUnitPreference={unitPreference} userId={session.user.id ?? "guest"} canAccessDev={getDevEmails().has(session.user.email?.toLowerCase() ?? "")} />;
 }

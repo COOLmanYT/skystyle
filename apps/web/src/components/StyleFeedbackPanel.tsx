@@ -1,24 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Dialog from "./Dialog";
 import { MAX_FEEDBACK_ADVICE, MAX_FEEDBACK_NOTE, MAX_FEEDBACK_SUMMARY, parseLocalStyleFeedback, styleFeedbackKey,
   withoutFeedbackEntry, type LocalStyleFeedback, type StyleVote } from "@/lib/style-feedback";
 
 const ignoreSummary = () => {};
 
 export default function StyleFeedbackPanel({ userId, hasRecommendation = false, recommendation = "",
-  onSummaryChange = ignoreSummary, showVoting = true }: {
+  onSummaryChange = ignoreSummary, showVoting = true, compact = false }: {
   userId: string;
   hasRecommendation?: boolean;
   recommendation?: string;
   onSummaryChange?: (summary: string) => void;
   showVoting?: boolean;
+  compact?: boolean;
 }) {
   const [data, setData] = useState<LocalStyleFeedback>({ entries: [], summary: "" });
   const [mode, setMode] = useState<"local" | "cloud">("local");
   const [ready, setReady] = useState(false);
   const [cloudAvailable, setCloudAvailable] = useState(false);
   const [note, setNote] = useState("");
+  const [modalOpen, setModalOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [summarizing, setSummarizing] = useState(false);
@@ -170,7 +173,7 @@ export default function StyleFeedbackPanel({ userId, hasRecommendation = false, 
     } finally { setSaving(false); }
   }
 
-  return (
+  const panel = (
     <section aria-label="Private style feedback" aria-busy={busy} className="space-y-3 rounded-xl border p-4"
       style={{ borderColor: "var(--card-border)", background: "var(--background)" }}>
       <div>
@@ -190,18 +193,18 @@ export default function StyleFeedbackPanel({ userId, hasRecommendation = false, 
       </select>
       <p className="text-xs opacity-60">Changing storage moves the current feedback and summary. Cloud changes are shared across your devices; refresh before editing on another device.</p>
       {volatileStorage && mode === "local" && <p role="alert" className="text-xs">Device storage is unavailable. Your feedback is temporary on this page unless you move it to cloud storage.</p>}
-      {showVoting && <>
-        <label htmlFor="style-feedback-note" className="block text-xs font-medium">Optional note about this outfit</label>
+      {modalOpen && <>
+        <label htmlFor="style-feedback-note" className="block text-xs font-medium">{showVoting ? "Optional note about this outfit" : "Advice preference note"}</label>
         <textarea id="style-feedback-note" value={note} onChange={(event) => setNote(event.target.value)}
           maxLength={MAX_FEEDBACK_NOTE} rows={2} disabled={busy} placeholder="e.g. Keep the message shorter"
           className="w-full rounded-lg border p-2 text-sm" style={{ borderColor: "var(--card-border)", background: "var(--card)" }} />
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={() => void vote("up")} disabled={busy || summarizing || !hasRecommendation}
+          <button type="button" onClick={() => void vote("up")} disabled={busy || summarizing || (showVoting ? !hasRecommendation : !note.trim())}
             className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50" style={{ borderColor: "var(--card-border)" }}>👍 Helpful</button>
-          <button type="button" onClick={() => void vote("down")} disabled={busy || summarizing || !hasRecommendation}
+          <button type="button" onClick={() => void vote("down")} disabled={busy || summarizing || (showVoting ? !hasRecommendation : !note.trim())}
             className="rounded-lg border px-3 py-2 text-sm disabled:opacity-50" style={{ borderColor: "var(--card-border)" }}>👎 Not helpful</button>
         </div>
-        {!hasRecommendation && <p className="text-xs opacity-60">Generate an outfit to rate it. Saved preferences are included with your next recommendation.</p>}
+        {!hasRecommendation && <p className="text-xs opacity-60">{showVoting ? "Generate an outfit to rate it." : "Write a note about your advice preferences, then save a vote."} Saved preferences are included with your next recommendation.</p>}
       </>}
       <label htmlFor="style-feedback-summary" className="block text-xs font-medium">Your editable AI preference summary</label>
       <textarea id="style-feedback-summary" value={data.summary} disabled={busy}
@@ -212,7 +215,7 @@ export default function StyleFeedbackPanel({ userId, hasRecommendation = false, 
         <button type="button" disabled={busy} onClick={() => void persist(data).then((saved) => { if (saved) setMessage("Preference summary saved."); })} className="underline">Save summary</button>
         {data.entries.length > 0 && <button type="button" onClick={() => void summarize(data.entries)} disabled={busy || summarizing} className="underline">{summarizing ? "Summarizing…" : "Refresh summary"}</button>}
       </div>
-      <p className="text-xs opacity-60">Save edits to use them with your next Style recommendation and follow-up. Refresh summarizes your 20 most recent votes; older votes are retained until you delete them.</p>
+      <p className="text-xs opacity-60">Save edits to use them with your next Style recommendation, follow-up or Shop search. Refresh summarizes your 20 most recent votes; older votes are retained until you delete them.</p>
       {data.entries.length > 0 && <div className="max-h-40 space-y-1 overflow-y-auto text-xs">
         {data.entries.map((entry) => <div key={entry.id} className="flex items-center justify-between gap-2">
           <span>{entry.vote === "up" ? "👍" : "👎"} {entry.note || "No note"} · {new Date(entry.createdAt).toLocaleDateString()}</span>
@@ -223,4 +226,12 @@ export default function StyleFeedbackPanel({ userId, hasRecommendation = false, 
       {message && <p role="status" className="text-xs">{message}</p>}
     </section>
   );
+  return <>
+    {!compact && !modalOpen && panel}
+    <button type="button" disabled={!ready} onClick={() => setModalOpen(true)} className="mt-3 rounded-xl border px-4 py-3 text-sm font-medium" style={{ borderColor: "var(--card-border)", background: "var(--card)" }}>Record private style feedback</button>
+    {modalOpen && <Dialog title="Record private style feedback" onClose={() => { if (!saving) setModalOpen(false); }}>
+      <div className="mb-3 flex items-center justify-between"><h2 className="text-lg font-semibold">Private style feedback</h2><button type="button" disabled={saving} onClick={() => setModalOpen(false)} aria-label="Close private feedback">✕</button></div>
+      {panel}
+    </Dialog>}
+  </>;
 }

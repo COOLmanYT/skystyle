@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { auth, DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncPublicUser } from "@/lib/sync-user";
 
@@ -15,6 +15,7 @@ export async function GET() {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.id === DEMO_USER_ID) return NextResponse.json({ items: [], persistence: "unavailable-in-demo" });
 
   const { data, error } = await supabaseAdmin
     .from("closet")
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.id === DEMO_USER_ID) return NextResponse.json({ error: "Cloud closet storage requires a real account." }, { status: 403 });
 
   const { item } = await req.json();
   if (!item || typeof item !== "string" || !item.trim()) {
@@ -69,6 +71,7 @@ export async function DELETE(req: NextRequest) {
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.id === DEMO_USER_ID) return NextResponse.json({ error: "Cloud closet storage requires a real account." }, { status: 403 });
 
   const { item } = await req.json();
   if (!item || typeof item !== "string") {
@@ -101,6 +104,7 @@ export async function DELETE(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.id === DEMO_USER_ID) return NextResponse.json({ error: "Cloud closet storage requires a real account." }, { status: 403 });
   const body = await req.json().catch(() => null) as { items?: unknown } | null;
   if (!Array.isArray(body?.items) || body.items.length > 500) return NextResponse.json({ error: "items must be an array of up to 500 entries" }, { status: 400 });
   const seen = new Set<string>();

@@ -12,20 +12,21 @@ import Link from "next/link";
 import Checkbox from "@/components/Checkbox";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
 import HamburgerNav from "@/components/HamburgerNav";
-import Tutorial from "@/components/Tutorial";
+import DashboardOnboarding from "@/components/DashboardOnboarding";
+import useDashboardSections from "./useDashboardSections";
+import { visibleDashboardSections } from "@/lib/dashboard-sections";
 import ShopPanel from "@/components/ShopPanel";
 import StyleFeedbackPanel from "@/components/StyleFeedbackPanel";
 import { selectLatestLoginPopup } from "@/lib/changelog-popup";
-import { getAllModels, isModelAvailable, ModelID, type PlanningData } from "@/lib/ai";
+import { getAllModels, isModelAvailable, ModelID, type PlanningData, type ByokProvider } from "@/lib/ai";
 import type { DailyLimitsInfo } from "@/lib/daily-usage";
+import AccountingUsage from "./AccountingUsage";
 import {
-  BUDGET_CURRENCIES,
   FRAGRANCE_FAMILIES,
   FRAGRANCE_TIERS,
   OCCASIONS,
   selectFutureHourlyForecast,
   withCurrentFeedback,
-  type BudgetCurrency,
   type EventForecastStatus,
   type FragranceFamily,
   type FragranceTier,
@@ -152,6 +153,9 @@ interface DashboardProps {
   initialCredits: number | null;
   initialDailyLimits: DailyLimitsInfo | null;
   initialExperienceMode: "guided" | "advanced" | null;
+  startTour?: boolean;
+  onboardingPersistenceAvailable?: boolean;
+  initialSection?: DashboardSection;
 }
 
 export default function Dashboard({
@@ -162,6 +166,9 @@ export default function Dashboard({
   initialCredits,
   initialDailyLimits,
   initialExperienceMode,
+  startTour = false,
+  onboardingPersistenceAvailable = true,
+  initialSection = "style",
 }: DashboardProps) {
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -200,11 +207,10 @@ export default function Dashboard({
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackCategory, setFeedbackCategory] = useState<string | undefined>(undefined);
   const [simpleMode, setSimpleMode] = useState(initialExperienceMode !== "advanced");
-  const [activeSection, setActiveSection] = useState<DashboardSection>("style");
+  const [selectedSection, setActiveSection] = useState<DashboardSection>(initialSection);
+  const { mode: sectionMode } = useDashboardSections(userId);
+  const activeSection = sectionMode === "both" ? selectedSection : sectionMode;
   const [feedbackSummary, setFeedbackSummary] = useState("");
-  const [budgetMin, setBudgetMin] = useState("");
-  const [budgetMax, setBudgetMax] = useState("");
-  const [budgetCurrency, setBudgetCurrency] = useState<BudgetCurrency>("AUD");
   const [occasion, setOccasion] = useState<Occasion>("everyday");
   const [customOccasion, setCustomOccasion] = useState("");
   const [eventDateTime, setEventDateTime] = useState("");
@@ -213,7 +219,7 @@ export default function Dashboard({
   const [fragranceFamily, setFragranceFamily] = useState<FragranceFamily>("any");
   const [fragranceTier, setFragranceTier] = useState<FragranceTier>("any");
   // BYOK enhancements — provider selector + client-side custom prompt (Pro/Dev)
-  const [byokProvider, setByokProvider] = useState<"openai" | "gemini" | "mistral">("openai");
+  const [byokProvider, setByokProvider] = useState<ByokProvider>("openai");
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
   const [modelSwitchesRemaining, setModelSwitchesRemaining] = useState<number | null>(null);
   
@@ -246,16 +252,6 @@ export default function Dashboard({
   const buildRecommendationContext = useCallback((): RecommendationContext | undefined => {
     const context: RecommendationContext = {};
     if (feedbackSummary.trim()) context.feedbackSummary = feedbackSummary.trim().slice(0, 600);
-    const parsedMinimum = Number(budgetMin);
-    const parsedBudget = Number(budgetMax);
-    if (budgetMax.trim() && Number.isFinite(parsedBudget) && parsedBudget > 0
-      && (!budgetMin.trim() || (Number.isFinite(parsedMinimum) && parsedMinimum >= 0 && parsedMinimum <= parsedBudget))) {
-      context.budget = {
-        ...(budgetMin.trim() ? { minAmount: parsedMinimum } : {}),
-        maxAmount: parsedBudget,
-        currency: budgetCurrency,
-      };
-    }
     context.occasion = {
       kind: occasion,
       ...(occasion === "other" && customOccasion.trim()
@@ -279,7 +275,7 @@ export default function Dashboard({
       context.fragrance = { mode: "none" };
     }
     return context;
-  }, [budgetCurrency, budgetMin, budgetMax, customOccasion, eventDateTime, feedbackSummary, fragranceFamily, fragranceMode, fragranceTier, occasion, ownedFragrance]);
+  }, [customOccasion, eventDateTime, feedbackSummary, fragranceFamily, fragranceMode, fragranceTier, occasion, ownedFragrance]);
 
   // Returns the gradient/background CSS class for plan-based primary buttons
   const planBtnClass = isDev ? "btn-plan-dev" : isPro ? "btn-plan-pro" : "btn-plan-free";
@@ -366,7 +362,7 @@ export default function Dashboard({
       }
 
       const savedByokProvider = localStorage.getItem("skystyle_byok_provider");
-      if (savedByokProvider === "gemini") setByokProvider("gemini");
+      if (savedByokProvider === "gemini" || savedByokProvider === "mistral" || savedByokProvider === "anthropic") setByokProvider(savedByokProvider);
       else setByokProvider("openai");
 
       const savedClientCustomPrompt = localStorage.getItem("skystyle_byok_custom_prompt");
@@ -584,8 +580,8 @@ export default function Dashboard({
   /** True when the user has hit their daily follow-up limit (client-side guard). */
   const isFollowUpLimitReached =
     dailyLimits !== null &&
-    dailyLimits.followUps.limit !== null &&
-    dailyLimits.followUps.used >= dailyLimits.followUps.limit;
+    ((dailyLimits.followUps.limit !== null && dailyLimits.followUps.used >= dailyLimits.followUps.limit)
+      || (dailyLimits.followUps.monthlyLimit != null && (dailyLimits.followUps.monthlyUsed ?? 0) >= dailyLimits.followUps.monthlyLimit));
 
   /** Called by LocationPicker — only stores the selected location, no auto-fetch. */
   const handleLocationResolved = useCallback((loc: ResolvedLocation) => {
@@ -744,7 +740,7 @@ export default function Dashboard({
           previousReasoning: baseReasoning,
           weather: result.weather,
           ...(followUpContext ? { recommendationContext: followUpContext } : {}),
-          ...(userApiKey ? { userApiKey } : {}),
+          ...(userApiKey ? { userApiKey, byokProvider } : {}),
         }),
       });
       if (!res.ok) {
@@ -991,7 +987,7 @@ export default function Dashboard({
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: "var(--background)" }}>
-      <Tutorial id="dashboard" title="Dashboard tour" steps={[{ title: "Choose a location", body: "Use the weather panel to enter a location or use GPS." }, { title: "Set your preferences", body: "Adjust planning and closet options before generating an outfit." }, { title: "Continue the conversation", body: "Use follow-ups to refine an outfit once it is ready." }]} />
+      <DashboardOnboarding userId={userId} startTour={startTour} persistenceAvailable={onboardingPersistenceAvailable} initialGuided={simpleMode} onSectionChange={setActiveSection} onGuidedChange={setSimpleMode} />
       {showUpgradeModal && (
         <UpgradePlanModal onClose={() => setShowUpgradeModal(false)} />
       )}
@@ -1051,32 +1047,21 @@ export default function Dashboard({
       />
 
       {/* ── Main Content ── */}
+      <nav aria-label="Dashboard sections" data-tour="sections" className="w-full border-b p-2 sm:px-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+        <div className="flex w-full gap-2">
+          {visibleDashboardSections(sectionMode).map((section) => <button key={section} id={`dashboard-${section}-tab`} type="button"
+            aria-pressed={activeSection === section} aria-controls={`dashboard-${section}-panel`} onClick={() => setActiveSection(section)}
+            className="flex-1 rounded-xl px-5 py-3 text-sm font-semibold transition-colors btn-interact"
+            style={{ background: activeSection === section ? "var(--accent)" : "transparent", color: activeSection === section ? "#fff" : "var(--foreground)" }}>
+            {section === "style" ? "Style · dress for your day" : "Shop · find your next outfit"}
+          </button>)}
+        </div>
+      </nav>
       <main
         id="main-content"
         className="flex-1 py-6"
         style={{ paddingLeft: extraSpacingEnabled ? 32 : 16, paddingRight: extraSpacingEnabled ? 32 : 16 }}
       >
-        <nav aria-label="Dashboard sections" className="mx-auto mb-6 max-w-7xl">
-          <div className="inline-flex rounded-2xl border p-1" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-            {(["style", "shop"] as const).map((section) => (
-              <button
-                key={section}
-                id={`dashboard-${section}-tab`}
-                type="button"
-                aria-pressed={activeSection === section}
-                aria-controls={`dashboard-${section}-panel`}
-                onClick={() => setActiveSection(section)}
-                className="min-w-24 rounded-xl px-5 py-2.5 text-sm font-semibold transition-colors btn-interact"
-                style={{
-                  background: activeSection === section ? "var(--accent)" : "transparent",
-                  color: activeSection === section ? "#fff" : "var(--foreground)",
-                }}
-              >
-                {section === "style" ? "Style" : "Shop"}
-              </button>
-            ))}
-          </div>
-        </nav>
         <section
           id="dashboard-style-panel"
           aria-labelledby="dashboard-style-tab"
@@ -1115,7 +1100,7 @@ export default function Dashboard({
             {!simpleMode && <WeatherPlanningPanel />}
 
             {/* ── Location Picker ── */}
-            <LocationPicker onLocationResolved={handleLocationResolved} />
+            <div data-tour="location"><LocationPicker onLocationResolved={handleLocationResolved} /></div>
 
             {location && (
               <WeatherEffectCard
@@ -1137,6 +1122,7 @@ export default function Dashboard({
             {!weatherOnly && (
               <section
                 aria-labelledby="recommendation-context-heading"
+                data-tour="style-preferences"
                 className="rounded-2xl p-4 space-y-4"
                 style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
               >
@@ -1146,54 +1132,6 @@ export default function Dashboard({
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <label htmlFor="budget-min" className="mb-1 block text-xs font-medium">Preferred total outfit budget range</label>
-                    <div className="flex gap-2">
-                      <select
-                        aria-label="Budget currency"
-                        value={budgetCurrency}
-                        onChange={(event) => setBudgetCurrency(event.target.value as BudgetCurrency)}
-                        className="rounded-xl px-3 py-2 text-sm"
-                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
-                      >
-                        {BUDGET_CURRENCIES.map((currency) => <option key={currency} value={currency}>{currency}</option>)}
-                      </select>
-                      <input
-                        id="budget-min"
-                        type="number"
-                        min="0"
-                        max="1000000"
-                        step="0.01"
-                        inputMode="decimal"
-                        value={budgetMin}
-                        onChange={(event) => setBudgetMin(event.target.value)}
-                        placeholder="Min"
-                        aria-label="Minimum outfit budget"
-                        className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
-                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
-                      />
-                      <input
-                        id="budget-max"
-                        type="number"
-                        min="0.01"
-                        max="1000000"
-                        step="0.01"
-                        inputMode="decimal"
-                        value={budgetMax}
-                        onChange={(event) => setBudgetMax(event.target.value)}
-                        placeholder="Max"
-                        aria-label="Maximum outfit budget"
-                        className="min-w-0 flex-1 rounded-xl px-3 py-2 text-sm"
-                        style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
-                      />
-                    </div>
-                    <p className="mt-1 text-[11px] opacity-50">
-                      Enter a maximum, plus an optional minimum. This guides advice; item prices and the total are not verified.
-                    </p>
-                    {budgetMin.trim() && (!budgetMax.trim() || Number(budgetMin) > Number(budgetMax)) && (
-                      <p role="alert" className="mt-1 text-xs text-red-500">The minimum must not exceed the maximum.</p>
-                    )}
-                  </div>
 
                   <div>
                     <label htmlFor="occasion" className="mb-1 block text-xs font-medium">Occasion</label>
@@ -1298,11 +1236,14 @@ export default function Dashboard({
               </section>
             )}
 
-            {/* ── Fetch Button (shown after location selected, before fetch starts) ── */}
-            {location && !loading && !aiLoading && !result && !weatherData && (
+            {/* Visible before a first fetch, so onboarding can highlight the real control. */}
+            {!loading && !aiLoading && !result && !weatherData && (
               <button
                 onClick={handleFetch}
-                className={`w-full rounded-2xl py-3 text-sm font-semibold btn-interact ${planBtnClass}`}
+                data-tour="generate-style"
+                disabled={!location}
+                title={!location ? "Choose a location first" : undefined}
+                className={`w-full rounded-2xl py-3 text-sm font-semibold btn-interact disabled:opacity-45 ${planBtnClass}`}
                 aria-label={weatherOnly ? "Fetch weather for selected location" : "Fetch weather and generate AI outfit recommendation"}
               >
                 {weatherOnly ? "🌤️ Fetch Weather" : "✨ Fetch Weather & Style"}
@@ -2154,6 +2095,7 @@ export default function Dashboard({
             {(result || weatherData) && !loading && !aiLoading && (
               <button
                 onClick={handleFetch}
+                data-tour="generate-style"
                 className="w-full rounded-2xl py-3 text-sm font-medium btn-interact"
                 style={{
                   background: "var(--card)",
@@ -2647,11 +2589,11 @@ export default function Dashboard({
                     className="text-xs mt-0.5"
                     style={{ color: "var(--foreground)", opacity: 0.5 }}
                   >
-                    {isDev ? "Special Access" : isPro ? "A$4/month" : "A$0 — free forever"}
+                    {isDev ? "Special Access" : isPro ? (dailyLimits?.accountingActive ? "Admin-managed Pro · A$6.99/month approved price · checkout unavailable" : "Legacy Pro allowance · V6 price approved, not active") : "A$0 — free forever"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {isPro && creditsRemaining !== null && (
+                  {(isPro || dailyLimits?.accountingActive) && !isDev && creditsRemaining !== null && (
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-medium ${planBtnClass}`}
                       style={planBtnStyle}
@@ -2672,6 +2614,7 @@ export default function Dashboard({
               </div>
 
               {/* Daily limits info */}
+              {dailyLimits?.accountingActive && <AccountingUsage limits={dailyLimits} />}
               {dailyLimits && !isPro && (
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   {[
@@ -2757,13 +2700,14 @@ export default function Dashboard({
                     AI provider for your key
                   </p>
                   <div className="flex gap-2">
-                    {(["openai", "gemini", "mistral"] as const).map((prov) => (
+                    {(["openai", "gemini", "mistral", "anthropic"] as const).map((prov) => (
                       <button
                         key={prov}
                         type="button"
                         onClick={() => {
                           setByokProvider(prov);
-                          try { localStorage.setItem("skystyle_byok_provider", prov); } catch { /* ignore */ }
+                          if (prov !== byokProvider) setUserApiKey("");
+                          try { localStorage.setItem("skystyle_byok_provider", prov); if (prov !== byokProvider) localStorage.removeItem("skystyle_byok_key"); } catch { /* optional browser storage */ }
                         }}
                         className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
                         style={{
@@ -2772,7 +2716,7 @@ export default function Dashboard({
                           border: "1px solid var(--card-border)",
                         }}
                       >
-                        {prov === "openai" ? "🤖 OpenAI" : prov === "gemini" ? "✨ Gemini" : "🦄 Mistral"}
+                        {prov === "openai" ? "OpenAI" : prov === "gemini" ? "Gemini" : prov === "anthropic" ? "Anthropic" : "Mistral"}
                       </button>
                     ))}
                   </div>
@@ -2783,8 +2727,8 @@ export default function Dashboard({
                     ? "Provide your OpenAI API key (sk-…)."
                     : byokProvider === "gemini"
                       ? "Provide your Google Gemini API key."
-                      : "Provide your Mistral AI API key."}{" "}
-                  Stored locally on your device only — never sent to Sky Style servers.
+                      : byokProvider === "anthropic" ? "Provide your Anthropic key for Claude Haiku 4.5." : "Provide your Mistral AI API key."}{" "}
+                  Stored in this browser, sent securely through Sky Style to your selected provider only when you request AI advice. Not saved in the Sky Style database.
                 </p>
                 <input
                   type="password"
@@ -2794,7 +2738,7 @@ export default function Dashboard({
                     setUserApiKey(val);
                     try { localStorage.setItem("skystyle_byok_key", val); } catch { /* ignore */ }
                   }}
-                  placeholder={byokProvider === "openai" ? "sk-… (optional)" : byokProvider === "gemini" ? "AI… (optional)" : "mx-… (optional)"}
+                  placeholder={byokProvider === "openai" ? "sk-… (optional)" : byokProvider === "gemini" ? "AI… (optional)" : byokProvider === "anthropic" ? "sk-ant-… (optional)" : "mx-… (optional)"}
                   autoComplete="off"
                   className="w-full rounded-xl px-3 py-2 text-xs outline-none"
                   style={{
@@ -2864,12 +2808,16 @@ export default function Dashboard({
           </div>
         </div>
           <div className="mx-auto mt-5 max-w-7xl">
-            <StyleFeedbackPanel userId={userId} hasRecommendation={Boolean(rec?.outfit)} recommendation={rec?.outfit ?? ""} onSummaryChange={setFeedbackSummary} />
+            <StyleFeedbackPanel compact userId={userId} hasRecommendation={Boolean(rec?.outfit)} recommendation={rec?.outfit ?? ""} onSummaryChange={setFeedbackSummary} />
           </div>
         </section>
         <ShopPanel
           outfitIdea={rec?.outfit}
+          userId={userId} isPro={isPro} isDev={isDev} userApiKey={userApiKey} byokProvider={byokProvider}
+          onApiKeyChange={setUserApiKey} onProviderChange={setByokProvider}
+          feedbackSummary={feedbackSummary}
           onSwitchToStyle={() => setActiveSection("style")}
+          canSwitchToStyle={sectionMode !== "shop"}
           hidden={activeSection !== "shop"}
         />
       </main>

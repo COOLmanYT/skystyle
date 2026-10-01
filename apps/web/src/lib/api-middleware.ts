@@ -20,6 +20,9 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { verifyApiKey, API_KEY_PREFIX, API_KEY_PREVIEW_LENGTH } from "@/lib/api-keys";
 import { getEndpointCreditCost, getHalfCreditCharge } from "@/lib/api-key-credits";
 import { deductCredit, deductStoredAppCredit, getCredits, getStoredAppCredits } from "@/lib/credits";
+import { getActiveAccounting, accountingRequest, requireLegacyWriter } from "./accounting";
+import { EntitlementError, withV6Usage } from "./entitlements";
+import type { UsagePurpose } from "./entitlement-policy";
 
 /** Default rate limit when API_RATE_LIMIT_PER_MINUTE is not set. */
 const DEFAULT_RATE_LIMIT = 60;
@@ -46,7 +49,7 @@ export interface ApiKeyContext {
 function applyStandardHeaders(response: NextResponse): void {
   response.headers.set("Access-Control-Allow-Origin", "*");
   response.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-  response.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type");
+  response.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key");
   response.headers.set("Access-Control-Max-Age", "86400");
   response.headers.set(
     "Access-Control-Expose-Headers",
@@ -115,6 +118,7 @@ async function resolveApiKey(
  * accidental double-deduction under concurrent requests.
  */
 async function deductApiKeyCredits(apiKeyId: string, amount: number): Promise<boolean> {
+  await requireLegacyWriter();
   if (!Number.isFinite(amount) || amount <= 0) return true;
   const debit = Math.max(1, Math.floor(amount));
 
@@ -290,6 +294,18 @@ type ApiHandler = (
   ctx: ApiKeyContext
 ) => Promise<NextResponse>;
 
+function responseCharge(response: NextResponse, cost: number): number {
+  const explicit = response.headers.get("x-api-credit-charge");
+  if (explicit !== null && /^\d+$/.test(explicit)) return Math.min(cost, Number(explicit));
+  if (response.ok) return cost;
+  return response.headers.get("x-api-partial-success") === "true" ? getHalfCreditCharge(cost) : 0;
+}
+
+const V6_PURPOSE: Record<string, UsagePurpose> = {
+  "/api/v1/recommend": "api_recommend", "/api/v1/recweather": "api_recweather",
+  "/api/v1/weather": "api_weather", "/api/v1/closet": "api_closet",
+};
+
 /**
  * Higher-order function that wraps a v1 API route handler with:
  *   - API key verification (401 on missing/invalid key)
@@ -363,10 +379,16 @@ export function withApiAuth(handler: ApiHandler) {
       applyStandardHeaders(res); queueUsageLog(keyRecord.id, res); return res;
     }
     const isDev = profile?.is_dev === true;
+    let accounting;
+    try { accounting = await getActiveAccounting(keyRecord.userId); }
+    catch (error) {
+      const res = NextResponse.json({ error: error instanceof EntitlementError ? error.code : "accounting_unavailable", message: error instanceof EntitlementError ? error.message : "Unable to verify account accounting." }, { status: error instanceof EntitlementError ? error.status : 503 });
+      applyStandardHeaders(res); queueUsageLog(keyRecord.id, res); return res;
+    }
     let useAppCreditFallback = false;
     // Dev API keys are unlimited. Other keys use their allocated API credits
     // first, then one regular App Credit when the key balance is exhausted.
-    if (!isDev && endpointCost > 0 && keyRecord.creditsRemaining < endpointCost) {
+    if (!accounting && !isDev && endpointCost > 0 && keyRecord.creditsRemaining < endpointCost) {
       const appCredits = profile?.is_pro
         ? await getCredits(keyRecord.userId)
         : await getStoredAppCredits(keyRecord.userId);
@@ -434,12 +456,25 @@ export function withApiAuth(handler: ApiHandler) {
 
     let response: NextResponse;
     try {
-      response = await handler(req, ctx);
+      if (accounting && endpointCost > 0) {
+        const purpose = V6_PURPOSE[endpoint];
+        if (!purpose) throw new EntitlementError("unsupported_usage_purpose", "Unsupported metered endpoint.", 400);
+        let input: unknown = Object.fromEntries(req.nextUrl.searchParams.entries());
+        if (req.method !== "GET") {
+          const text = await req.clone().text();
+          if (Buffer.byteLength(text, "utf8") > 64_000) throw new EntitlementError("invalid_request", "Request is too large.", 413);
+          try { input = JSON.parse(text); } catch { throw new EntitlementError("invalid_request", "Invalid JSON body.", 400); }
+        }
+        response = await withV6Usage({ userId: keyRecord.userId, apiKeyId: keyRecord.id, purpose,
+          ...accountingRequest(req.headers), validatedInput: { endpoint, method: req.method, input } },
+          () => handler(req, ctx), { shouldCharge: (result) => responseCharge(result, endpointCost) > 0,
+            finalCreditCharge: (result, reserved) => Math.min(reserved, responseCharge(result, endpointCost)) });
+      } else response = await handler(req, ctx);
     } catch (err) {
       console.error("[api-middleware] Unhandled handler error:", err);
       const res = NextResponse.json(
-        { error: "internal_error", message: "An unexpected error occurred." },
-        { status: 500 }
+        { error: err instanceof EntitlementError ? err.code : "internal_error", message: err instanceof EntitlementError ? err.message : "An unexpected error occurred." },
+        { status: err instanceof EntitlementError ? err.status : 500 }
       );
       applyStandardHeaders(res);
       queueUsageLog(keyRecord.id, res);
@@ -452,7 +487,7 @@ export function withApiAuth(handler: ApiHandler) {
     response.headers.set("X-RateLimit-Remaining", String(rateLimit.remaining));
 
     // 6. Log after response — non-blocking
-    if (endpointCost > 0) {
+    if (!accounting && endpointCost > 0) {
       const explicitCharge = Number.parseInt(
         response.headers.get("x-api-credit-charge") ?? "",
         10

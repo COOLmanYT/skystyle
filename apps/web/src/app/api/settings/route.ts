@@ -9,12 +9,15 @@ import { auth, DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
+import { getActiveAccounting } from "@/lib/accounting";
+import { EntitlementError } from "@/lib/entitlements";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  if (session.user.id === DEMO_USER_ID) return NextResponse.json({});
 
   const { data } = await supabaseAdmin
     .from("settings")
@@ -38,6 +41,9 @@ export async function PATCH(req: NextRequest) {
     updates = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+  if (!updates || typeof updates !== "object" || Array.isArray(updates)) {
+    return NextResponse.json({ error: "Body must be an object" }, { status: 400 });
   }
 
   const onboardingUpdates: Record<string, unknown> = {};
@@ -67,6 +73,7 @@ export async function PATCH(req: NextRequest) {
     }
     return NextResponse.json({ success: true, updated: onboardingUpdates, persistence: "browser" });
   }
+  if (userId === DEMO_USER_ID) return NextResponse.json({ error: "Account settings require a real account; browser preferences still work in demo." }, { status: 403 });
 
   // Sync NextAuth user to public.users (required for FK references in app tables)
   await syncPublicUser(session);
@@ -78,8 +85,11 @@ export async function PATCH(req: NextRequest) {
     .eq("id", userId)
     .single();
 
-  const isPro = profile?.is_pro ?? false;
-  const isDev = profile?.is_dev ?? false;
+  let account;
+  try { account = await getActiveAccounting(userId); }
+  catch (error) { return NextResponse.json({ error: error instanceof EntitlementError ? error.message : "Unable to verify account access." }, { status: error instanceof EntitlementError ? error.status : 503 }); }
+  const isPro = account ? account.plan === "pro" : profile?.is_pro ?? false;
+  const isDev = account ? account.isDev : profile?.is_dev ?? false;
   const allowedKeys = (isPro || isDev)
     ? ["unit_preference", "custom_system_prompt", "custom_source_url", "custom_weather_api_key"]
     : ["unit_preference", "custom_source_url"];
@@ -95,7 +105,7 @@ export async function PATCH(req: NextRequest) {
   }
 
   // Free users: source picker limited to 1x/day (devs bypass)
-  if (!isPro && !isDev && ("custom_source_url" in filtered)) {
+  if (!account && !isPro && !isDev && ("custom_source_url" in filtered)) {
     const { allowed } = await canUseFeature(userId, "source_picks", isPro, isDev);
     if (!allowed) {
       return NextResponse.json(

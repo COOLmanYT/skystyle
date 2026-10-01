@@ -1,4 +1,5 @@
 import { auth } from "@/auth";
+import { getActiveAccounting } from "@/lib/accounting";
 import { supabaseAdmin } from "@/lib/supabase";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -52,8 +53,9 @@ export default async function FeedbackPage() {
     .eq("id", userId)
     .single();
 
-  const isPro = profile?.is_pro ?? false;
-  const isDev = profile?.is_dev ?? false;
+  const account = await getActiveAccounting(userId);
+  const isPro = account ? account.plan === "pro" : profile?.is_pro ?? false;
+  const isDev = account ? account.isDev : profile?.is_dev ?? false;
 
   const userName = session.user.name ?? session.user.email ?? undefined;
 

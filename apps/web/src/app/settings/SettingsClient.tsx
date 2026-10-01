@@ -6,6 +6,8 @@ import Toggle from "@/components/Toggle";
 import Checkbox from "@/components/Checkbox";
 import HamburgerNav from "@/components/HamburgerNav";
 import StyleFeedbackPanel from "@/components/StyleFeedbackPanel";
+import useDashboardSections from "@/components/useDashboardSections";
+import { DASHBOARD_SECTION_OPTIONS, type DashboardSections } from "@/lib/dashboard-sections";
 import { handleSignOut } from "@/app/actions";
 
 const MAX_GENDER_LENGTH = 30;
@@ -37,9 +39,12 @@ const WEATHER_PLANNING_OPTIONS: { value: WeatherPlanningVisibility; label: strin
 interface SettingsClientProps {
   initialUnitPreference: "metric" | "imperial";
   userId: string;
+  canAccessDev?: boolean;
 }
 
-export default function SettingsClient({ initialUnitPreference, userId }: SettingsClientProps) {
+export default function SettingsClient({ initialUnitPreference, userId, canAccessDev = false }: SettingsClientProps) {
+  const { mode: sections, setMode: setSections } = useDashboardSections(userId);
+  const [sectionMessage, setSectionMessage] = useState("");
   const [gender, setGender] = useState<string>(() => {
     const stored = getLocalStorage("skystyle_gender", "N/A");
     if (!stored) return "N/A";
@@ -132,6 +137,7 @@ export default function SettingsClient({ initialUnitPreference, userId }: Settin
   }
 
   function replayTutorial(id: "dashboard" | "api-dashboard" | "dev-dashboard", destination: string) {
+    if (id === "dashboard") { window.location.assign("/onboarding?replay=1"); return; }
     try { localStorage.removeItem(`skystyle_tutorial_seen_${id}`); } catch { /* storage unavailable */ }
     window.location.assign(destination);
   }
@@ -376,6 +382,16 @@ export default function SettingsClient({ initialUnitPreference, userId }: Settin
             Dashboard Behaviour
           </p>
 
+          <div>
+            <label htmlFor="dashboard-sections" className="block text-sm font-medium">Dashboard sections</label>
+            <select id="dashboard-sections" value={sections} onChange={(event) => setSectionMessage(setSections(event.target.value as DashboardSections)
+              ? "Sections saved for your account in this browser." : "Storage is unavailable; this choice lasts for this visit.")}
+              className="mt-2 w-full rounded-xl border p-3" style={{ background: "var(--background)", borderColor: "var(--card-border)" }}>
+              {DASHBOARD_SECTION_OPTIONS.map((option) => <option key={option} value={option}>{option === "both" ? "Style and Shop" : `${option === "style" ? "Style" : "Shop"} only`}</option>)}
+            </select>
+            <p className="mt-2 text-xs opacity-60">Updates the bar and sidebar immediately. Stored on this device, not synced to other browsers.</p>
+            {sectionMessage && <p role="status" className="mt-2 text-xs">{sectionMessage}</p>}
+          </div>
           {/* Weather Planning visibility */}
           <div className="space-y-2">
             <p className="text-xs font-medium" style={{ color: "var(--foreground)", opacity: 0.7 }}>Weather Planning Panel</p>
@@ -571,7 +587,7 @@ export default function SettingsClient({ initialUnitPreference, userId }: Settin
 
         <div id="settings-tutorials" className="rounded-2xl p-5 space-y-3" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
           <div><p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>Tutorials</p><p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>Replay any guided tour whenever you need a refresher.</p></div>
-          <div className="flex flex-wrap gap-2">{[["dashboard", "Dashboard", "/dashboard"], ["api-dashboard", "API Dashboard", "/dashboard/api"], ["dev-dashboard", "Dev Dashboard", "/dev"] as const].map(([id, label, destination]) => <button key={id} onClick={() => replayTutorial(id as "dashboard" | "api-dashboard" | "dev-dashboard", destination)} className="rounded-xl px-3 py-2 text-xs font-medium btn-interact" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}>Replay {label} tour</button>)}</div>
+          <div className="flex flex-wrap gap-2">{[["dashboard", "first-use", "/dashboard"], ["api-dashboard", "API Dashboard", "/dashboard/api"], ["dev-dashboard", "Dev Dashboard", "/dev"] as const].filter(([id]) => id !== "dev-dashboard" || canAccessDev).map(([id, label, destination]) => <button key={id} onClick={() => replayTutorial(id as "dashboard" | "api-dashboard" | "dev-dashboard", destination)} className="rounded-xl px-3 py-2 text-xs font-medium btn-interact" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}>Replay {label} tour</button>)}</div>
         </div>
 
         {/* ── Custom Spacing (drag to resize) ── */}

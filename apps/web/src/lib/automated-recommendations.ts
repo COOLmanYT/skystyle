@@ -1,6 +1,10 @@
 import { supabaseAdmin } from "@/lib/supabase";
-import { getStyleRecommendation, StyleRecommendation } from "@/lib/ai";
+import { getStyleRecommendation, getDefaultModel, StyleRecommendation } from "@/lib/ai";
 import { getWeather, WeatherData } from "@/lib/weather";
+import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
+import { getCredits, deductCredit } from "@/lib/credits";
+import { getActiveAccounting, scheduledUsageId } from "@/lib/accounting";
+import { EntitlementError, withV6Usage } from "@/lib/entitlements";
 
 export type AutomaticRecurrence = "once" | "daily" | "weekly";
 
@@ -17,7 +21,7 @@ export interface AutomaticRecommendationSchedule {
   next_run_at: string;
 }
 
-function nextRunAt(schedule: AutomaticRecommendationSchedule): string {
+export function nextRunAt(schedule: AutomaticRecommendationSchedule, after?: Date): string {
   if (schedule.recurrence === "once") return new Date().toISOString();
   // Advance the calendar day in the user's chosen zone, not a fixed 24-hour
   // duration, so a daily schedule remains at its chosen wall-clock time across DST.
@@ -27,7 +31,15 @@ function nextRunAt(schedule: AutomaticRecommendationSchedule): string {
     hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
   });
   const parts = Object.fromEntries(formatter.formatToParts(date).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
-  const localCalendar = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + (schedule.recurrence === "weekly" ? 7 : 1), Number(parts.hour), Number(parts.minute), Number(parts.second)));
+  const interval = schedule.recurrence === "weekly" ? 7 : 1;
+  let periods = 1;
+  if (after) {
+    const nowParts = Object.fromEntries(formatter.formatToParts(after).filter((part) => part.type !== "literal").map((part) => [part.type, part.value]));
+    const wallClock = (value: Record<string, string>) => Date.UTC(Number(value.year), Number(value.month) - 1, Number(value.day), Number(value.hour), Number(value.minute), Number(value.second));
+    // Skip missed occurrences rather than repeatedly charging for a backlog.
+    periods = Math.max(1, Math.floor((wallClock(nowParts) - wallClock(parts)) / (interval * 86_400_000)) + 1);
+  }
+  const localCalendar = new Date(Date.UTC(Number(parts.year), Number(parts.month) - 1, Number(parts.day) + interval * periods, Number(parts.hour), Number(parts.minute), Number(parts.second)));
   const target = { year: localCalendar.getUTCFullYear(), month: localCalendar.getUTCMonth() + 1, day: localCalendar.getUTCDate(), hour: localCalendar.getUTCHours(), minute: localCalendar.getUTCMinutes(), second: localCalendar.getUTCSeconds() };
   let candidate = Date.UTC(target.year, target.month - 1, target.day, target.hour, target.minute, target.second);
   // Two passes account for the offset changing at the DST boundary.
@@ -68,7 +80,7 @@ async function failRun(
       .eq("id", runId),
     supabaseAdmin
       .from("automated_recommendation_schedules")
-      .update({ locked_at: null, active: schedule.recurrence !== "once", updated_at: new Date().toISOString() })
+      .update({ locked_at: null, next_run_at: nextRunAt(schedule, new Date()), active: schedule.recurrence !== "once", updated_at: new Date().toISOString() })
       .eq("id", schedule.id),
   ]);
   if (runError) throw runError;
@@ -103,27 +115,47 @@ export async function runAutomaticRecommendationSchedule(
       supabaseAdmin.from("user_access_controls").select("*").eq("user_id", schedule.user_id).maybeSingle(),
       supabaseAdmin.from("settings").select("custom_system_prompt").eq("user_id", schedule.user_id).maybeSingle(),
       supabaseAdmin.from("closet").select("items").eq("user_id", schedule.user_id).maybeSingle(),
-      supabaseAdmin.from("users").select("is_dev").eq("id", schedule.user_id).maybeSingle(),
+      supabaseAdmin.from("users").select("is_dev, is_pro").eq("id", schedule.user_id).maybeSingle(),
     ]);
     for (const result of [controlResult, settingsResult, closetResult, profileResult]) {
       if (result.error) throw result.error;
     }
     if (controlResult.data?.banned_at || (controlResult.data?.app_blocked && (!controlResult.data?.app_blocked_until || Date.parse(controlResult.data.app_blocked_until) > Date.now()))) throw new Error("Automatic recommendations are disabled for this account.");
+    const accounting = await getActiveAccounting(schedule.user_id);
+    const isPro = accounting ? accounting.plan === "pro" : profileResult.data?.is_pro === true;
+    const isDev = accounting ? accounting.isDev : profileResult.data?.is_dev === true;
+    if (!profileResult.data) throw new Error("Account unavailable.");
+    if (!accounting && !isDev) {
+      if (isPro && await getCredits(schedule.user_id) <= 0) throw new Error("Insufficient App Credits.");
+      if (!isPro && !(await canUseFeature(schedule.user_id, "ai_uses", isPro, isDev)).allowed) throw new Error("Daily AI limit reached.");
+    }
 
-    const weather: WeatherData = await getWeather(schedule.latitude, schedule.longitude);
-    const recommendation: StyleRecommendation = await getStyleRecommendation({
+    const generate = async () => {
+      const weather: WeatherData = await getWeather(schedule.latitude, schedule.longitude);
+      const recommendation: StyleRecommendation = await getStyleRecommendation({
       weather,
       closetItems: Array.isArray(closetResult.data?.items) ? closetResult.data.items : [],
       unitPreference: schedule.unit_preference,
-      customSystemPrompt: settingsResult.data?.custom_system_prompt ?? undefined,
-      clientCustomPrompt: schedule.prompt ?? undefined,
+      customSystemPrompt: isPro || isDev ? settingsResult.data?.custom_system_prompt ?? undefined : undefined,
+      clientCustomPrompt: isPro || isDev ? schedule.prompt ?? undefined : undefined,
       forceCloset: false,
       shareLocation: false,
-      isDev: profileResult.data?.is_dev ?? false,
-    });
+      isDev,
+      modelId: getDefaultModel(isPro, isDev).id,
+      });
+      return { weather, recommendation };
+    };
+    const { weather, recommendation } = accounting ? await withV6Usage({ userId: schedule.user_id,
+      purpose: "recommendation", requestId: scheduledUsageId(schedule.id, schedule.next_run_at),
+      validatedInput: { scheduleId: schedule.id, occurrence: schedule.next_run_at, latitude: schedule.latitude,
+        longitude: schedule.longitude, unit: schedule.unit_preference, prompt: isPro || isDev ? schedule.prompt : null } }, generate) : await generate();
+    if (!accounting && !isDev) {
+      if (isPro) { if (!await deductCredit(schedule.user_id)) throw new Error("Insufficient App Credits."); }
+      else if (!await incrementUsage(schedule.user_id, "ai_uses", isPro, isDev)) throw new Error("Daily AI limit reached.");
+    }
 
     const completedAt = new Date().toISOString();
-    const nextRun = nextRunAt(schedule);
+    const nextRun = nextRunAt(schedule, new Date());
     const [{ error: runUpdateError }, { error: scheduleUpdateError }] = await Promise.all([
       supabaseAdmin
         .from("automated_recommendation_runs")
@@ -142,16 +174,17 @@ export async function runAutomaticRecommendationSchedule(
     ]);
     if (runUpdateError) throw runUpdateError;
     if (scheduleUpdateError) throw scheduleUpdateError;
-    await addInboxMessage(
+    try { await addInboxMessage(
       schedule.user_id,
       "recommendation",
       `Automatic recommendation ready: ${schedule.label}`,
       recommendation.outfit,
       { scheduleId: schedule.id, runId: run.id, weather, recommendation }
-    );
+    ); } catch { console.error("[automatic-recommendations] Completed run could not be copied to Inbox; it remains available in run history."); }
     return { status: "completed" };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Automatic recommendation failed.";
+    const safeMessages = ["Automatic recommendations are disabled for this account.", "Insufficient App Credits.", "Daily AI limit reached.", "Account unavailable."];
+    const message = error instanceof EntitlementError ? error.message : error instanceof Error && safeMessages.includes(error.message) ? error.message : "Automatic recommendation failed. Check your settings and try again.";
     try {
       await failRun(schedule, run.id, message);
     } catch (persistError) {
@@ -161,7 +194,7 @@ export async function runAutomaticRecommendationSchedule(
   }
 }
 
-export async function claimAndRunAutomaticRecommendations(maxJobs = 25) {
+export async function claimAndRunAutomaticRecommendations(maxJobs = 1) {
   const { data, error } = await supabaseAdmin.rpc("claim_due_automated_recommendation_schedules", { max_jobs: maxJobs });
   if (error) throw error;
   const schedules = (data ?? []) as AutomaticRecommendationSchedule[];

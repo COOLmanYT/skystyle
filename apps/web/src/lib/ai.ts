@@ -52,6 +52,9 @@ export const MODEL_PRIORITIES = {
 // Extract model ID type from the priorities
 export type ModelConfig = (typeof MODEL_PRIORITIES)[keyof typeof MODEL_PRIORITIES][number];
 export type ModelProvider = ModelConfig["provider"];
+export type ByokProvider = ModelProvider | "anthropic";
+export const BYOK_PROVIDERS = ["openai", "gemini", "mistral", "anthropic"] as const;
+export const ANTHROPIC_BYOK_MODEL = "claude-haiku-4-5-20251001";
 export type ModelID = ModelConfig["id"];
 
 // Singleton instances for server-side clients
@@ -178,7 +181,7 @@ export interface StyleInput {
   /** Pro/Dev client-side custom prompt (localStorage only, never persisted server-side) */
   clientCustomPrompt?: string;
   /** Which provider to use for the BYOK key ("openai" | "gemini" | "mistral", defaults to "openai") */
-  byokProvider?: ModelProvider;
+  byokProvider?: ByokProvider;
   /** Gender context for recommendations (e.g. "Male", "Female", "N/A", or custom text) */
   gender?: string;
   /** Whether the user consented to share their location with the AI */
@@ -207,6 +210,7 @@ export interface FollowUpInput {
   unitPreference: "metric" | "imperial";
   customSystemPrompt?: string;
   userApiKey?: string;
+  byokProvider?: ByokProvider;
   recommendationContext?: RecommendationContext;
   eventForecast?: EventForecastMatch;
   /** Dev mode: include raw AI output in response */
@@ -476,28 +480,30 @@ function normalizeMessageContent(content: unknown): string {
 }
 
 /** Call AI with a specific model or use default priority */
-async function callAIWithModel(
+export async function callAIWithModel(
   systemPrompt: string,
   userMessage: string,
   userApiKey: string | undefined,
   isDev: boolean,
   modelId: ModelID | undefined,
-  byokProvider: ModelProvider | undefined,
+  byokProvider: ByokProvider | undefined,
   maxTokens: number
 ): Promise<{ raw: string; modelUsed: string }> {
+  // Never send one provider's user key to a different provider or silently fall
+  // back to a server key. BYOK also takes precedence over the hosted default.
+  if (userApiKey) {
+    const provider = byokProvider || "openai";
+    if (provider === "anthropic") return callAnthropic(systemPrompt, userMessage, userApiKey, maxTokens);
+    const requested = modelId ? getModelById(modelId) : undefined;
+    const model = requested?.provider === provider ? requested : MODEL_PRIORITIES.pro.find((entry) => entry.provider === provider)!;
+    return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, model, maxTokens);
+  }
   // If a specific model is requested, use it
   if (modelId) {
     const model = getModelById(modelId);
     if (model) {
       return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, model, maxTokens);
     }
-  }
-
-  // BYOK takes precedence when user provides their own key
-  if (userApiKey) {
-    const provider = byokProvider || "openai";
-    const defaultModel = MODEL_PRIORITIES.pro.find(m => m.provider === provider) || MODEL_PRIORITIES.pro[0];
-    return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, defaultModel, maxTokens);
   }
 
   // Try server keys in priority order
@@ -551,6 +557,22 @@ async function callProvider(
     default:
       throw new Error(`Unknown provider: ${provider}`);
   }
+}
+
+/** Call OpenAI API */
+async function callAnthropic(system: string, message: string, key: string, maxTokens: number): Promise<{ raw: string; modelUsed: string }> {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", cache: "no-store", signal: AbortSignal.timeout(30_000),
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+    body: JSON.stringify({ model: ANTHROPIC_BYOK_MODEL, max_tokens: maxTokens, system: `${system}\nReturn only valid JSON, without code fences.`, messages: [{ role: "user", content: message }] }),
+  });
+  // Provider bodies can contain request data: never forward/log them or the key.
+  if (!response.ok) throw new Error(`Anthropic request failed (HTTP ${response.status}). Check your key and provider quota.`);
+  const data = await response.json() as { content?: { type?: string; text?: string }[]; stop_reason?: string };
+  if (data.stop_reason === "max_tokens") throw new Error("Anthropic response was incomplete. Please try a shorter request.");
+  const raw = data.content?.filter((part) => part.type === "text").map((part) => part.text ?? "").join("");
+  if (!raw?.trim()) throw new Error("Anthropic returned no text.");
+  return { raw, modelUsed: ANTHROPIC_BYOK_MODEL };
 }
 
 /** Call OpenAI API */
@@ -819,10 +841,11 @@ Please recommend an outfit.`;
 export async function getDevChatResponse(
   message: string,
   userApiKey?: string,
-  modelId?: ModelID
+  modelId?: ModelID,
+  byokProvider?: ByokProvider
 ): Promise<StyleRecommendation> {
   const { raw, modelUsed } = await callAIWithModel(
-    DEFAULT_SYSTEM_PROMPT, message, userApiKey, true, modelId, undefined, 500
+    DEFAULT_SYSTEM_PROMPT, message, userApiKey, true, modelId, byokProvider, 500
   );
   const recommendation = parseRecommendationFromRaw(raw);
   return sanitizeRecommendationFields({
@@ -839,7 +862,7 @@ export async function getFollowUpRecommendation(
 ): Promise<StyleRecommendation> {
   const {
     previousOutfit, previousReasoning, weather, followUpMessage, unitPreference,
-    customSystemPrompt, userApiKey, recommendationContext, eventForecast, modelId,
+    customSystemPrompt, userApiKey, byokProvider, recommendationContext, eventForecast, modelId,
   } = input;
   const isDev = input.isDev === true;
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
@@ -865,7 +888,7 @@ User follow-up question: "${followUpMessage}"
 Please update the outfit recommendation based on the follow-up question. Respond with the same JSON format.`;
 
   const { raw, modelUsed } = await callAIWithModel(
-    systemPrompt, userMessage, userApiKey, isDev, modelId, undefined, 500
+    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, 500
   );
   
   const recommendation = parseRecommendationFromRaw(raw);

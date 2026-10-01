@@ -57,7 +57,7 @@ export default function PrivacyClient() {
         Privacy Policy
       </h1>
       <p className="text-sm mb-4" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-        Last updated: April 2026
+        Last updated: 28 September 2026
       </p>
 
       {/* Simple Mode toggle */}
@@ -86,11 +86,12 @@ export default function PrivacyClient() {
             <p className="text-base font-semibold" style={{ opacity: 1 }}>👤 What we collect (and why)</p>
             <ul className="space-y-2 list-disc pl-5">
               <li><strong>Name &amp; email</strong>{" "}— from your GitHub or Google login, so you can sign in.</li>
-              <li><strong>Location</strong>{" "}— only used to fetch weather. Never stored.</li>
+              <li><strong>Location</strong>{" "}— used to fetch weather. Automatic recommendations save the location you choose for a schedule; we do not keep a location history.</li>
               <li><strong>Gender preference</strong>{" "}— optional. Stored locally on your device and sent to the AI when generating recommendations.</li>
               <li><strong>Closet items</strong>{" "}— optional. Stored so AI can personalise recommendations.</li>
               <li><strong>Daily usage counts</strong>{" "}— for rate limiting only. No request content stored.</li>
-              <li><strong>Private style feedback</strong>{" "}— local by default, or cloud if you choose. Notes, votes, and a short outfit excerpt are sent to Mistral Small for an editable preference summary. Delete it in Dashboard or Settings.</li>
+              <li><strong>Private style feedback</strong>{" "}— local by default, or cloud if you choose. Notes, votes, and a short outfit excerpt are sent to Mistral Small when you request an editable preference summary. Saved summaries personalize Style and Shop. Manage or delete feedback in Settings.</li>
+              <li><strong>Shopping requests</strong>{" "}— when live search is connected, your clothing query and size go to the approved product source, and selected preferences and sourced products go to your chosen AI provider. We do not record shopping queries, products viewed, or clicks for analytics, and do not add affiliate links.</li>
             </ul>
           </div>
           <div
@@ -104,7 +105,7 @@ export default function PrivacyClient() {
               <li>Bring Your Own Key — AI API key (optional, Pro/Dev only)</li>
               <li>UI preferences (theme, layout, spacing)</li>
             </ul>
-            <p>This data stays on your device and is not stored on Sky Style servers. Local storage data may be cleared if you clear your browser data.</p>
+            <p>Browser preferences and BYOK keys are stored in this browser. Relevant preferences and your chosen key are sent through Sky Style to the selected provider when needed for an AI request; keys are not saved in our database. Clearing browser data removes local copies.</p>
           </div>
           <div
             className="rounded-2xl p-5 space-y-3"
@@ -114,7 +115,7 @@ export default function PrivacyClient() {
             <ul className="space-y-2 list-disc pl-5">
               <li>We don&apos;t sell or share your data with data brokers.</li>
               <li>We don&apos;t track you across other websites.</li>
-              <li>We don&apos;t store your AI API keys.</li>
+              <li>We don&apos;t save your AI API keys in our database.</li>
               <li>We don&apos;t use advertising or tracking cookies.</li>
             </ul>
           </div>
@@ -196,6 +197,7 @@ export default function PrivacyClient() {
                 weather APIs to fetch weather data. We do not store your location history.
                 Your location is{" "}<strong>not</strong>{" "}shared with the AI unless you explicitly
                 consent via the &quot;Share my location with AI&quot; toggle.
+                Automatic recommendations store the coordinates you select for that schedule.
               </li>
               <li>
                 <strong>Gender preference</strong>{" "}— optional. Stored locally on your device and sent to the AI only when generating recommendations. This data is not stored on Sky Style servers.
@@ -212,7 +214,8 @@ export default function PrivacyClient() {
                 <strong>Usage counts</strong>{" "}— daily counters for rate limiting (AI uses,
                 follow-ups, closet uses, source picks). No request content is stored.
               </li>
-              <li><strong>Private style feedback</strong>{" "}— votes, optional notes, short outfit excerpts, and an editable summary. Stored on this device by default; cloud storage is optional. There is no automatic expiry. Cloud feedback is deleted with the account; device copies must be deleted in each browser. Mistral processes submitted feedback to summarize preferences, and the saved summary is included with subsequent Style advice.</li>
+              <li><strong>Private style feedback</strong>{" "}— votes, optional notes, short outfit excerpts, and an editable summary. Stored on this device by default; cloud storage is optional. There is no automatic expiry. Cloud feedback is deleted with the account; device copies must be deleted in each browser. Mistral processes submitted feedback when you request a summary, and the saved summary is included with subsequent Style and Shop advice.</li>
+              <li><strong>Shopping inputs</strong>{" "}— clothing queries, size and preferences are processed to search an approved source and rank its products. Sky Style does not persist shopping queries or product/click histories for analytics. Source requests and provider processing are subject to those services&apos; own terms.</li>
             </ul>
           </section>
 
@@ -222,7 +225,7 @@ export default function PrivacyClient() {
               <li>We do not track you across other websites.</li>
               <li>We do not sell or share your data with data brokers.</li>
               <li>We do not use advertising trackers or analytics cookies.</li>
-              <li>We do not store your AI API keys on our servers (BYOK keys are stored locally on your device only).</li>
+              <li>We do not persist your BYOK keys in our database or include them in application logs. Keys stored in your browser are transmitted through the server to the provider you select for each BYOK request.</li>
               <li>We do not store your location history or weather request logs.</li>
               <li>We do not store your gender preference on our servers.</li>
             </ul>
@@ -237,8 +240,9 @@ export default function PrivacyClient() {
               <li>UI preferences (theme, layout, spacing)</li>
             </ul>
             <p className="mt-2">
-              This data remains on your device and is not stored on Sky Style servers.
-              Local storage data may be cleared if you clear your browser data.
+              Browser preferences and BYOK keys are stored locally. Relevant preferences and
+              your selected key are transmitted for AI processing when needed; BYOK keys are
+              not saved in our database. Clearing browser data removes local copies.
             </p>
           </section>
 
@@ -264,13 +268,15 @@ export default function PrivacyClient() {
                     Google Gemini
                   </a>
                 </strong>{" "}
-                — AI outfit recommendations. Your weather data and closet items are sent for
-                each request.
+                — AI outfit recommendations and Shop ranking. Relevant weather, wardrobe,
+                selected preferences and sourced products are sent for the requested feature.
               </li>
               <li>
                 <strong>Weather providers:</strong>{" "}OpenWeatherMap, Open-Meteo, BOM, WeatherAPI, Visual Crossing, Pirate Weather — only coordinates are sent.
               </li>
               <li><strong>Mistral</strong>{" "}— AI outfit advice and feedback preference summaries. The summary service receives votes, notes, and limited outfit text, not account identifiers or API credentials. Provider-side processing and retention are subject to Mistral&apos;s own terms; deleting Sky Style feedback does not recall already processed requests.</li>
+              <li><strong><a href="https://privacy.anthropic.com" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>Anthropic</a></strong>{" "}— optional BYOK outfit advice, follow-ups and Shop ranking. Your selected context and key are sent to its API only when you choose this provider. Processing follows your provider account&apos;s terms.</li>
+              <li><strong><a href="https://www.ebay.com.au/help/policies/member-behaviour-policies/user-privacy-notice-privacy-policy?id=4260" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>eBay Australia</a></strong>{" "}— product search through its official API when an approved source is connected. Clothing queries and optional sizes are sent to the source. Product images are proxied through Sky Style; visiting a direct retailer link is subject to the retailer&apos;s own privacy practices. No affiliate parameters or Sky Style shopping tracking are added.</li>
               <li>
                 <strong>
                   <a href="https://osmfoundation.org/wiki/Privacy_Policy" target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--accent)" }}>

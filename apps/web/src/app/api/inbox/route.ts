@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { auth, DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncPublicUser } from "@/lib/sync-user";
 
 async function currentUser() {
   const session = await auth();
   if (!session?.user?.id) return null;
+  if (session.user.id === DEMO_USER_ID) return DEMO_USER_ID;
   await syncPublicUser(session);
   return session.user.id;
 }
@@ -13,6 +14,7 @@ async function currentUser() {
 export async function GET() {
   const userId = await currentUser();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (userId === DEMO_USER_ID) return NextResponse.json({ messages: [], preferences: null, persistence: "unavailable-in-demo" });
   const [messagesResult, preferencesResult] = await Promise.all([
     supabaseAdmin.from("user_inbox").select("*").eq("user_id", userId).is("dismissed_at", null).order("created_at", { ascending: false }).limit(200),
     supabaseAdmin.from("notification_preferences").select("*").eq("user_id", userId).maybeSingle(),
@@ -24,6 +26,7 @@ export async function GET() {
 export async function PATCH(req: NextRequest) {
   const userId = await currentUser();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (userId === DEMO_USER_ID) return NextResponse.json({ error: "Inbox storage requires a real account." }, { status: 403 });
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 

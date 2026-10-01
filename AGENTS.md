@@ -2,7 +2,7 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-## Current version: 6.0.0
+## Current version: 6.1.0
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 
@@ -84,5 +84,5 @@ VALUES (
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`)
 - **Auth:** NextAuth v5 JWT — `auth()` server-side, `/api/auth/session` client-side
 - **DB:** Supabase admin client at `apps/web/src/lib/supabase.ts`; always set `onConflict` on upserts
-- **Current enforcement:** Free 20 AI/day and 40 follow-ups/day; demo 10× Free; Pro uses daily credits; dev unlimited. V6 targets in Notion are not active until cost and launch approval.
+- **Current enforcement:** Legacy Free 20 AI/day and 40 follow-ups/day; preview demo 200/400; Pro uses daily credits; dev unlimited. Approved V6 values live in `lib/entitlement-policy.ts`. Active branches are integrated but rollout stays disabled pending coordinated writer drain, revocation SQL approval, atomic access/finalization review and real-account acceptance. Local concurrency/controlled-clock tests pass; no current real Pro accounts need date backfill. Checkout stays disabled.
 - **localStorage prefix:** all keys use `skystyle_` (e.g. `skystyle_last_seen_changelog`)

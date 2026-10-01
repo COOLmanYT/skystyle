@@ -116,7 +116,7 @@ describe('Weather Caching - Cache Behavior', () => {
 
   it('should return cached data if within TTL', () => {
     const cacheKey = 'test-key';
-    const cachedData = { ...mockWeatherData, source: 'OpenWeather' };
+    const cachedData = { ...mockWeatherData, source: 'OpenWeather' as const };
     
     // Add data to cache
     weatherCache.set(cacheKey, { data: cachedData, timestamp: testDate.getTime() });
@@ -135,7 +135,7 @@ describe('Weather Caching - Cache Behavior', () => {
 
   it('should return null and remove expired cache entry for OpenWeather', () => {
     const cacheKey = 'test-key';
-    const cachedData = { ...mockWeatherData, source: 'OpenWeather' };
+    const cachedData = { ...mockWeatherData, source: 'OpenWeather' as const };
     const oldTimestamp = testDate.getTime() - (900 * 1000 + 1000); // 15 minutes + 1 second ago
     
     // Add expired data to cache
@@ -150,7 +150,7 @@ describe('Weather Caching - Cache Behavior', () => {
 
   it('should return null and remove expired cache entry for BOM', () => {
     const cacheKey = 'test-key';
-    const cachedData = { ...mockWeatherData, source: 'BOM' };
+    const cachedData = { ...mockWeatherData, source: 'BOM' as const };
     const oldTimestamp = testDate.getTime() - (1800 * 1000 + 1000); // 30 minutes + 1 second ago
     
     // Add expired data to cache
@@ -165,7 +165,7 @@ describe('Weather Caching - Cache Behavior', () => {
 
   it('should return cached data if exactly at TTL boundary', () => {
     const cacheKey = 'test-key';
-    const cachedData = { ...mockWeatherData, source: 'OpenWeather' };
+    const cachedData = { ...mockWeatherData, source: 'OpenWeather' as const };
     const boundaryTimestamp = testDate.getTime() - (900 * 1000); // Exactly 15 minutes ago
     
     // Add data at exact TTL boundary
@@ -179,7 +179,7 @@ describe('Weather Caching - Cache Behavior', () => {
 
   it('should use default TTL for unknown sources', () => {
     const cacheKey = 'test-key';
-    const cachedData = { ...mockWeatherData, source: 'UnknownSource' } as WeatherData & { source: string };
+    const cachedData = { ...mockWeatherData, source: 'UnknownSource' } as unknown as WeatherData & { source: string };
     const oldTimestamp = testDate.getTime() - (900 * 1000 + 1000); // 15 minutes + 1 second ago
     
     // Add expired data with unknown source
@@ -261,7 +261,7 @@ describe('Weather Caching - Integration Scenarios', () => {
 
   it('should cache and retrieve weather data correctly', () => {
     const cacheKey = generateCacheKey(40.7128, -74.0060);
-    const weatherData = { ...mockWeatherData, source: 'OpenWeather' };
+    const weatherData = { ...mockWeatherData, source: 'OpenWeather' as const };
     
     // Simulate caching
     weatherCache.set(cacheKey, { data: weatherData, timestamp: testDate.getTime() });
@@ -276,8 +276,8 @@ describe('Weather Caching - Integration Scenarios', () => {
     const key1 = generateCacheKey(40.7128, -74.0060);
     const key2 = generateCacheKey(34.0522, -118.2437);
     
-    const data1 = { ...mockWeatherData, source: 'OpenWeather' };
-    const data2 = { ...mockWeatherData, source: 'BOM' };
+    const data1 = { ...mockWeatherData, source: 'OpenWeather' as const };
+    const data2 = { ...mockWeatherData, source: 'BOM' as const };
     
     // Cache both entries
     weatherCache.set(key1, { data: data1, timestamp: testDate.getTime() });
@@ -295,8 +295,8 @@ describe('Weather Caching - Integration Scenarios', () => {
     const key1 = generateCacheKey(40.7128, -74.0060);
     const key2 = generateCacheKey(34.0522, -118.2437);
     
-    const data1 = { ...mockWeatherData, source: 'OpenWeather' }; // 15 min TTL
-    const data2 = { ...mockWeatherData, source: 'BOM' }; // 30 min TTL
+    const data1 = { ...mockWeatherData, source: 'OpenWeather' as const }; // 15 min TTL
+    const data2 = { ...mockWeatherData, source: 'BOM' as const }; // 30 min TTL
     
     const oldTimestamp1 = testDate.getTime() - (900 * 1000 + 1000); // 15 min + 1 sec ago
     const oldTimestamp2 = testDate.getTime() - (900 * 1000 + 1000); // 15 min + 1 sec ago

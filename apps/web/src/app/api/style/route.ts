@@ -14,11 +14,13 @@ import { auth } from "@/auth";
 import { DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getWeather, CustomSource, SourceMode, MAX_CUSTOM_SOURCES } from "@/lib/weather";
-import { getStyleRecommendation, getDevChatResponse, PlanningData, ModelID, getDefaultModel, getModelById } from "@/lib/ai";
+import { getStyleRecommendation, getDevChatResponse, PlanningData, ModelID, getDefaultModel, getModelById, isModelAvailable, BYOK_PROVIDERS, type ByokProvider } from "@/lib/ai";
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
 import { matchEventForecast, parseRecommendationContext } from "@/lib/recommendation-context";
+import { getActiveAccounting, accountingRequest } from "@/lib/accounting";
+import { EntitlementError, withV6Usage } from "@/lib/entitlements";
 
 export async function POST(req: NextRequest) {
   // 1. Auth check
@@ -45,12 +47,14 @@ export async function POST(req: NextRequest) {
     planningData?: unknown; clientCustomPrompt?: string; byokProvider?: string;
     modelId?: string;
     recommendationContext?: unknown;
+    useCredits?: unknown;
   };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
 
   const { lat, lon, userApiKey, gender, shareLocation, forceCloset, devMessage, modelId } = body;
   
@@ -60,9 +64,10 @@ export async function POST(req: NextRequest) {
   }
   
   // Validate BYOK provider
-  const byokProvider: "openai" | "gemini" | "mistral" =
-    body.byokProvider === "gemini" ? "gemini" : (body.byokProvider === "mistral" ? "mistral" : "openai");
-  if (typeof lat !== "number" || typeof lon !== "number" || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+  if (body.byokProvider !== undefined && !BYOK_PROVIDERS.includes(body.byokProvider as ByokProvider)) return NextResponse.json({ error: "Invalid BYOK provider" }, { status: 400 });
+  if (userApiKey !== undefined && (typeof userApiKey !== "string" || userApiKey.length > 500 || /[\r\n]/.test(userApiKey))) return NextResponse.json({ error: "Invalid user API key" }, { status: 400 });
+  const byokProvider = (body.byokProvider ?? "openai") as ByokProvider;
+  if (typeof lat !== "number" || typeof lon !== "number" || !Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
     return NextResponse.json(
       { error: "lat must be between -90 and 90, lon between -180 and 180" },
       { status: 400 }
@@ -74,6 +79,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: parsedContext.error }, { status: 400 });
   }
   const recommendationContext = parsedContext.value;
+  let accounting: Awaited<ReturnType<typeof getActiveAccounting>>;
+  let requestAccounting;
+  try { accounting = await getActiveAccounting(userId, isDemo); requestAccounting = accountingRequest(req.headers, body.useCredits); }
+  catch (error) { return NextResponse.json({ error: error instanceof EntitlementError ? error.message : "Unable to verify accounting." }, { status: error instanceof EntitlementError ? error.status : 503 }); }
 
   // 3. Load user profile + settings
   let isPro = false;
@@ -103,11 +112,12 @@ export async function POST(req: NextRequest) {
 
     isPro = profileResult.data?.is_pro ?? false;
     isDev = profileResult.data?.is_dev ?? false;
+    if (accounting) { isPro = accounting.plan === "pro"; isDev = accounting.isDev; }
     settings = (settingsResult.data ?? {}) as { unit_preference?: string; custom_system_prompt?: string; custom_source_url?: string };
 
     // Closet: free users can use it 1x/day; Pro/Dev/Demo unlimited-ish
     const rawCloset: string[] = closetResult.data?.items ?? [];
-    if (!isPro && !isDev && rawCloset.length > 0) {
+    if (!accounting && !isPro && !isDev && rawCloset.length > 0) {
       const { allowed } = await canUseFeature(userId, "closet_uses", isPro, isDev, isDemo);
       if (!allowed) {
         closetItems = [];
@@ -125,6 +135,7 @@ export async function POST(req: NextRequest) {
     body.unitPreference === "imperial" || body.unitPreference === "metric"
       ? body.unitPreference
       : settings.unit_preference === "imperial" ? "imperial" : "metric";
+  if (accounting && ((modelId && !isModelAvailable(modelId as ModelID, isPro, isDev)) || (userApiKey && !isPro && !isDev))) return NextResponse.json({ error:"The selected model or BYOK is unavailable for your current account plan." }, { status:403 });
   const customSystemPrompt: string | undefined = (isPro || isDev)
     ? settings.custom_system_prompt ?? undefined
     : undefined;
@@ -138,7 +149,7 @@ export async function POST(req: NextRequest) {
     : undefined;
 
   // 4. Credits / daily limit check (devs and demos bypass credit deduction)
-  if (!isDev && !isDemo) {
+  if (!accounting && !isDev && !isDemo) {
     if (isPro) {
       const balance = await getCredits(userId);
       if (balance <= 0) {
@@ -172,10 +183,12 @@ export async function POST(req: NextRequest) {
   if (isDev && devMessage) {
     let recommendation;
     try {
-      recommendation = await getDevChatResponse(devMessage, userApiKey);
+      const generate = () => getDevChatResponse(devMessage, userApiKey, undefined, byokProvider);
+      recommendation = accounting ? await withV6Usage({ userId, purpose:"recommendation", ...requestAccounting,
+        validatedInput:{ route:"dev-chat", message:devMessage, byokProvider } }, generate) : await generate();
     } catch (err) {
       const message = err instanceof Error ? err.message : "AI request failed";
-      return NextResponse.json({ error: message }, { status: 502 });
+      return NextResponse.json({ error: message }, { status: err instanceof EntitlementError ? err.status : 502 });
     }
     const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev, isDemo);
     return NextResponse.json({
@@ -234,23 +247,29 @@ export async function POST(req: NextRequest) {
   }
 
   // 5. Fetch weather
-  let weather;
-  try {
-    weather = await getWeather(lat, lon, customSourceUrl, sourceMode, customSources);
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Weather fetch failed";
-    return NextResponse.json({ error: message }, { status: 502 });
+  async function generate() {
+    const weather = await getWeather(lat!, lon!, customSourceUrl, sourceMode, customSources);
+    const eventForecast = matchEventForecast(weather.hourly, recommendationContext?.event?.at);
+    const recommendation = await getStyleRecommendation({
+      weather, closetItems, unitPreference, customSystemPrompt, clientCustomPrompt,
+      userApiKey: (isPro || isDev) ? userApiKey : undefined,
+      byokProvider: (isPro || isDev) ? byokProvider : undefined,
+      gender: typeof gender === "string" ? gender.slice(0, 30) : undefined,
+      shareLocation: shareLocation === true, forceCloset: forceCloset === true,
+      isDev, customContext: weather.customContext, planningData, recommendationContext, eventForecast,
+      modelId: accounting ? (modelId as ModelID | undefined) ?? getDefaultModel(isPro, isDev).id : modelId as ModelID | undefined,
+    });
+    return { weather, eventForecast, recommendation };
   }
-  const eventForecast = matchEventForecast(weather.hourly, recommendationContext?.event?.at);
 
   // 6. Get AI recommendation (use BYOK if provided and user is Pro/Dev)
-  let recommendation;
+  let generated;
   try {
     // Check if user is trying to use a model switch (different from default)
     const isModelSwitch = Boolean(modelId && modelId !== getDefaultModel(isPro, isDev).id);
     
     // For free users, check model switch limit (2/week)
-    if (!isPro && !isDev && !isDemo && isModelSwitch) {
+    if (!accounting && !isPro && !isDev && !isDemo && isModelSwitch) {
       const { allowed, used, limit } = await canUseFeature(userId, "model_switches", isPro, isDev, isDemo);
       if (!allowed) {
         return NextResponse.json(
@@ -262,31 +281,16 @@ export async function POST(req: NextRequest) {
       await incrementUsage(userId, "model_switches", isPro, isDev, isDemo);
     }
     
-    recommendation = await getStyleRecommendation({
-      weather,
-      closetItems,
-      unitPreference,
-      customSystemPrompt,
-      clientCustomPrompt,
-      userApiKey: (isPro || isDev) ? userApiKey : undefined,
-      byokProvider: (isPro || isDev) ? byokProvider : undefined,
-      gender: typeof gender === "string" ? gender.slice(0, 30) : undefined,
-      shareLocation: shareLocation === true,
-      forceCloset: forceCloset === true,
-      isDev,
-      customContext: weather.customContext,
-      planningData,
-      recommendationContext,
-      eventForecast,
-      modelId: modelId as ModelID | undefined,
-    });
+    generated = accounting ? await withV6Usage({ userId, purpose: "recommendation", ...requestAccounting,
+      modelSwitch: isModelSwitch, validatedInput: { lat, lon, modelId, gender, shareLocation, forceCloset,
+        unitPreference, sourceMode, customSources, planningData, recommendationContext, clientCustomPrompt } }, generate) : await generate();
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";
-    return NextResponse.json({ error: message }, { status: 502 });
+    return NextResponse.json({ error: message }, { status: err instanceof EntitlementError ? err.status : 502 });
   }
 
   // 7. Deduct credit / increment daily usage (devs bypass)
-  if (!isDev && !isDemo) {
+  if (!accounting && !isDev && !isDemo) {
     if (isPro) {
       await deductCredit(userId);
     } else {
@@ -297,6 +301,7 @@ export async function POST(req: NextRequest) {
   }
 
   const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev, isDemo);
+  const { weather, recommendation, eventForecast } = generated;
 
   return NextResponse.json({
     weather,
@@ -305,7 +310,7 @@ export async function POST(req: NextRequest) {
       isPro,
       isDev,
       unitPreference,
-      creditsRemaining: isPro ? (await getCredits(userId)) : null,
+      creditsRemaining: (accounting || isPro) && !isDev ? (await getCredits(userId)) : null,
       dailyLimits,
       modelUsed: recommendation.modelUsed ?? "unknown",
       recommendationContext,

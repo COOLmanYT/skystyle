@@ -1,6 +1,6 @@
 /**
- * Tests the currently enforced limits. V6 target entitlements remain deferred
- * until cost and billing decisions are approved.
+ * Tests legacy enforcement while the approved V6 accounting rollout is off.
+ * New policy/RPC behavior is covered separately by entitlement tests.
  */
 import { canUseFeature, getDailyUsage, incrementUsage, LIMITS, type DailyUsageRecord } from "../daily-usage";
 import { supabaseAdmin } from "../supabase";
@@ -51,7 +51,14 @@ beforeEach(() => {
 });
 
 describe("current daily limits", () => {
-  it("keeps the pre-V6 Free and demo limits until entitlement approval", () => {
+  it("tracks preview demo usage without touching UUID-backed account tables", async () => {
+    fromMock.mockClear();
+    const before = await getDailyUsage("demo-user-123");
+    expect(await incrementUsage("demo-user-123", "ai_uses", false, false, true)).toBe(true);
+    expect((await getDailyUsage("demo-user-123")).ai_uses).toBe(before.ai_uses + 1);
+    expect(fromMock).not.toHaveBeenCalled();
+  });
+  it("keeps legacy Free and stable demo limits until the coordinated cutover", () => {
     expect(LIMITS.free).toEqual({
       ai_uses: 20, follow_ups: 40, closet_uses: 4, source_picks: 4, model_switches: 2,
     });

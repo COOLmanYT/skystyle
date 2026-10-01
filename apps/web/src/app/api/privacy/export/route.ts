@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { syncPublicUser } from "@/lib/sync-user";
 import { logSecurityEvent } from "@/lib/security";
 import { NextResponse, NextRequest } from "next/server";
+import { getActiveAccounting } from "@/lib/accounting";
 
 /**
  * GET /api/privacy/export
@@ -17,6 +18,9 @@ export async function GET(req: NextRequest) {
   await syncPublicUser(session);
 
   const userId = session.user.id;
+  let accountAccounting;
+  try { accountAccounting = await getActiveAccounting(userId); }
+  catch { return NextResponse.json({error:"Unable to verify account accounting for this export."},{status:503}); }
 
   // Fetch all user data in parallel
   const [
@@ -53,7 +57,7 @@ export async function GET(req: NextRequest) {
       name: userRow.data?.name,
       email: userRow.data?.email,
       image: userRow.data?.image,
-      plan: userRow.data?.is_dev ? "dev" : userRow.data?.is_pro ? "pro" : "free",
+      plan: accountAccounting?.plan ?? (userRow.data?.is_dev ? "dev" : userRow.data?.is_pro ? "pro" : "free"),
       pending_deletion: userRow.data?.pending_deletion ?? false,
       mfa_enabled: userRow.data?.mfa_enabled ?? false,
     },
@@ -66,6 +70,7 @@ export async function GET(req: NextRequest) {
       items: closetRow.data?.items ?? [],
     },
     daily_usage: dailyUsage.data ?? [],
+    account_accounting:accountAccounting,
     feedback: feedbackRows.data ?? [],
     private_style_feedback: stylePreferences.data ?? null,
     local_style_feedback_note: "Device-only feedback is not held on the server. View or delete it in Settings on each device.",

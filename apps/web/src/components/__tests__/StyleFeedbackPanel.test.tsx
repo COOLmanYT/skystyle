@@ -11,7 +11,13 @@ describe("V6 private feedback controls", () => {
     expect(markup).toContain('for="style-feedback-storage"');
     expect(markup).toContain('for="style-feedback-summary"');
     expect(markup).toContain("Save summary");
-    expect(markup).toContain("Generate an outfit to rate it");
+    expect(markup).toContain("Record private style feedback");
+    expect(markup).not.toContain('id="style-feedback-note"');
+  });
+  it("keeps dashboard feedback compact until the record button is clicked", () => {
+    const markup = renderToStaticMarkup(createElement(StyleFeedbackPanel, { userId: "owner", compact: true }));
+    expect(markup).toContain("Record private style feedback");
+    expect(markup).not.toContain('id="style-feedback-summary"');
   });
   it("offers summary and storage settings without voting on the settings page", () => {
     const markup = renderToStaticMarkup(createElement(StyleFeedbackPanel, { userId: "owner", showVoting: false }));

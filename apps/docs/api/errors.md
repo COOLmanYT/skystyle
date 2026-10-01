@@ -1,5 +1,7 @@
 # Errors & Credits
 
+This page describes legacy API middleware. Existing endpoint costs remain unchanged. The [approved V6 account-credit and usage policy](../development/v6-entitlements) is staged, not active; its server adapter fails closed, reserves before provider work and settles before serving output. Do not treat legacy per-key grants/fallbacks as the approved V6 design.
+
 ## Error responses
 
 All error responses return JSON with a single `error` field:

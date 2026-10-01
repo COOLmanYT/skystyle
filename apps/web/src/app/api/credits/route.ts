@@ -9,6 +9,8 @@ import { getCredits, getMoneyCreditCents, getStoredAppCredits } from "@/lib/cred
 import { supabaseAdmin } from "@/lib/supabase";
 import { API_CREDITS_PER_AUD_DOLLAR } from "@/lib/api-key-credits";
 import { syncPublicUser } from "@/lib/sync-user";
+import { getActiveAccounting } from "@/lib/accounting";
+import { getEntitlementRollout, EntitlementError } from "@/lib/entitlements";
 
 export async function GET() {
   const session = await auth();
@@ -19,6 +21,14 @@ export async function GET() {
   await syncPublicUser(session);
 
   const userId = session.user.id;
+  try {
+    const account = await getActiveAccounting(userId);
+    if (account) return NextResponse.json({ accountingActive:true, isPro:account.plan === "pro", isDev:account.isDev,
+      accountCredits:account.credits, appCredits:account.isDev ? null : account.credits.total, apiCredits:account.isDev ? null : account.credits.total,
+      moneyCreditCents:0, checkoutEnabled:false, keys:[], plan:account.plan,
+      usage:{ recommendations:account.recommendations, followups:account.followups }, rules:account.rules,
+      dailyResetAt:account.dailyResetAt, monthlyResetAt:account.monthlyResetAt }, { headers:{ "Cache-Control":"no-store" } });
+  } catch (error) { return NextResponse.json({ error:error instanceof EntitlementError ? error.message : "Unable to verify account credits." }, { status:error instanceof EntitlementError ? error.status : 503 }); }
   const { data } = await supabaseAdmin
     .from("users")
     .select("*")
@@ -40,6 +50,8 @@ export async function PATCH(req: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await syncPublicUser(session);
+  try { if ((await getEntitlementRollout()).enabled) return NextResponse.json({ error:"Per-key allocation and money-credit conversion are disabled. API requests use your shared account wallet. Purchases are unavailable." }, { status:409 }); }
+  catch { return NextResponse.json({ error:"Unable to verify accounting. No credits were changed." }, { status:503 }); }
   const body = await req.json().catch(() => null) as { keyId?: unknown; moneyCreditCents?: unknown } | null;
   const keyId = typeof body?.keyId === "string" ? body.keyId : "";
   const moneyCreditCents = typeof body?.moneyCreditCents === "number" ? body.moneyCreditCents : 0;

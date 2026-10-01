@@ -16,10 +16,11 @@ https://skystyle.app/api/v1
 | `POST` | [`/recweather`](./recweather) | Recommendation + full weather in one call | 3 |
 | `GET`  | [`/weather`](./weather) | Raw weather data for coordinates | 1 |
 | `GET`  | [`/closet`](./closet) | Your saved closet items | 1 |
+| `GET`  | [`/health`](./health) | Bounded, cached connectivity checks | 0 |
 
 ## Authentication
 
-All requests require an API key as a Bearer token. See the [Authentication guide](./authentication) for setup instructions.
+Recommendation, weather and closet requests require an API key as a Bearer token. Public read-only health endpoints do not require a key and consume no API credits. See the [Authentication guide](./authentication) for setup instructions.
 
 ```http
 Authorization: Bearer sk_live_YOUR_API_KEY
@@ -34,3 +35,5 @@ All responses are `application/json`. Error responses always include a top-level
 ```
 
 See the full [Error Reference](./errors) for status codes.
+
+The web application's **Shop** endpoint is `POST /api/shop`, outside `v1`. It requires a web session, not an API key, and uses the current app recommendation allowance. See [Shop request and source limits](./health#authenticated-shop-endpoint).

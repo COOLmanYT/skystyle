@@ -15,6 +15,13 @@ process.env.AUTH_SECRET = 'test-auth-secret';
 process.env.AUTH_URL = 'http://localhost:3000';
 process.env.OPENWEATHER_API_KEY = 'test-weather-key';
 
+// Existing route suites exercise the explicitly inactive legacy path. Active
+// integration suites override this mock; adapter tests unmock the module.
+jest.mock('@/lib/entitlements', () => ({
+  ...jest.requireActual<object>('@/lib/entitlements'),
+  getEntitlementRollout: jest.fn<() => Promise<{ enabled: boolean; checkoutEnabled: false }>>().mockResolvedValue({ enabled: false, checkoutEnabled: false }),
+}));
+
 // Mock Next.js router
 jest.mock('next/navigation', () => ({
   useRouter: () => ({
@@ -40,7 +47,7 @@ jest.mock('next/headers', () => ({
 // Mock Next.js server functions
 jest.mock('next/server', () => ({
   NextResponse: {
-    json: jest.fn((data, init) => new Response(JSON.stringify(data), {
+    json: jest.fn((data: unknown, init?: ResponseInit) => new Response(JSON.stringify(data), {
       status: init?.status || 200,
       headers: { 'content-type': 'application/json' },
     })),
@@ -84,7 +91,7 @@ afterAll(() => {
 });
 
 // Mock fetch for API tests
-global.fetch = jest.fn() as jest.Mock;
+global.fetch = jest.fn() as unknown as typeof fetch;
 
 // Mock localStorage for client component tests
 const localStorageMock = (() => {

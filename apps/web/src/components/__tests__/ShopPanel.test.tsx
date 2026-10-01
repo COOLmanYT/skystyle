@@ -1,41 +1,25 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ShopPanel from "../ShopPanel";
-
-describe("Shop dashboard section", () => {
-  it("offers a direct retailer search without affiliate or tracking parameters", () => {
-    const markup = renderToStaticMarkup(createElement(ShopPanel, { onSwitchToStyle: () => {}, hidden: true }));
-
-    expect(markup).toContain('id="dashboard-shop-panel"');
-    expect(markup).toContain("hidden");
-    expect(markup).toContain("Search THE ICONIC");
-    expect(markup).toContain("https://www.theiconic.com.au/catalog/?q=outfits");
-    expect(markup).toContain('referrerPolicy="no-referrer"');
-    expect(markup).toContain("Verified product metadata, stock, prices, and currency conversion are not available yet");
+const props = { userId: "owner", isPro: false, isDev: false, userApiKey: "", byokProvider: "openai" as const, onApiKeyChange: () => {}, onProviderChange: () => {}, feedbackSummary: "", onSwitchToStyle: () => {} };
+describe("Shop 6.1 configuration", () => {
+  it("offers budget, size, occasion and the same account models, without affiliate links", () => {
+    const markup = renderToStaticMarkup(createElement(ShopPanel, { ...props, hidden: true }));
+    expect(markup).toContain('id="dashboard-shop-panel"'); expect(markup).toContain("hidden");
+    expect(markup).toContain("Maximum shopping budget"); expect(markup).toContain("Size / fit"); expect(markup).toContain("AI model");
+    expect(markup).toContain("https://www.theiconic.com.au/catalog/?q=outfits"); expect(markup).toContain('referrerPolicy="no-referrer"');
+    expect(markup).not.toMatch(/utm_|aff_id|onClick=.*retailer/);
   });
-
-  it("shows an outfit idea as plain text rather than an unverified retailer link", () => {
-    const markup = renderToStaticMarkup(createElement(ShopPanel, {
-      outfitIdea: "Try <a href=\"https://example.com\">this coat</a>",
-      onSwitchToStyle: () => {},
-    }));
-
-    expect(markup).toContain("Your latest outfit idea");
-    expect(markup).toContain("&lt;a href=");
-    expect(markup).not.toContain('<a href="https://example.com"');
-    expect(markup).toContain("not a product listing or a verified shopping basket");
+  it("renders the reference outfit as escaped text, not AI-supplied product links", () => {
+    const markup = renderToStaticMarkup(createElement(ShopPanel, { ...props, outfitIdea: '<a href="https://example.com">coat</a>' }));
+    expect(markup).toContain("&lt;a href="); expect(markup).not.toContain('<a href="https://example.com"');
   });
-
-  it("renders direct product widgets without inventing metadata or retaining tracking", () => {
-    const markup = renderToStaticMarkup(createElement(ShopPanel, {
-      outfitIdea: "[Linen shirt](https://www.theiconic.com.au/linen-shirt-1234.html?aff_id=123&utm_source=ai)",
-      onSwitchToStyle: () => {},
-    }));
-    expect(markup).toContain("AI-suggested product links");
-    expect(markup).toContain('href="https://www.theiconic.com.au/linen-shirt-1234.html"');
-    expect(markup).toContain("Price: check retailer");
-    expect(markup).toContain("Rating: not verified");
-    expect(markup).not.toContain('href="https://www.theiconic.com.au/linen-shirt-1234.html?');
-    expect(markup).not.toContain("<img");
+  it("provides Anthropic BYOK only for Pro/developer controls", () => {
+    expect(renderToStaticMarkup(createElement(ShopPanel, props))).not.toContain("API key</label>");
+    const markup = renderToStaticMarkup(createElement(ShopPanel, { ...props, isPro: true }));
+    expect(markup).toContain("anthropic"); expect(markup).toContain("Claude Haiku 4.5");
+  });
+  it("does not offer a dead Style link in a Shop-only workspace", () => {
+    expect(renderToStaticMarkup(createElement(ShopPanel, { ...props, canSwitchToStyle: false }))).not.toContain("Back to Style");
   });
 });

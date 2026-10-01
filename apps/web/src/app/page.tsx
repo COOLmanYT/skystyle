@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import DemoLocationPicker, { ResolvedLocation } from "@/components/DemoLocationPicker";
 import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "@/components/WeatherEffectCard";
 import Link from "next/link";
+import V6PlanOverview from "@/components/V6PlanOverview";
 
 /** Returns true if semver string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -210,14 +211,14 @@ export default function Home() {
           className="text-4xl sm:text-5xl font-bold mb-4 leading-tight"
           style={{ color: "var(--foreground)" }}
         >
-          Dress perfectly for&nbsp;the&nbsp;weather
+          Your day. Your weather. Your style.
         </h1>
         <p
           className="text-lg mb-8 max-w-xl mx-auto"
           style={{ color: "var(--foreground)", opacity: 0.6 }}
         >
-          Sky Style combines hyper-local weather data with AI to recommend the
-          perfect outfit every day. Never overdress or underdress again.
+          Weather-aware outfit advice for what you own, and a separate Shop workspace
+          for what comes next. Start simply, then make it yours.
         </p>
         <div className="flex items-center justify-center gap-4 flex-wrap">
           <Link
@@ -243,9 +244,19 @@ export default function Home() {
 
       <section className="px-6 pb-8 max-w-5xl mx-auto" aria-label="Sky Style benefits">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[["🧥", "Wear what you own", "Use your closet to keep advice grounded in your real wardrobe."], ["⏰", "Plan ahead", "Save an exact-time automatic recommendation and review it later."], ["💬", "Keep refining", "Ask follow-ups when your plans, comfort, or conditions change."]].map(([emoji, title, description]) => <div key={title} className="rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}><p className="text-2xl" aria-hidden="true">{emoji}</p><h2 className="font-semibold mt-3">{title}</h2><p className="text-sm mt-1 opacity-60">{description}</p></div>)}
+          {[["🧥", "Wear what you own", "Use your closet to keep advice grounded in your real wardrobe."], ["⏰", "Plan ahead", "Schedule an automatic recommendation and review the result later."], ["💬", "Keep refining", "Ask follow-ups when your plans, comfort, or conditions change."]].map(([emoji, title, description]) => <div key={title} className="rounded-2xl p-5" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}><p className="text-2xl" aria-hidden="true">{emoji}</p><h2 className="font-semibold mt-3">{title}</h2><p className="text-sm mt-1 opacity-60">{description}</p></div>)}
         </div>
       </section>
+
+      <section className="mx-auto grid max-w-5xl gap-5 px-6 py-8 sm:grid-cols-2" aria-label="Style and Shop workspaces">
+        {[
+          ["Style", "Dress for the day you have", "Choose a location, add an occasion, and get an outfit from your wardrobe. Keep refining it with follow-ups and private preference feedback."],
+          ["Shop", "Find the pieces you are missing", "Set your own budget, size and occasion. Direct retailer search is available; AI-ranked product cards require a connected, approved product source."],
+        ].map(([title, heading, body]) => <article key={title} className="rounded-3xl border p-6 sm:p-8" style={{ background: "color-mix(in srgb, var(--accent) 5%, var(--card))", borderColor: "var(--card-border)" }}>
+          <p className="text-xs font-semibold uppercase tracking-widest opacity-60">{title}</p><h2 className="mt-3 text-2xl font-semibold tracking-tight">{heading}</h2><p className="mt-3 text-sm leading-relaxed opacity-70">{body}</p>
+        </article>)}
+      </section>
+      <p className="mx-auto max-w-3xl px-6 text-center text-sm opacity-60">Keep both workspaces, or show only Style or Shop. A first-use tour highlights the real controls; replay it from Settings. No affiliate links or shopping click tracking.</p>
 
       {/* How it works */}
       <section className="px-6 py-16 max-w-4xl mx-auto" aria-labelledby="how-it-works-heading">
@@ -641,108 +652,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="px-6 py-16 max-w-6xl mx-auto" aria-labelledby="pricing-heading">
-        <h2
-          id="pricing-heading"
-          className="text-2xl font-semibold text-center mb-2"
-          style={{ color: "var(--foreground)" }}
-        >
-          Pricing
-        </h2>
-        <p
-          className="text-sm text-center mb-10"
-          style={{ color: "var(--foreground)", opacity: 0.5 }}
-        >
-          Start free, upgrade when you need more.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-8">
-          {/* Free */}
-          <div
-            className="rounded-2xl p-8"
-            style={{
-              background: "var(--card)",
-              border: "1px solid var(--card-border)",
-            }}
-          >
-            <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>
-              Free
-            </h3>
-            <p className="text-3xl font-bold mb-6" style={{ color: "var(--foreground)" }}>
-              A$0
-            </p>
-            <ul className="text-sm space-y-3" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-              <li>✅ 5 AI recommendations/day</li>
-              <li>✅ 10 follow-ups/day</li>
-              <li>✅ Real-time multi-source weather</li>
-              <li>✅ Closet (1 use/day)</li>
-              <li>✅ Source picker (1/day)</li>
-              <li>✅ GPS &amp; manual location</li>
-            </ul>
-          </div>
-
-          {/* Monthly */}
-          <div
-            className="rounded-2xl p-8 relative"
-            style={{
-              background: "var(--card)",
-              border: "2px solid var(--accent)",
-            }}
-          >
-            <span
-              className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1 rounded-full"
-              style={{ background: "var(--accent)", color: "#fff" }}
-            >
-              Popular
-            </span>
-            <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>
-              Pro Monthly
-            </h3>
-            <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-              A$4<span className="text-sm font-normal opacity-60">/month</span>
-            </p>
-            <ul className="text-sm space-y-3 mt-6" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-              <li>✅ Everything in Free</li>
-              <li>✅ 50 App Credits per day</li>
-              <li>✅ 100 follow-ups/day</li>
-              <li>✅ Unlimited closet &amp; sources</li>
-              <li>✅ Custom AI prompts</li>
-              <li>✅ Bring your own AI key</li>
-              <li>✅ Custom weather sources</li>
-            </ul>
-          </div>
-
-          {/* Pay As You Go */}
-          <div
-            className="rounded-2xl p-8 relative"
-            style={{
-              background: "var(--card)",
-              border: "1px dashed var(--card-border)",
-              opacity: 0.75,
-            }}
-          >
-            <span
-              className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1 rounded-full"
-              style={{ background: "var(--foreground)", color: "var(--background)", opacity: 0.6 }}
-            >
-              Coming one day
-            </span>
-            <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>
-              Pay As You Go
-            </h3>
-            <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-              A$?<span className="text-sm font-normal opacity-60">/use</span>
-            </p>
-            <ul className="text-sm space-y-3 mt-6" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-              <li>💡 Select what you want</li>
-              <li>💰 Pay only for what you use</li>
-              <li>🚫 No more overpaying</li>
-              <li>⚡ Priority support</li>
-              <li>📸 Image Upload add-on</li>
-            </ul>
-          </div>
-        </div>
+      {/* Approved V6 policy; current account allowances remain unchanged. */}
+      <section id="pricing" className="px-6 py-16 max-w-6xl mx-auto" aria-label="Approved V6 plans">
+        <V6PlanOverview />
       </section>
 
       {/* Changelog Section */}

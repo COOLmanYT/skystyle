@@ -21,6 +21,7 @@ New here? Try the [no-login Live Demo](https://skystyle.app/#demo) first to see 
 **Feature reference:**
 
 - **[Dashboard & Closet](./dashboard)** — recommendation modes, weather planning panel, model switching, follow-up questions, BYOK, and your wardrobe.
+- **[Shop](./web-app/shop)** — your budget range, sourced product widgets, shared AI models, and product-source availability gates.
 - **[Settings](./settings)** — profile, units, appearance, preferences, dashboard behaviour, layout & spacing, and tutorials.
 - **[Security & Privacy](./security-and-privacy)** — 2FA, passkeys, API keys, security log, data export, and account deletion.
 - **[Automatic Recommendations](./automatic-recommendations)** — schedule exact-time outfit recommendations with a manual location.
@@ -35,13 +36,15 @@ New here? Try the [no-login Live Demo](https://skystyle.app/#demo) first to see 
 
 - **[FAQ & Troubleshooting](./faq)** — common questions, error explanations, and fixes.
 
-## Credits
+## Legacy credits — V6 accounting inactive
+
+The [approved V6 policy](./development/v6-entitlements) uses one account balance with separate grant/purchased expiry rules, not new credits per key. It is **not active yet**. Current credit screens still use legacy accounting pending the coordinated cutover; checkout and purchases are unavailable.
 
 Sky Style keeps three balances distinct:
 
 | Balance | Use |
 | --- | --- |
-| $ Credit (AUD) | Convert $1.00 into 50 API Credit for a key you choose. Pro receives $1.00 each calendar month. |
+| $ Credit (AUD) | Legacy money-wallet conversion is unavailable on the verified schema; do not assume a monthly money grant or a working purchase flow. |
 | API Credit | Per-key balance consumed by public API requests. |
 | App Credit | In-app balance, including developer gifts and API fallback when a key's API Credit is empty. Pro receives 50 App Credits each day. |
 

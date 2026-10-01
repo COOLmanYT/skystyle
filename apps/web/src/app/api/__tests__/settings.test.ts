@@ -30,6 +30,10 @@ describe("Settings API V6 onboarding", () => {
     jest.clearAllMocks();
     (jest.requireMock("@/auth").auth as jest.Mock).mockResolvedValue({ user: { id: "demo-user-123" } });
   });
+  it.each([null, [], "bad"])("rejects a non-object body %p without persistence", async (body) => {
+    expect((await PATCH(request(body))).status).toBe(400);
+    expect(syncPublicUser).not.toHaveBeenCalled();
+  });
 
   it("keeps onboarding-only demo completion in the browser", async () => {
     const response = await PATCH(request({

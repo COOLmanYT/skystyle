@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getDevEmails } from "@/lib/dev-auth";
 import { supabaseAdmin } from "@/lib/supabase";
+import { getAdminAccounting } from "@/lib/admin-accounting";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const session = await auth();
@@ -10,6 +11,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
   }
   const { userId } = await params;
   if (!/^[0-9a-f-]{36}$/i.test(userId)) return NextResponse.json({ error: "Invalid user id." }, { status: 400 });
+  let accounting;
+  try { accounting = await getAdminAccounting([userId]); }
+  catch { return NextResponse.json({error:"Unable to verify account accounting for this export."},{status:503}); }
 
   const [profile, settings, closet, dailyUsage, feedback, securityLogs, passkeys, deletionRequest, inbox, apiKeys] = await Promise.all([
     supabaseAdmin.from("users").select("id, name, email, image, is_pro, is_dev, mfa_enabled").eq("id", userId).maybeSingle(),
@@ -46,7 +50,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
     exported_at: new Date().toISOString(),
     exported_by: "Sky Style developer",
     schema_version: "5.1.0",
-    profile: { ...profile.data, pending_deletion: deletionRequest.data?.status === "pending" },
+    profile: { ...profile.data, plan:profile.data.is_dev ? "dev" : accounting?.get(userId)?.plan ?? (profile.data.is_pro ? "pro":"free"), pending_deletion: deletionRequest.data?.status === "pending" },
+    account_accounting:accounting?.get(userId) ?? null,
+    legacy_key_balances_note:accounting ? "Per-key credit counters below are frozen legacy records, not live wallet balances." : null,
     settings: settings.data ?? null,
     closet: closet.data ?? null,
     daily_usage: dailyUsage.data ?? [],

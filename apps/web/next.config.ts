@@ -10,6 +10,7 @@ const nextConfig: NextConfig = {
   // Image optimization for weather icons and other external images
   images: {
     remotePatterns: [
+      { protocol: 'https', hostname: 'i.ebayimg.com', pathname: '/images/**', search: '' },
       { protocol: 'https', hostname: '*.openweathermap.org' },
       { protocol: 'https', hostname: '*.supabase.co' },
       { protocol: 'https', hostname: '*.vercel.app' },

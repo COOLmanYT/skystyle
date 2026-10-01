@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase";
+import { DEMO_USER_ID } from "./demo";
 
 export interface OnboardingState {
   complete: boolean;
@@ -8,6 +9,7 @@ export interface OnboardingState {
 
 /** Read durable onboarding state while allowing a browser fallback if the query fails. */
 export async function getOnboardingState(userId: string): Promise<OnboardingState> {
+  if (userId === DEMO_USER_ID) return { complete: false, experienceMode: null, persistenceAvailable: false };
   try {
     const { data, error } = await supabaseAdmin
       .from("settings")

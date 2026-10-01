@@ -44,7 +44,7 @@ describe('AI Module - Model Configuration', () => {
       expect(freeModels.some(m => m.id === 'ministral-8b-latest')).toBe(true);
       
       // Free users should NOT have OpenAI models
-      expect(freeModels.some(m => m.provider === 'openai')).toBe(false);
+      expect(freeModels.some(m => String(m.provider) === 'openai')).toBe(false);
     });
   });
 

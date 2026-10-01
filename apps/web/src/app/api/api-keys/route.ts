@@ -7,6 +7,8 @@ import { syncPublicUser } from "@/lib/sync-user";
 import { generateApiKey, hashApiKey } from "@/lib/api-keys";
 import { getInitialApiKeyCredits } from "@/lib/api-key-credits";
 import { logSecurityEvent } from "@/lib/security";
+import { randomUUID } from "node:crypto";
+import { getEntitlementRollout, callEntitlementRpc, EntitlementError } from "@/lib/entitlements";
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -73,6 +75,19 @@ export async function POST(req: NextRequest) {
   await syncPublicUser(session);
 
   const body = await req.json().catch(() => ({})) as Record<string, unknown>;
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  try {
+    if ((await getEntitlementRollout()).enabled) {
+      const { key, preview } = generateApiKey();
+      const id = randomUUID();
+      await callEntitlementRpc("v6_create_api_key", { p_user_id: session.user.id, p_key_id: id,
+        p_key_hash: hashApiKey(key), p_key_preview: preview, p_nickname: cleanLabel(body.nickname,80), p_folder: cleanLabel(body.folder,80) });
+      const { data, error } = await supabaseAdmin.from("api_keys").select(API_KEY_COLUMNS).eq("id",id).eq("user_id",session.user.id).single();
+      if (error || !data || data.credits_remaining !== 0) throw new EntitlementError("accounting_unavailable", "Key creation could not be verified. Check your keys before retrying.");
+      await logSecurityEvent(session.user.id, "api_key_created", { key_id:id });
+      return NextResponse.json({ apiKey:key, keyMeta:data, sharedAccountCredits:true }, { status:201 });
+    }
+  } catch (error) { return NextResponse.json({ error: error instanceof EntitlementError ? error.message : "Unable to create account API key." }, { status: error instanceof EntitlementError ? error.status : 503 }); }
   const { data: profile, error: profileError } = await supabaseAdmin.from("users").select("is_pro, is_dev").eq("id", session.user.id).maybeSingle();
   if (profileError) return NextResponse.json({ error: "Failed to load your API plan." }, { status: 500 });
   const keyLimit = profile?.is_dev ? Infinity : profile?.is_pro ? 20 : 3;
@@ -132,10 +147,21 @@ export async function PATCH(req: NextRequest) {
   await syncPublicUser(session);
 
   const body = await req.json().catch(() => ({}));
+  if (!body || typeof body !== "object" || Array.isArray(body)) return NextResponse.json({ error:"Invalid request body." }, { status:400 });
   const id = typeof body?.id === "string" ? body.id : "";
   if (!isUuid(id)) {
     return NextResponse.json({ error: "Invalid key id" }, { status: 400 });
   }
+
+  try {
+    if ((await getEntitlementRollout()).enabled && body.action === "revoke") {
+      if ("nickname" in body || "folder" in body) return NextResponse.json({ error:"Revoke and label edits must be separate requests." }, { status:400 });
+      const result = await callEntitlementRpc("v6_revoke_api_key", { p_user_id:session.user.id, p_key_id:id }) as { id?:unknown; revoked?:unknown } | null;
+      if (!result || result.id !== id.toLowerCase() || result.revoked !== true) throw new EntitlementError("accounting_unavailable","Key revocation could not be verified.");
+      await logSecurityEvent(session.user.id, "api_key_revoked", { key_id:id });
+      return NextResponse.json({ success:true });
+    }
+  } catch (error) { return NextResponse.json({ error:error instanceof EntitlementError ? error.message : "Unable to revoke account API key." }, { status:error instanceof EntitlementError ? error.status : 503 }); }
 
   const updates: Record<string, unknown> = {};
   if (body?.action === "revoke") updates.revoked = true;

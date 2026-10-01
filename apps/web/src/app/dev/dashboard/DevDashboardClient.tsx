@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
-import Tutorial from "@/components/Tutorial";
+import DevNavBar from "@/components/DevNavBar";
 import { sanitizeUrl } from "@/lib/sanitize-url";
 
 interface DeletionRequest {
@@ -98,27 +97,7 @@ export default function DevDashboardClient({ initialSection = "triage" }: { init
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <Tutorial id="dev-dashboard" title="Dev Dashboard tour" steps={[{ title: "Triage requests", body: "Review deletion requests and record the resolution." }, { title: "Support users", body: "Use chat and ticket replies to communicate with users." }, { title: "Publish carefully", body: "Preview Changelog content before publishing it." }]} />
-      {/* Nav */}
-      <nav
-        className="sticky-nav px-4 py-3"
-        style={{ borderBottom: "1px solid var(--card-border)" }}
-      >
-        <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Link
-              href="/dev"
-              className="text-sm btn-interact rounded-xl px-3 py-2"
-              style={{ color: "var(--foreground)", opacity: 0.6 }}
-            >
-              ← Dev Center
-            </Link>
-            <span className="text-base font-semibold" style={{ color: "var(--foreground)" }}>
-              Dev Center
-            </span>
-          </div>
-        </div>
-      </nav>
+      <DevNavBar email="" />
 
       <div className="max-w-6xl mx-auto px-4 py-6">
         <div className="flex gap-6 items-start">

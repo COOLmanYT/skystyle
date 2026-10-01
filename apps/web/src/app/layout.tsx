@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://skystyle.app"),
   title: "Sky Style — AI Weather Stylist",
   description:
-    "Hyper-local weather data meets AI-powered outfit recommendations. Dress perfectly for the day.",
+    "Weather-aware outfit advice, a separate shopping workspace, and private preferences. Dress for your day with Sky Style.",
   alternates: { canonical: "/" },
 };
 

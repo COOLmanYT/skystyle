@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import useDashboardSections from "./useDashboardSections";
+import { visibleDashboardSections } from "@/lib/dashboard-sections";
 
 export type NavPage = "dashboard" | "closet" | "account" | "settings" | "feedback" | "other";
 
@@ -41,6 +43,7 @@ export default function HamburgerNav({
   const [inboxUnread, setInboxUnread] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
+  const { mode, canAccessDev } = useDashboardSections();
 
   useEffect(() => {
     let active = true;
@@ -224,14 +227,11 @@ export default function HamburgerNav({
                     >
                       Dashboard
                     </Link>
-                    <Link
-                      href="/onboarding?replay=1"
-                      onClick={() => setMenuOpen(false)}
-                      className="block rounded-xl px-3 py-2 text-sm btn-interact"
-                      style={{ color: "var(--foreground)", opacity: 0.8 }}
-                    >
-                      Setup guide
-                    </Link>
+                    {visibleDashboardSections(mode).map((section) => <Link key={section}
+                      href={`/dashboard?section=${section}`} onClick={() => setMenuOpen(false)}
+                      className="block rounded-xl px-3 py-2 text-sm btn-interact" style={{ color: "var(--foreground)", opacity: 0.8 }}>
+                      {section === "style" ? "Style · outfit advice" : "Shop · find clothing"}
+                    </Link>)}
                      <Link
                        href="/dashboard/api"
                        onClick={() => setMenuOpen(false)}
@@ -311,7 +311,7 @@ export default function HamburgerNav({
               </button>
 
               {/* Dev Dashboard (only for dev users) */}
-              {isDev && currentPage === "dashboard" && (
+              {(isDev || canAccessDev) && (
                 <button
                   onClick={() => {
                     setMenuOpen(false);
