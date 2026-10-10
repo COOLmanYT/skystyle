@@ -1,8 +1,16 @@
-# Sky Style 6.3.2 candidate review
+# Sky Style 6.3.3 candidate review
 
 Review date: 4 October 2026. Branch: `codex/skystyle-6.3.0`, based on `a6457c0`.
 
-Scheduler and live acceptance follow-up: 10 October 2026. The local candidate is now 6.3.2; see [the live acceptance record](SKYSTYLE_LIVE_ACCEPTANCE_2026_10_10.md) for current production changes and remaining device/cloud gates. The 4 October verification below remains historical.
+Scheduler and live acceptance follow-up: 10 October 2026. The candidate is now 6.3.3; see [the live acceptance record](SKYSTYLE_LIVE_ACCEPTANCE_2026_10_10.md) for current production changes and remaining device/cloud gates. The 4 October verification below remains historical.
+
+## Final review — 10 October
+
+Final review repaired hosted AI item swaps that selected OpenAI even when its credentials were absent. Hosted swaps now select a configured provider within the account's available models; BYOK retains its provider-specific selection and requires no hosted credentials. Three route regression tests cover configured Gemini, BYOK-only access and recoverable missing-provider failure.
+
+Fresh checks passed: 545 tests across 54 suites, lint and production app build with synthetic database settings. The documentation build passed during the immediately preceding commit preparation; this review changes no documentation-site content. The reviewed schema candidates and frozen foundation remain unchanged. A local Chromium demo check at 390 × 844 verifies the dashboard layout and temporary wardrobe flow; it does not establish physical-device, Safari or cloud acceptance.
+
+The 6.3.3 development changelog was inserted and independently verified: `881402dd-47fb-4522-8cd1-c9ed8a4cdaab`, published Development with login announcement disabled. Its SQL receipt is `supabase/review/v633-final-review-changelog.sql`; the Supabase folder changed. Production remains on the isolated 6.1.1 hotfix. This review prepares only the separate branch for the user's requested push; full deployment, reviewed schema installation and accounting activation remain separate gates.
 
 ## Commit preparation — 10 October
 

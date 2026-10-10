@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/lib/supabase";
 import { readWardrobe } from "@/lib/wardrobe-server";
 import { parseOutfitPayload, replaceOutfitSlot } from "@/lib/outfits";
 import { callAIWithModel, getDefaultModel, isModelAvailable, BYOK_PROVIDERS, type ByokProvider, type ModelID } from "@/lib/ai";
+import { getScheduledModel } from "@/lib/scheduled-model";
 import { getActiveAccounting, accountingRequest } from "@/lib/accounting";
 import { EntitlementError, withV6Usage } from "@/lib/entitlements";
 import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
@@ -27,7 +28,9 @@ export async function POST(req: NextRequest) {
     if(profile.error || controls.error || !profile.data) throw new Error("Account verification unavailable.");
     if(profile.data.pending_deletion || controls.data?.banned_at || controls.data?.app_blocked && (!controls.data.app_blocked_until || Date.parse(controls.data.app_blocked_until)>Date.now())) return NextResponse.json({error:"App access unavailable."},{status:403});
     const isDev = account?.isDev ?? profile.data.is_dev === true, isPro = account ? account.plan === "pro" : profile.data.is_pro === true;
-    const model = getDefaultModel(isPro,isDev).id as ModelID;
+    // Like scheduled jobs, hosted swaps must choose a configured provider.
+    // BYOK retains its provider-specific selection inside callAIWithModel.
+    const model = (body.userApiKey ? getDefaultModel(isPro,isDev) : getScheduledModel(isPro,isDev)).id as ModelID;
     if(body.modelId !== undefined && body.modelId !== model) return NextResponse.json({error:"Swaps use your plan’s default model."},{status:400});
     if (!isModelAvailable(model,isPro,isDev) || body.userApiKey && !isPro && !isDev) return NextResponse.json({error:"These AI settings are unavailable for this plan."},{status:403});
     const candidates = wardrobe.wardrobeItems.filter(item=>item.available && item.id!==slot.itemId && (slot.category==="other" || item.category==="other" || item.category===slot.category));
