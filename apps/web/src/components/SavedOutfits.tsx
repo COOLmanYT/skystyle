@@ -20,7 +20,7 @@ export default function SavedOutfits({ userId }: { userId: string }) {
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Could not load saved outfits. Please retry."); }
     finally { setLoading(false); }
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { let current = true; queueMicrotask(() => { if (current) void load(); }); return () => { current = false; }; }, [load]);
   async function remove(outfit: SavedOutfit) {
     if (!window.confirm(`Delete ${outfit.title}?`)) return;
     setDeleting(outfit.id); setError("");

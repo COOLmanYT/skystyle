@@ -1,7 +1,7 @@
 # Everyday Outfits
 
 ::: info Release status
-This page describes the 6.3 development candidate, including the 6.3.1 review fixes. It has not been deployed. Cloud wardrobe and saved-outfit availability depends on the reviewed database rollout; see [release status](../development/architecture#accounting-and-release-status).
+This page describes the 6.3 development candidate, including review fixes through 6.3.4. It has not been deployed. Cloud wardrobe and saved-outfit availability depends on the reviewed database rollout; see [release status](../development/architecture#accounting-and-release-status).
 :::
 
 Start with one location and a few clothes. Style shows an illustrative outfit before your first request; that example does not use AI or your allowance. Provider and model controls remain advanced settings.
@@ -25,6 +25,8 @@ A manual swap replaces one item with an available wardrobe item without using AI
 ## Your day and comfort
 
 Open **Your day & comfort** to set temperature preference, fabric dislikes, coverage, footwear restrictions and a dress code. These explicit settings take precedence over inferred feedback. Save across devices, or switch to device-only storage; the switch confirms removal of the cloud copy. Failed removal is labelled unfinished and can be retried. Delete saved preferences to remove both this device’s copy and the cloud copy.
+
+You can edit while preferences load. A late cloud response preserves changes you have already made, including a reset.
 
 A time window can span up to 24 hours. Both ends are required, and the end must be after the start. An invalid window blocks generation rather than silently dropping that context. Enter its start and end in your device’s timezone and clear the single event time. Advice includes a short bring checklist and changes through the day. Forecast coverage is labelled full, partial or unavailable; missing hours are never filled using current conditions.
 

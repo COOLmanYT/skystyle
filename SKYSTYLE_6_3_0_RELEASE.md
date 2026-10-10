@@ -1,8 +1,12 @@
-# Sky Style 6.3.3 candidate review
+# Sky Style 6.3.4 candidate review
 
 Review date: 4 October 2026. Branch: `codex/skystyle-6.3.0`, based on `a6457c0`.
 
-Scheduler and live acceptance follow-up: 10 October 2026. The candidate is now 6.3.3; see [the live acceptance record](SKYSTYLE_LIVE_ACCEPTANCE_2026_10_10.md) for current production changes and remaining device/cloud gates. The 4 October verification below remains historical.
+Scheduler and live acceptance follow-up: 10 October 2026. The candidate is now 6.3.4; see [the live acceptance record](SKYSTYLE_LIVE_ACCEPTANCE_2026_10_10.md) for current production changes and remaining device/cloud gates. The 4 October verification below remains historical.
+
+## Thorough review follow-up — 10 October
+
+The 6.3.4 follow-up fixes duplicate-label wardrobe preservation, legacy model/BYOK eligibility, comfort-loading races and framework-update UI compatibility. Next.js 16.4.0 and patched Auth.js packages replace the preceding versions. See [the thorough review record](SKYSTYLE_THOROUGH_REVIEW.md) for current validation, UI evidence, remaining dependency findings and acceptance boundaries. Earlier sections remain dated snapshots; their 13-finding audit is superseded by this follow-up's lockfile-based audit (four low production findings; 44 across the complete tree).
 
 ## Final review — 10 October
 

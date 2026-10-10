@@ -249,16 +249,14 @@ export default function Dashboard({
   // BYOK enhancements — provider selector + client-side custom prompt (Pro/Dev)
 
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
-  const [modelSwitchesRemaining, setModelSwitchesRemaining] = useState<number | null>(null);
-  
-  // Update model switches remaining when daily limits change
+  const modelSwitchesRemaining = dailyLimits?.model_switches
+    ? (dailyLimits.model_switches.limit ?? Infinity) - dailyLimits.model_switches.used
+    : null;
+  const [forecastNow, setForecastNow] = useState(() => Date.now());
   useEffect(() => {
-    if (dailyLimits?.model_switches) {
-      setModelSwitchesRemaining(
-        (dailyLimits.model_switches.limit ?? Infinity) - dailyLimits.model_switches.used
-      );
-    }
-  }, [dailyLimits]);
+    const timer = setInterval(() => setForecastNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   
   // Model selection and regeneration
   const [showModelSelector, setShowModelSelector] = useState(false);
@@ -394,14 +392,19 @@ export default function Dashboard({
 
   // Load custom sources from localStorage on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("skystyle_custom_sources");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed.customSources)) setCustomSources(parsed.customSources);
-        if (parsed.sourceMode) setSourceMode(parsed.sourceMode);
-      }
-    } catch { /* ignore */ }
+    let current = true;
+    queueMicrotask(() => {
+      if (!current) return;
+      try {
+        const saved = localStorage.getItem("skystyle_custom_sources");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed.customSources)) setCustomSources(parsed.customSources);
+          if (parsed.sourceMode) setSourceMode(parsed.sourceMode);
+        }
+      } catch { /* ignore */ }
+    });
+    return () => { current = false; };
   }, []);
 
   // Persist gender preference to localStorage when changed
@@ -472,7 +475,8 @@ export default function Dashboard({
       const id = setTimeout(() => setAiRevealed(true), 50);
       return () => clearTimeout(id);
     } else {
-      setAiRevealed(false);
+      const id = setTimeout(() => setAiRevealed(false), 0);
+      return () => clearTimeout(id);
     }
   }, [result]);
 
@@ -526,11 +530,13 @@ export default function Dashboard({
         /* ignore */
       }
     })();
-    syncStoredPreferences();
+    let current = true;
+    queueMicrotask(() => { if (current) syncStoredPreferences(); });
     window.addEventListener("storage", syncStoredPreferences);
     window.addEventListener("skystyle-preferences-updated", syncStoredPreferences);
 
     return () => {
+      current = false;
       window.removeEventListener("storage", syncStoredPreferences);
       window.removeEventListener("skystyle-preferences-updated", syncStoredPreferences);
     };
@@ -827,13 +833,6 @@ export default function Dashboard({
       setResult(data);
       if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
       
-      // Update model switches remaining
-      if (data.meta?.dailyLimits?.model_switches !== undefined) {
-        setModelSwitchesRemaining(
-          (data.meta.dailyLimits.model_switches.limit ?? Infinity) - 
-          data.meta.dailyLimits.model_switches.used
-        );
-      }
     } catch {
       setRegenerationError("Network error — please try again.");
     } finally {
@@ -888,13 +887,6 @@ export default function Dashboard({
       setSelectedModel(modelId);
       if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
       
-      // Update model switches remaining
-      if (data.meta?.dailyLimits?.model_switches !== undefined) {
-        setModelSwitchesRemaining(
-          (data.meta.dailyLimits.model_switches.limit ?? Infinity) - 
-          data.meta.dailyLimits.model_switches.used
-        );
-      }
     } catch {
       setRegenerationError("Network error — please try again.");
     } finally {
@@ -1507,7 +1499,7 @@ export default function Dashboard({
                         Hourly Forecast
                       </p>
                       <div className="flex gap-2 overflow-x-auto pb-1" tabIndex={0} role="region" aria-label="Hourly forecast — scroll horizontally">
-                        {selectFutureHourlyForecast(w!.hourly, Date.now(), HOURLY_FORECAST_LIMIT).map((h, i) => (
+                        {selectFutureHourlyForecast(w!.hourly, forecastNow, HOURLY_FORECAST_LIMIT).map((h, i) => (
                           <div
                             key={i}
                             className="flex-shrink-0 rounded-xl p-2 text-center min-w-[80px]"
@@ -1755,7 +1747,7 @@ export default function Dashboard({
                           <p className="text-sm mb-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
                             {isPro || isDev 
                               ? "Choose a different AI model for your recommendation." 
-                              : `Free users can switch models ${modelSwitchesRemaining !== null ? modelSwitchesRemaining : 2} more times this week.`
+                              : `Free users can switch models ${modelSwitchesRemaining !== null ? modelSwitchesRemaining : 2} more times today.`
                             }
                           </p>
                           

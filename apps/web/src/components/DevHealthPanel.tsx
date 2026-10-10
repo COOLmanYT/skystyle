@@ -23,7 +23,7 @@ export default function DevHealthPanel() {
     } catch (failure) { if (!signal?.aborted) setError(failure instanceof Error ? failure.message : "Unable to reach diagnostics."); }
     finally { if (!signal?.aborted) setBusy(false); }
   }, []);
-  useEffect(() => { const controller = new AbortController(); void refresh(controller.signal); return () => controller.abort(); }, [refresh]);
+  useEffect(() => { const controller = new AbortController(); queueMicrotask(() => { if (!controller.signal.aborted) void refresh(controller.signal); }); return () => controller.abort(); }, [refresh]);
   return <section className="space-y-5" aria-label="System health">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-semibold">System health</h2><p className="mt-1 text-sm opacity-65">Provider reachability and release readiness.</p></div><button disabled={busy} onClick={() => void refresh()} className="rounded-xl border px-4 py-2 text-sm disabled:opacity-50" style={{ borderColor: "var(--card-border)" }}>{busy ? "Checking…" : "Refresh diagnostics"}</button></div>
     {error && <p role="alert" className="rounded-xl border border-red-400 p-4 text-sm">{error} {data && "Showing the previous successful check."}</p>}

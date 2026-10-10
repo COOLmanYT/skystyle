@@ -7,7 +7,7 @@ export const dynamic = "force-dynamic";
  *         weather: WeatherData; userApiKey?: string }
  *
  * Sends a follow-up prompt to modify AI recommendations.
- * Free: 10/day, Pro: 100/day.
+ * Free: 40/day; Pro uses the current plan's daily follow-up allowance.
  */
 
 import { requireUsableRecommendation } from "@/lib/recommendation-validation";
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
     .single()).data;
 
   const unitPreference = settings?.unit_preference === "imperial" ? "imperial" as const : "metric" as const;
-  if (accounting && ((modelId && !isModelAvailable(modelId as ModelID, isPro, isDev)) || (userApiKey && !isPro && !isDev))) return NextResponse.json({ error:"The selected model or BYOK is unavailable for your current account plan." }, { status:403 });
+  if ((modelId && !isModelAvailable(modelId as ModelID, isPro, isDev)) || (userApiKey && !isPro && !isDev)) return NextResponse.json({ error:"The selected model or BYOK is unavailable for your current account plan." }, { status:403 });
   const customSystemPrompt = (isPro || isDev) ? settings?.custom_system_prompt : undefined;
 
   let recommendation;
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
     // Check if user is trying to use a model switch (different from default)
     const isModelSwitch = Boolean(modelId && modelId !== getDefaultModel(isPro, isDev).id);
     
-    // For free users, check model switch limit (2/week)
+    // For free users, check the daily model switch limit.
     if (!accounting && !isPro && !isDev && isModelSwitch) {
       const { allowed, used, limit } = await canUseFeature(userId, "model_switches", isPro, isDev, isDemo);
       if (!allowed) {

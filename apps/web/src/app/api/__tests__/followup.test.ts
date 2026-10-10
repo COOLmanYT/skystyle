@@ -47,6 +47,7 @@ jest.mock('@/lib/ai', () => {
   getDefaultModel: jest.fn((isPro: boolean, isDev: boolean) => ({
     id: isPro || isDev ? 'gpt-4o' : 'gemini-2.5-flash',
   })),
+  isModelAvailable: jest.requireActual('@/lib/ai-models').isModelAvailable,
   PlanningData: jest.fn(),
   ModelID: jest.fn(),
   getModelById: jest.fn((modelId: string) => {
@@ -393,6 +394,7 @@ describe('Followup API Route - Model Switch Rate Limiting', () => {
 });
 
 describe('Followup API Route - BYOK Provider Validation', () => {
+  beforeEach(() => setMockProfile(mockProUser));
   it('should accept openai as byokProvider for pro users', async () => {
     const req = createMockNextRequest({ 
       message: 'Test message',
@@ -409,7 +411,7 @@ describe('Followup API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
     
     // Restore original
     authModule.auth = originalAuth;
@@ -431,7 +433,7 @@ describe('Followup API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
     
     // Restore original
     authModule.auth = originalAuth;
@@ -453,7 +455,7 @@ describe('Followup API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
     
     // Restore original
     authModule.auth = originalAuth;
@@ -474,7 +476,7 @@ describe('Followup API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
     
     // Restore original
     authModule.auth = originalAuth;
@@ -683,6 +685,7 @@ describe('Followup API Route - Dev Mode', () => {
 });
 
 describe('Followup API Route - Model Selection', () => {
+  beforeEach(() => setMockProfile(mockProUser));
   it('should use specified model when modelId is provided', async () => {
     const req = createMockNextRequest({ 
       message: 'Test message',
@@ -760,4 +763,16 @@ describe("6.3 usable-output charging",()=>{
   expect((await POST(createMockNextRequest({message:"Change shoes",previousOutfit:"Cotton shirt",previousReasoning:"Warm enough",weather:mockWeatherData}))).status).toBe(200);
   expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
  });
+});
+
+describe('legacy account model and credential access', () => {
+  it.each([{ modelId: 'gpt-4o' }, { userApiKey: 'synthetic-key' }])('rejects unavailable options before generation: %j', async options => {
+    setMockProfile(mockUser);
+    const ai = jest.requireMock('@/lib/ai');
+    ai.getFollowUpRecommendation.mockClear();
+    const response = await POST(createMockNextRequest({ ...{ message: "Adjust it", previousOutfit: "Shirt", weather: mockWeatherData }, ...options }));
+    expect(response.status).toBe(403);
+    expect(ai.getFollowUpRecommendation).not.toHaveBeenCalled();
+    expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
+  });
 });

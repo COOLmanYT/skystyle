@@ -40,7 +40,7 @@ export default function ClosetManager({ initialItems, initialSnapshot, highlight
   useEffect(() => {
     if (initialSnapshot) { queueMicrotask(() => { setSnapshot(initialSnapshot); setReady(true); setSelected(previous => previous.filter(id => initialSnapshot.wardrobeItems.some(item => item.id === id))); }); }
     else if (temporary) { queueMicrotask(() => setSnapshot(readDemoWardrobe())); }
-    else { void load(); }
+    else { let current = true; queueMicrotask(() => { if (current) void load(); }); return () => { current = false; }; }
   }, [initialSnapshot, temporary, load, publish]);
   async function save(operation: { type: "add" | "update"; item: WardrobeItem } | { type: "delete"; ids: string[] }) {
     setBusy(true); setError("");
@@ -70,7 +70,7 @@ export default function ClosetManager({ initialItems, initialSnapshot, highlight
   return <section className="closet-manager space-y-4 rounded-2xl border p-4 sm:p-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
     <ClosetHighlighter highlight={highlight} targetId={highlighted ? closetItemId(highlighted.id) : null} ready={ready} />
     <div className="flex flex-wrap items-center justify-between gap-3"><Heading className="text-xl font-semibold">My closet</Heading><Link href="/outfits" className="control-button text-sm underline">Saved outfits</Link></div>
-    <p className="text-sm opacity-70">{snapshot.wardrobeItems.length} items. Mark clothes unavailable when they are in the wash or away.</p>
+    <p className="text-sm opacity-70">{snapshot.wardrobeItems.length} {snapshot.wardrobeItems.length === 1 ? "item" : "items"}. Mark clothes unavailable when they are in the wash or away.</p>
     {temporary && <p role="status" className="text-sm">{demoPersisted ? "Demo closet: saved in this tab until you sign out. Nothing is stored in the cloud." : "Browser storage is blocked. Demo changes last only on this page."}</p>}
     <form className="flex gap-2" onSubmit={async event => { event.preventDefault(); addId.current ??= crypto.randomUUID(); if (await save({ type: "add", item: newWardrobeItem(addId.current, label.trim()) })) { setLabel(""); addId.current = null; } }}>
       <label className="min-w-0 flex-1"><span className="sr-only">Item description</span><input disabled={busy} maxLength={200} value={label} onChange={event => { setLabel(event.target.value); addId.current = null; }} placeholder="Blue denim jacket" className="form-control" /></label>

@@ -31,7 +31,7 @@ export default function AutomaticRecommendationsPage() {
     catch (failure) { setError(failure instanceof Error ? failure.message : "Unable to load. Please retry."); }
     finally { setLoading(false); }
   }, [load]);
-  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { let current = true; queueMicrotask(() => { if (current) void refresh(); }); return () => { current = false; }; }, [refresh]);
 
   async function createSchedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

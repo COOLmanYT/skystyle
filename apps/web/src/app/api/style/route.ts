@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
     body.unitPreference === "imperial" || body.unitPreference === "metric"
       ? body.unitPreference
       : settings.unit_preference === "imperial" ? "imperial" : "metric";
-  if (accounting && ((modelId && !isModelAvailable(modelId as ModelID, isPro, isDev)) || (userApiKey && !isPro && !isDev))) return NextResponse.json({ error:"The selected model or BYOK is unavailable for your current account plan." }, { status:403 });
+  if ((modelId && !isModelAvailable(modelId as ModelID, isPro, isDev)) || (userApiKey && !isPro && !isDev)) return NextResponse.json({ error:"The selected model or BYOK is unavailable for your current account plan." }, { status:403 });
   const customSystemPrompt: string | undefined = (isPro || isDev)
     ? settings.custom_system_prompt ?? undefined
     : undefined;
@@ -266,7 +266,7 @@ export async function POST(req: NextRequest) {
     // Check if user is trying to use a model switch (different from default)
     const isModelSwitch = Boolean(modelId && modelId !== getDefaultModel(isPro, isDev).id);
     
-    // For free users, check model switch limit (2/week)
+    // For free users, check the daily model switch limit.
     if (!accounting && !isPro && !isDev && !isDemo && isModelSwitch) {
       const { allowed, used, limit } = await canUseFeature(userId, "model_switches", isPro, isDev, isDemo);
       if (!allowed) {

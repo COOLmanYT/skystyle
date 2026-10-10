@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Toggle from "@/components/Toggle";
 import Checkbox from "@/components/Checkbox";
 import HamburgerNav from "@/components/HamburgerNav";
@@ -52,6 +53,7 @@ export default function SettingsClient(props: SettingsClientProps) {
 }
 
 function BrowserSettingsClient({ initialUnitPreference, userId, canAccessDev = false }: SettingsClientProps) {
+  const router = useRouter();
   const { mode: sections, setMode: setSections } = useDashboardSections(userId);
   const [sectionMessage, setSectionMessage] = useState("");
   const [gender, setGender] = useState<string>(() => decodeGenderPreference(getLocalStorage("skystyle_gender", "")));
@@ -129,9 +131,9 @@ function BrowserSettingsClient({ initialUnitPreference, userId, canAccessDev = f
   }
 
   function replayTutorial(id: "dashboard" | "api-dashboard" | "dev-dashboard", destination: string) {
-    if (id === "dashboard") { window.location.assign("/onboarding?replay=1"); return; }
+    if (id === "dashboard") { router.push("/onboarding?replay=1"); return; }
     try { localStorage.removeItem(`skystyle_tutorial_seen_${id}`); } catch { /* storage unavailable */ }
-    window.location.assign(destination);
+    router.push(destination);
   }
 
   function saveToLocalStorage() {
