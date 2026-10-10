@@ -2,7 +2,7 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-## Current version: 6.3.4
+## Current version: 6.3.5
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 
@@ -75,6 +75,12 @@ VALUES (
 
 > [!IMPORTANT]
 > Make sure to tell the user if anything in the supabase folder was changed.
+
+## Mandatory release gate
+
+Before merging a release candidate, deploying/promoting to production, or announcing a deployed release, require a successful Vercel **Sky Style app preview for the exact release commit SHA**. Run `npm run release:gate -- <full-commit-sha>` and record the SHA, deployment ID and preview URL. The `Vercel preview release gate` GitHub Actions check must pass for that candidate. A local build, an older commit's preview, the documentation preview, or a production deployment does not satisfy this gate. Missing, pending, failed, canceled or inaccessible evidence blocks release. Any code change requires a new preview and gate check. Keep the existing SQL, accounting, checkout and real-account acceptance gates as well.
+
+The workflow checks non-production branch pushes and pull requests to `main`. The gate is mandatory in the release procedure: do not proceed with a failing check or missing preview evidence. Preview success establishes hosted build success, while authenticated behavior and production rollout still need their own acceptance evidence.
 
 ## Key codebase facts
 

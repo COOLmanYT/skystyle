@@ -1,7 +1,7 @@
 # Everyday Outfits
 
 ::: info Release status
-This page describes the 6.3 development candidate, including review fixes through 6.3.4. It has not been deployed. Cloud wardrobe and saved-outfit availability depends on the reviewed database rollout; see [release status](../development/architecture#accounting-and-release-status).
+This page describes the 6.3 development candidate, including review fixes through 6.3.5. It has not been released to production. Cloud wardrobe and saved-outfit availability depends on the reviewed database rollout; see [release status](../development/architecture#accounting-and-release-status).
 :::
 
 Start with one location and a few clothes. Style shows an illustrative outfit before your first request; that example does not use AI or your allowance. Provider and model controls remain advanced settings.

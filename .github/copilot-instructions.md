@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions — Sky Style (skystyle)
 
-## Current version: 6.3.4
+## Current version: 6.3.5
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in `AGENTS.md` as well.) Remember, update the version number. 
 
@@ -73,6 +73,12 @@ VALUES (
 
 > [!IMPORTANT]
 > Make sure to tell the user if anything in the supabase folder was changed.
+
+## Mandatory release gate
+
+Before merging a release candidate, deploying/promoting to production, or announcing a deployed release, require a successful Vercel **Sky Style app preview for the exact release commit SHA**. Run `npm run release:gate -- <full-commit-sha>` and record the SHA, deployment ID and preview URL. The `Vercel preview release gate` GitHub Actions check must pass for that candidate. Local builds, older previews, documentation previews and production deployments do not satisfy it. Missing, pending, failed, canceled or inaccessible evidence blocks release. Any code change requires a new preview and gate check. Preserve the existing SQL, accounting, checkout and real-account acceptance gates.
+
+The workflow checks non-production branch pushes and pull requests to `main`. The gate is mandatory in the release procedure: do not proceed with a failing check or missing preview evidence. Preview success proves hosted build success, while authenticated behavior and production rollout require separate evidence.
 
 ## Codebase conventions
 

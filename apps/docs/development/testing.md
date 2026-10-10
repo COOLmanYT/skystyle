@@ -12,16 +12,29 @@ Jest runs TypeScript tests from `apps/web/src` using the root `jest.config.js`. 
 | `npm run test:coverage` | Generate current text, HTML and LCOV coverage in `coverage/` |
 | `npm run test:ci` | Run serially with coverage |
 | `npm run lint` | Lint web source and Next.js configuration |
+| `npm run typecheck` | Type-check production web code without test globals |
+| `npm run typecheck:tests` | Type-check tests with Jest types from the root installation |
+| `npm run test:release-gate` | Verify release gate rejection and success behavior |
+| `npm run release:gate -- <full-commit-sha>` | Require the latest Sky Style app preview to succeed for that exact commit |
 | `npm run build` | Verify the Next.js production build |
 | `npm run docs:build` | Build VitePress documentation |
 
 The production build uses the web environment configured in [setup](https://github.com/COOLmanYT/skystyle/blob/main/SETUP.md). Jest uses test credentials instead of real provider keys.
+
+## Mandatory Vercel preview gate
+
+Every release candidate must have a successful Sky Style app preview for the exact commit being released. After the candidate is committed and pushed to a non-production branch, wait for the `Vercel preview release gate` check. It verifies GitHub's Vercel deployment records for `Preview – skystyle`, the exact commit and Vercel bot, then requires the newest deployment's latest status to be successful with a Sky Style preview URL. The workflow waits up to 15 minutes for a missing or building preview; failures and inaccessible evidence block the gate.
+
+Run `npm run release:gate -- <full-commit-sha>` immediately before a release and retain its commit SHA, deployment ID and URL. Running without a SHA verifies `HEAD` and rejects tracked changes. New code needs a new preview. A local build, documentation preview, older successful attempt or production deployment cannot satisfy the gate. Release merges, production pushes and manual promotions must obey this mandatory release procedure. The gate uses GitHub's read-only API and needs no Vercel token. In GitHub Actions it uses the job's read-only token; local public-repository reads can run without a token.
+
+This proves the hosted preview build succeeded. It does not replace authenticated cloud, schema, real-provider or device acceptance, and does not authorize accounting or checkout activation.
 
 ## Test layout and mocks
 
 - `apps/web/src/__tests__/setup.ts` supplies test environment variables and shared Next.js, fetch, and localStorage mocks.
 - `apps/web/src/__tests__/mocks.ts` contains shared fixtures.
 - Library, component and API suites are colocated in their own `__tests__` directories.
+- Production `tsconfig.json` excludes test files and restricts ambient types to application dependencies. Jest uses `tsconfig.test.json`, which restores Jest types and includes the test files. Vercel's web installation does not need the root test tooling to build the product.
 - Supabase and Auth.js are mocked by the suites that use them; they are not universally mocked by global setup.
 
 Jest uses a Node environment. Component suites must explicitly provide any DOM or rendering support they require. Account and usage suites explicitly select the behavior they exercise; adapter suites unmock the module when needed.

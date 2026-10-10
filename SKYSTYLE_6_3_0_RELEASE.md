@@ -1,8 +1,22 @@
-# Sky Style 6.3.4 candidate review
+# Sky Style 6.3.5 candidate review
 
 Review date: 4 October 2026. Branch: `codex/skystyle-6.3.0`, based on `a6457c0`.
 
-Scheduler and live acceptance follow-up: 10 October 2026. The candidate is now 6.3.4; see [the live acceptance record](SKYSTYLE_LIVE_ACCEPTANCE_2026_10_10.md) for current production changes and remaining device/cloud gates. The 4 October verification below remains historical.
+Scheduler and live acceptance follow-up: 10 October 2026. The candidate is now 6.3.5; see [the live acceptance record](SKYSTYLE_LIVE_ACCEPTANCE_2026_10_10.md) for production changes and remaining device/cloud gates. The 4 October verification below remains historical.
+
+## Preview build repair and release gate — 11 October
+
+The 6.3.4 app preview failed for commit `75fd0e67738b6f7dadbaa60376da2d66b4547231` (Vercel deployment `dpl_Aoafkmv6Pa36ip6miZpfjU92uMGM`). Bundling succeeded, then the web build type-checked Jest files without the root test tooling and failed on missing Jest globals. The documentation preview passed independently and did not establish app readiness.
+
+6.3.5 separates application and test TypeScript configurations. Production excludes test files and restricts ambient application types; Jest and the separate test type check include the test files with Jest types. A generated Next.js route check also exposed an invalid named export on the changelog page; the helper is now private to that page. The release gate checks the newest app preview and latest status for the exact commit, rejecting unrelated projects, production environments, older successful attempts, failures and inaccessible evidence. `.github/workflows/vercel-preview-gate.yml` supplies the candidate check without deployment credentials.
+
+**Mandatory before release:** require the `Vercel preview release gate` check and run `npm run release:gate -- <full-commit-sha>`. Record the SHA, deployment ID and successful app preview URL before any release merge, production deployment/promotion, or deployed-release announcement. Code changes invalidate earlier preview evidence. Direct production pushes and manual promotion also remain subject to this release procedure. All schema, accounting, checkout and real-account gates below remain applicable.
+
+GitHub's saved `main` protection requires the Vercel app's `Vercel – skystyle` status, up-to-date branches and a successful `Preview – skystyle` deployment. It applies to administrators. The documentation preview is not a required deployment environment. The new Actions check additionally verifies the exact candidate SHA and newest preview attempt; its workflow is prepared locally and has not run for 6.3.5 yet.
+
+Fresh verification passed: 557 Jest tests across 56 suites, five release-gate regression tests, application and test TypeScript checks, lint and the documentation build. A Webpack production build passed generated route validation and all 52 static pages with synthetic database settings. The normal local Turbopack build still encounters a Windows worker-startup failure; the failed Vercel build had bundled successfully before its type error. A new hosted preview for the fixes remains pending the candidate commit and push, so hosted build success is not yet established.
+
+The 6.3.5 development changelog was inserted and independently read back as one published Development row, with login announcement disabled: `faaa22e1-3c34-47ea-8f9f-be882e276b68`. Its receipt is `supabase/review/v635-preview-build-changelog.sql`; this is the only Supabase-folder change in this task. No schema migration or accounting/checkout activation was performed.
 
 ## Thorough review follow-up — 10 October
 
@@ -95,6 +109,8 @@ The first file adds canonical wardrobe data and revision checks, private saved o
 Production schema installation requires approval of the exact reviewed artifacts; approval to implement the branch does not install them. The separately authorized 10 October scheduler secret and invocation-function repair is recorded in the live acceptance follow-up.
 
 ## Ordered rollout and acceptance gates
+
+**Gate 0:** Before any release action, verify a successful Sky Style app preview for the exact release commit using `npm run release:gate -- <full-commit-sha>`. Record the SHA, deployment ID and preview URL. The required `Vercel preview release gate` check must pass. Local builds and the documentation deployment alone cannot satisfy this gate.
 
 1. Review the exact SQL files above, including service-only grants, ownership checks, legacy allowance behaviour, and how the current production tables differ from isolated fixtures. Confirm a recoverable database backup and record the current deployment and scheduler configuration.
 2. Pause the scheduler and drain existing runner requests. Drain old closet writers, including previously loaded tabs and integrations that replace whole arrays. Establish a maintenance boundary so old writers cannot race the canonical backfill or new revision operations.

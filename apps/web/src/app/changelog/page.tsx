@@ -127,7 +127,7 @@ export default function ChangelogPage() {
   );
 }
 
-export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[]; limit?: number }) {
+function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[]; limit?: number }) {
   const shown = limit ? entries.slice(0, limit) : entries;
   const [modalEntry, setModalEntry] = useState<ChangelogModalEntry | null>(null);
 
