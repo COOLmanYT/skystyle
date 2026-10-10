@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { sanitizeUrl } from "@/lib/sanitize-url";
-import { parseRecommendationAction } from "@/lib/recommendation-links";
+import { clothingAction, parseRecommendationAction } from "@/lib/recommendation-links";
+import type { WardrobeItem } from "@/lib/wardrobe";
 
 interface Props {
   content: string;
@@ -10,16 +11,18 @@ interface Props {
   style?: React.CSSProperties;
   /** If provided, matching closet item names become links to /closet */
   closetItems?: string[];
+  wardrobeItems?: WardrobeItem[];
   /** Enable validated AI clothing actions only in recommendation output. */
   recommendationLinks?: boolean;
   onShopItem?: (item: string) => void;
 }
 
-interface InlineContext { closetItems: string[]; recommendationLinks?: boolean; onShopItem?: (item: string) => void }
+interface InlineContext { closetItems: string[]; wardrobeItems: WardrobeItem[]; recommendationLinks?: boolean; onShopItem?: (item: string) => void }
 
 // ── Closet link helper ────────────────────────────────────────────────────────
 
-function applyClosetLinks(text: string, { closetItems }: InlineContext): React.ReactNode[] {
+function applyClosetLinks(text: string, { closetItems, wardrobeItems, recommendationLinks }: InlineContext): React.ReactNode[] {
+  if (recommendationLinks === false) return [text];
   if (!closetItems.length) return [text];
   const sorted = [...new Set(closetItems.filter((item) => item.trim()))].sort((a, b) => b.length - a.length);
   if (!sorted.length) return [text];
@@ -31,11 +34,13 @@ function applyClosetLinks(text: string, { closetItems }: InlineContext): React.R
       && (i === 0 || !/[\p{L}\p{N}]/u.test(parts[i - 1].slice(-1)))
       && (i === parts.length - 1 || !/[\p{L}\p{N}]/u.test(parts[i + 1].slice(0, 1)));
     if (isMatch) {
+      const action = clothingAction(part, closetItems, wardrobeItems);
       return (
         <Link
           key={i}
-          href={`/closet?highlight=${encodeURIComponent(part)}`}
-          style={{ textDecoration: "underline", textDecorationStyle: "dotted", color: "inherit" }}
+          href={action?.href ?? `/closet?highlight=${encodeURIComponent(part)}`}
+          className={recommendationLinks ? "clothing-reference clothing-reference-owned" : undefined}
+          style={recommendationLinks ? undefined : { textDecoration: "underline", textDecorationStyle: "dotted", color: "inherit" }}
           aria-label={`View ${part} in your closet`}
         >
           {part}
@@ -50,7 +55,7 @@ function applyClosetLinks(text: string, { closetItems }: InlineContext): React.R
 // Handles: **bold**, *italic*, ~~strikethrough~~, `code`, [text](url)
 
 const INLINE_RE =
-  /(\*\*(?:[^*]|\*(?!\*))+\*\*|~~[^~]+~~|\*(?:[^*])+\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g;
+  /(\*\*(?:[^*]|\*(?!\*))+\*\*|~~[^~]+~~|\*(?:[^*])+\*|`[^`]+`|\[(?:\\.|[^\]\\])+\]\([^)]+\))/g;
 
 function renderInline(text: string, context: InlineContext, keyPrefix: string): React.ReactNode[] {
   const parts = text.split(INLINE_RE);
@@ -82,10 +87,11 @@ function renderInline(text: string, context: InlineContext, keyPrefix: string): 
         </code>
       );
     } else if (seg.startsWith("[") && seg.includes("](")) {
-      const m = seg.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      const m = seg.match(/^\[((?:\\.|[^\]\\])+)\]\(([^)]+)\)$/);
       if (m) {
-        const [, linkText, rawUrl] = m;
-        const action = context.recommendationLinks ? parseRecommendationAction(rawUrl, context.closetItems) : null;
+        const [, escapedText, rawUrl] = m;
+        const linkText = escapedText.replace(/\\([\\[\]*_`|])/g, "$1");
+        const action = context.recommendationLinks ? parseRecommendationAction(rawUrl, context.closetItems, context.wardrobeItems, linkText) : null;
         if (action) {
           nodes.push(<Link key={k} href={action.href}
             aria-label={action.kind === "closet" ? `View ${action.item} in your closet` : `Find ${action.item} in Shop`}
@@ -93,10 +99,11 @@ function renderInline(text: string, context: InlineContext, keyPrefix: string): 
               if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
               event.preventDefault(); context.onShopItem?.(action.item);
             } : undefined}
-            style={{ color: "var(--accent)", textDecoration: "underline" }}>{linkText}</Link>);
+            className={`clothing-reference${action.kind === "closet" ? " clothing-reference-owned" : ""}`}
+            title={action.kind === "closet" ? "In your closet" : "Find in Shop"}>{action.item}</Link>);
           return;
         }
-        if (context.recommendationLinks && /^\/(?:closet|dashboard)(?:[?#]|$)/.test(rawUrl)) {
+        if (rawUrl.startsWith("clothing:") || context.recommendationLinks && /^\/(?:closet|dashboard)(?:[?#]|$)/.test(rawUrl)) {
           nodes.push(<span key={k}>{linkText}</span>); return;
         }
         const safeUrl = sanitizeUrl(rawUrl);
@@ -156,7 +163,16 @@ function isHorizontalRule(line: string): boolean {
 }
 
 function splitTableRow(line: string): string[] {
-  return line.trim().replace(/^\||\|$/g, "").split("|").map((cell) => cell.trim());
+  const row = line.trim().replace(/^\||\|$/g, "");
+  const cells: string[] = [];
+  let cell = "", slashes = 0;
+  for (const char of row) {
+    if (char === "|" && slashes % 2 === 0) { cells.push(cell.trim()); cell = ""; }
+    else cell += char;
+    slashes = char === "\\" ? slashes + 1 : 0;
+  }
+  cells.push(cell.trim());
+  return cells;
 }
 
 function isTableDivider(line: string): boolean {
@@ -389,10 +405,11 @@ export default function MarkdownRenderer({
   className,
   style,
   closetItems = [],
-  recommendationLinks = false,
+  wardrobeItems = [],
+  recommendationLinks,
   onShopItem,
 }: Props) {
-  const context: InlineContext = { closetItems, recommendationLinks, onShopItem };
+  const context: InlineContext = { closetItems, wardrobeItems, recommendationLinks, onShopItem };
   if (!content) return null;
 
   // Some model providers return Markdown newlines double-escaped ("\\n").

@@ -5,7 +5,7 @@ import { getCredits, getMoneyCreditCents } from "@/lib/credits";
 import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
-import V6PlanOverview from "@/components/V6PlanOverview";
+import PlanOverview from "@/components/PlanOverview";
 import HamburgerNav from "@/components/HamburgerNav";
 import SecurityClient from "@/app/settings/security/SecurityClient";
 import PrivacyHubClient from "@/app/settings/privacy/PrivacyHubClient";
@@ -139,7 +139,7 @@ export default async function AccountPage() {
             You can add a GitHub or Google account to your profile by signing in with that provider.
           </p>
           {!isPro && !isDev && (
-            <Link href="/pricing" className="inline-block rounded-xl border px-4 py-2 text-xs font-medium" style={{ borderColor: "var(--card-border)", color: "var(--accent)" }}>View approved V6 plans</Link>
+            <Link href="/pricing" className="inline-block rounded-xl border px-4 py-2 text-xs font-medium" style={{ borderColor: "var(--card-border)", color: "var(--accent)" }}>Compare plans</Link>
           )}
         </div>
 
@@ -218,7 +218,7 @@ export default async function AccountPage() {
           ].map(([label, description, href]) => <Link key={href} href={href} className="rounded-xl p-3 btn-interact" style={{ background: "var(--background)", border: "1px solid var(--card-border)", color: "var(--foreground)" }}><p className="text-sm font-medium">{label}</p><p className="text-xs mt-1 opacity-55">{description}</p></Link>)}</div>
         </div>
 
-        <section className="max-w-6xl mx-auto" aria-label="Approved V6 plans"><V6PlanOverview /></section>
+        <section className="max-w-6xl mx-auto" aria-label="Plans and allowances"><PlanOverview accountingEnabled={dailyLimits?.accountingActive ?? (accountingUnavailable ? null : false)} /></section>
 
         {/* ── Security ── */}
         <div className="max-w-3xl mx-auto space-y-2">

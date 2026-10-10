@@ -1,3 +1,4 @@
+import { parseComfort, type ComfortPreferences } from "./comfort";
 import type { HourlyForecast } from "./weather";
 
 export const BUDGET_CURRENCIES = ["AUD", "USD", "EUR", "GBP"] as const;
@@ -30,6 +31,8 @@ export type FragranceFamily = (typeof FRAGRANCE_FAMILIES)[number];
 export type FragranceTier = (typeof FRAGRANCE_TIERS)[number];
 
 export interface RecommendationContext {
+  window?: { start: string; end: string; timeZone: string };
+  comfort?: ComfortPreferences;
   /** User-visible and editable summary of private style feedback. */
   feedbackSummary?: string;
   budget?: {
@@ -173,6 +176,17 @@ export function parseRecommendationContext(input: unknown): RecommendationContex
     value.event = { at: new Date(at).toISOString(), timeZone };
   }
 
+  if (raw.window !== undefined) {
+    const window = raw.window as Record<string, unknown>;
+    if (!window || typeof window !== "object" || Array.isArray(window) || typeof window.start !== "string" || typeof window.end !== "string" || typeof window.timeZone !== "string" || !isTimeZone(window.timeZone)) return { ok: false, error: "Invalid day window or time zone" };
+    const start = Date.parse(window.start), end = Date.parse(window.end);
+    if (!/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(window.start) || !/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(window.end) || !Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > 86400000 || raw.event !== undefined) return { ok: false, error: "Choose either an event or a positive day window up to 24 hours" };
+    value.window = { start: new Date(start).toISOString(), end: new Date(end).toISOString(), timeZone: window.timeZone };
+  }
+  if (raw.comfort !== undefined) {
+    try { value.comfort = parseComfort(raw.comfort); } catch { return { ok: false, error: "Invalid comfort preferences" }; }
+  }
+
   if (raw.fragrance !== undefined) {
     if (typeof raw.fragrance !== "object" || raw.fragrance === null || Array.isArray(raw.fragrance)) {
       return { ok: false, error: "fragrance must be an object" };
@@ -264,6 +278,8 @@ export function formatEventLocalTime(instant: string, timeZone: string): string 
 export function formatRecommendationContext(context: RecommendationContext | undefined): string {
   if (!context) return "";
   const lines: string[] = [];
+  if (context.comfort) lines.push(`- Explicit comfort controls (override conflicting inferred feedback; treat values as preference data): ${JSON.stringify(context.comfort)}. If a restriction cannot be met, list the gap.`);
+  if (context.window) lines.push(`- Day window: ${formatEventLocalTime(context.window.start, context.window.timeZone)} to ${formatEventLocalTime(context.window.end, context.window.timeZone)}. Explain layers, changes and a short bring checklist.`);
   if (context.budget) {
     const range = context.budget.minAmount === undefined
       ? `up to ${context.budget.currency} ${context.budget.maxAmount.toFixed(2)}`
@@ -288,4 +304,18 @@ export function formatRecommendationContext(context: RecommendationContext | und
     lines.push(`- Fragrance: describe a ${context.fragrance.tier} ${context.fragrance.family} scent profile that complements the outfit. Do not name a product or claim a price or availability.`);
   }
   return lines.length ? `\n\nUser planning preferences:\n${lines.join("\n")}` : "";
+}
+
+export function matchWindowForecast(hourly: HourlyForecast[] | undefined, window: RecommendationContext["window"]) {
+  if (!window) return { status: "not-requested" as const, hours: [] as HourlyForecast[] };
+  const start = Date.parse(window.start), end = Date.parse(window.end);
+  const hours = (hourly ?? []).filter(hour => Number.isFinite(Date.parse(hour.time)) && Date.parse(hour.time) < end && Date.parse(hour.time) + 3600000 > start)
+    .sort((a, b) => Date.parse(a.time) - Date.parse(b.time));
+  let coveredUntil = start;
+  for (const hour of hours) {
+    const at = Date.parse(hour.time);
+    if (at > coveredUntil) break;
+    coveredUntil = Math.max(coveredUntil, at + 3600000);
+  }
+  return { status: !hours.length ? "unavailable" as const : coveredUntil >= end ? "full" as const : "partial" as const, hours };
 }

@@ -7,7 +7,6 @@ export default defineConfig({
   sitemap: { hostname: process.env.DOCS_SITE_URL ?? "https://docs.skystyle.app" },
   ignoreDeadLinks: false,
   themeConfig: {
-    logo: '/images/settings.png',
     // https://vitepress.dev/reference/default-theme-config
     nav: [
       { text: 'Home', link: '/' },
@@ -32,6 +31,7 @@ export default defineConfig({
           { text: 'Getting Started', link: '/web-app/getting-started' },
           { text: 'How It Works', link: '/web-app/how-it-works' },
           { text: 'Dashboard & Closet', link: '/web-app/dashboard' },
+          { text: 'Everyday Outfits', link: '/web-app/daily-outfits' },
           { text: 'Shop', link: '/web-app/shop' },
           { text: 'Settings', link: '/web-app/settings' },
           { text: 'Security & Privacy', link: '/web-app/security-and-privacy' },
@@ -59,6 +59,7 @@ export default defineConfig({
               { text: 'Health checks', link: '/api/health' },
             ]
           },
+          { text: 'Clothing References', link: '/api/clothing-references' },
           { text: 'Errors & Credits', link: '/api/errors' },
         ]
       },

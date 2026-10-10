@@ -27,8 +27,8 @@ Combined endpoint — returns an AI outfit recommendation **and** the full weath
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `outfit` | `string` | AI outfit recommendation. |
-| `reasoning` | `string` | Explanation of the recommendation. |
+| `outfit` | `string` | Outfit advice as Markdown; may include [clothing references](./clothing-references). |
+| `reasoning` | `string` | Markdown explanation of the recommendation. |
 | `weather` | `object` | Full weather snapshot — all [/weather](./weather) fields plus `source`. |
 | `model` | `string` | AI model used. |
 | `generated_at` | `string` | ISO-8601 UTC timestamp. |
@@ -94,3 +94,7 @@ curl -X POST "https://skystyle.app/api/v1/recweather" \
 | Credit cost | 2 | 3 |
 
 Use `/recommend` when you only need the outfit text. Use `/recweather` when you also need to display weather data to your users.
+
+## Development response additions
+
+The 6.3 candidate retains legacy weather fields and adds nullable [`measurements`](./weather#unavailable-measurements) to distinguish missing observations from real zeroes. Outfit and reasoning text can contain [clothing references](./clothing-references). These additions describe the development candidate, pending deployment.

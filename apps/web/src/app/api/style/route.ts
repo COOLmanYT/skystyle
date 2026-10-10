@@ -1,3 +1,5 @@
+import { readWardrobe } from "@/lib/wardrobe-server";
+import type { WardrobeItem } from "@/lib/wardrobe";
 export const dynamic = "force-dynamic";
 /**
  * POST /api/style
@@ -5,10 +7,11 @@ export const dynamic = "force-dynamic";
  * Body: { lat: number; lon: number; userApiKey?: string; modelId?: string }
  *
  * Returns an AI-generated outfit recommendation based on real-time weather data.
- * Auth-protected. Pro users have credits deducted. Free users get 5 AI uses/day.
+ * Auth-protected. Pro users have credits deducted. Free users use the current daily recommendation allowance.
  * Supports model selection for Pro users and BYOK.
  */
 
+import { requireUsableRecommendation } from "@/lib/recommendation-validation";
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { DEMO_USER_ID } from "@/auth";
@@ -18,7 +21,7 @@ import { getStyleRecommendation, getDevChatResponse, PlanningData, ModelID, getD
 import { deductCredit, getCredits } from "@/lib/credits";
 import { incrementUsage, canUseFeature, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
-import { matchEventForecast, parseRecommendationContext } from "@/lib/recommendation-context";
+import { matchEventForecast, matchWindowForecast, parseRecommendationContext } from "@/lib/recommendation-context";
 import { getActiveAccounting, accountingRequest } from "@/lib/accounting";
 import { EntitlementError, withV6Usage } from "@/lib/entitlements";
 
@@ -48,6 +51,7 @@ export async function POST(req: NextRequest) {
     modelId?: string;
     recommendationContext?: unknown;
     useCredits?: unknown;
+    structuredOutfit?: boolean;
   };
   try {
     body = await req.json();
@@ -89,6 +93,7 @@ export async function POST(req: NextRequest) {
   let isDev = false;
   let settings: { unit_preference?: string; custom_system_prompt?: string; custom_source_url?: string } = {};
   let closetItems: string[] = [];
+  let wardrobeItems: WardrobeItem[] | undefined;
 
   if (isDemo) {
     // Demo users bypass all Supabase lookups — use empty defaults
@@ -115,19 +120,12 @@ export async function POST(req: NextRequest) {
     if (accounting) { isPro = accounting.plan === "pro"; isDev = accounting.isDev; }
     settings = (settingsResult.data ?? {}) as { unit_preference?: string; custom_system_prompt?: string; custom_source_url?: string };
 
-    // Closet: free users can use it 1x/day; Pro/Dev/Demo unlimited-ish
-    const rawCloset: string[] = closetResult.data?.items ?? [];
-    if (!accounting && !isPro && !isDev && rawCloset.length > 0) {
-      const { allowed } = await canUseFeature(userId, "closet_uses", isPro, isDev, isDemo);
-      if (!allowed) {
-        closetItems = [];
-      } else {
-        await incrementUsage(userId, "closet_uses", isPro, isDev, isDemo);
-        closetItems = rawCloset;
-      }
-    } else {
-      closetItems = rawCloset;
-    }
+    if (body.structuredOutfit || forceCloset) {
+      try { wardrobeItems = (await readWardrobe(userId)).wardrobeItems; }
+      catch { return NextResponse.json({error:"Wardrobe storage is not ready. Please retry after the update."},{status:503}); }
+      closetItems = wardrobeItems.filter(item=>item.available).map(item=>item.label);
+    } else closetItems = Array.isArray(closetResult.data?.items) ? closetResult.data.items : [];
+
   }
 
   // Use unitPreference from request body (client state) if provided, else fall back to DB
@@ -159,17 +157,17 @@ export async function POST(req: NextRequest) {
         );
       }
     } else {
-      // Free users: 5 AI uses per day
+      // Free users: apply the current recommendation allowance.
       const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro, isDev, isDemo);
       if (!allowed) {
         return NextResponse.json(
-          { error: `Daily AI limit reached (${used}/${limit}). Upgrade to Pro for unlimited access.` },
+          { error: `Daily AI limit reached (${used}/${limit}). Check your account allowance or try again after the daily reset.` },
           { status: 429 }
         );
       }
     }
   } else if (isDemo) {
-    // Demo users: 50 AI uses per day (10× free). Still enforce the limit.
+    // Demo users: enforce the separate preview recommendation allowance.
     const { allowed, used, limit } = await canUseFeature(userId, "ai_uses", isPro, isDev, isDemo);
     if (!allowed) {
       return NextResponse.json(
@@ -251,7 +249,7 @@ export async function POST(req: NextRequest) {
     const weather = await getWeather(lat!, lon!, customSourceUrl, sourceMode, customSources);
     const eventForecast = matchEventForecast(weather.hourly, recommendationContext?.event?.at);
     const recommendation = await getStyleRecommendation({
-      weather, closetItems, unitPreference, customSystemPrompt, clientCustomPrompt,
+      weather, closetItems, wardrobeItems, structuredOutfit: body.structuredOutfit === true, unitPreference, customSystemPrompt, clientCustomPrompt,
       userApiKey: (isPro || isDev) ? userApiKey : undefined,
       byokProvider: (isPro || isDev) ? byokProvider : undefined,
       gender: typeof gender === "string" ? gender.slice(0, 30) : undefined,
@@ -259,7 +257,7 @@ export async function POST(req: NextRequest) {
       isDev, customContext: weather.customContext, planningData, recommendationContext, eventForecast,
       modelId: accounting ? (modelId as ModelID | undefined) ?? getDefaultModel(isPro, isDev).id : modelId as ModelID | undefined,
     });
-    return { weather, eventForecast, recommendation };
+    return { weather, eventForecast, recommendation:requireUsableRecommendation(recommendation) };
   }
 
   // 6. Get AI recommendation (use BYOK if provided and user is Pro/Dev)
@@ -277,29 +275,31 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
-      // Deduct model switch
-      await incrementUsage(userId, "model_switches", isPro, isDev, isDemo);
+
     }
     
     generated = accounting ? await withV6Usage({ userId, purpose: "recommendation", ...requestAccounting,
       modelSwitch: isModelSwitch, validatedInput: { lat, lon, modelId, gender, shareLocation, forceCloset,
-        unitPreference, sourceMode, customSources, planningData, recommendationContext, clientCustomPrompt } }, generate) : await generate();
+        unitPreference, sourceMode, customSources, planningData, recommendationContext, clientCustomPrompt } }, generate, { shouldCharge: result => result.recommendation.chargeable !== false }) : await generate();
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed";
     return NextResponse.json({ error: message }, { status: err instanceof EntitlementError ? err.status : 502 });
   }
 
-  // 7. Deduct credit / increment daily usage (devs bypass)
-  if (!accounting && !isDev && !isDemo) {
+  // 7. Charge only a usable complete result (devs bypass).
+  if (generated.recommendation.chargeable !== false && !accounting && !isDev && !isDemo) {
     if (isPro) {
       await deductCredit(userId);
     } else {
       await incrementUsage(userId, "ai_uses", isPro, isDev, isDemo);
     }
-  } else if (isDemo) {
+  } else if (generated.recommendation.chargeable !== false && isDemo) {
     await incrementUsage(userId, "ai_uses", isPro, isDev, isDemo);
   }
 
+  if (generated.recommendation.chargeable !== false && !accounting && !isPro && !isDev && !isDemo && modelId && modelId !== getDefaultModel(isPro, isDev).id) {
+    await incrementUsage(userId, "model_switches", isPro, isDev, isDemo);
+  }
   const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev, isDemo);
   const { weather, recommendation, eventForecast } = generated;
 
@@ -315,6 +315,7 @@ export async function POST(req: NextRequest) {
       modelUsed: recommendation.modelUsed ?? "unknown",
       recommendationContext,
       eventForecastStatus: eventForecast.status,
+      windowForecastStatus: matchWindowForecast(weather.hourly,recommendationContext?.window).status,
     },
   });
 }

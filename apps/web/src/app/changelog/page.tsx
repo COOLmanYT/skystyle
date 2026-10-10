@@ -15,6 +15,7 @@ interface ChangelogCta {
 interface ChangelogEntry {
   date: string;
   version: string;
+  releaseStatus?: "development" | "released";
   title: string;
   description: string;
   category?: string;
@@ -133,6 +134,7 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
   function toModalEntry(entry: ChangelogEntry): ChangelogModalEntry {
     return {
       version: entry.version,
+      releaseStatus: entry.releaseStatus,
       title: entry.title,
       description: entry.description,
       imageUrl: entry.imageUrl ?? entry.image,
@@ -208,7 +210,7 @@ export function ChangelogTimeline({ entries, limit }: { entries: ChangelogEntry[
                     className="text-xs font-mono px-2 py-0.5 rounded-lg"
                     style={{ background: "var(--background)", color: "var(--foreground)", opacity: 0.7 }}
                   >
-                    v{entry.version}
+                    v{entry.version}{entry.releaseStatus && <span className="ml-2 text-xs font-normal">{entry.releaseStatus==="development"?"In development · not deployed":"Released"}</span>}
                   </span>
                   {entry.category && (
                     <span

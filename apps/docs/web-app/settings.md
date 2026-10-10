@@ -19,7 +19,7 @@ This is stored locally and never sent to Sky Style except when required for an A
 
 ## Units
 
-Switch between **metric** (°C, km/h) and **imperial** (°F, mph). Saved to your account.
+Switch between **metric** (°C, km/h) and **imperial** (°F, mph). Units save to your account after sign-in; the demo keeps them in this browser. Save messages distinguish device preferences from account storage and preserve your selections if either fails.
 
 ## Appearance {#appearance}
 
@@ -55,6 +55,12 @@ Replay any guided tour whenever you need a refresher:
 - **First-use tour** — the same onboarding flow shown after first sign-in: choose workspaces, follow highlighted controls, and learn how to request advice or find clothes. No recommendation is generated during the tour.
 - **API Dashboard tour** — managing API keys and credits.
 - **Dev Dashboard tour** — developer tooling (Dev users only).
+
+## Your day and comfort
+
+The **Your day & comfort** controls are in Style. Set temperature preference, fabric dislikes, coverage, footwear restrictions and a dress code, then save across devices or choose device-only storage. Resetting the controls does not delete saved preferences; use **Delete saved preferences** for removal. See [Everyday Outfits](./daily-outfits#your-day-and-comfort).
+
+Provider keys have separate [session or remember-on-device controls](./dashboard#bring-your-own-key-pro-dev); they are not part of cloud Settings.
 
 ## Private style feedback
 

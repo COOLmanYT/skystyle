@@ -32,7 +32,19 @@ Choose an existing suite near the code you change as a starting point. Assert ob
 
 For route tests, mock `@/auth` and database/provider operations deliberately. Supply actual request data and fixtures defined in the test; use the request methods the handler reads. Reset changed environment variables and mocks so a suite does not affect the next one. The test filename should end in `.test.ts` or `.test.tsx`.
 
-Avoid real network calls, production secrets, or production writes in Jest. Database regression checks have a separate [rollback-only SQL fixture guide](https://github.com/COOLmanYT/skystyle/blob/main/supabase/tests/README.md); they are not run by `npm test` and require their own review.
+Avoid real network calls, production secrets, or production writes in Jest. Database checks have a separate [isolated PostgreSQL guide](https://github.com/COOLmanYT/skystyle/blob/main/supabase/tests/README.md); they are not run by `npm test` and require their own review. The sequential rollback fixture and disposable concurrent runner provide different evidence.
+
+## Everyday outfit regression checks
+
+Verify missing weather independently from real zeroes, compatible rain periods, provider deadlines, and usable AI output before charging. Check wardrobe ownership, conflicting revisions, availability, saved-outfit reuse and a single-item swap that preserves the rest of the outfit and checklist.
+
+For [clothing references](../api/clothing-references), cover names, stable IDs, renamed/duplicate/deleted items, escaped Markdown characters, and malformed destinations. Owned references open and focus the matching closet item; unowned references prepare Shop without automatically running an AI search.
+
+## Browser acceptance
+
+Test Style, Shop, Closet, Saved outfits, automatic recommendations, Inbox, Settings and plan information at phone, tablet, desktop and landscape sizes. Check horizontal overflow, readable inputs, touch targets, loading/retry states, light/dark themes, reduced motion, keyboard navigation and modal focus. Exercise form changes and saves, rather than relying only on screenshots.
+
+Use synthetic local fixtures for repeatable component checks and remove disposable routes before the production build. Record the browser engine, viewport dimensions, credentials/data scope and unavailable dependencies. A local demo is not authenticated cloud acceptance; physical-device and Safari checks must be recorded separately. Development previews support both `localhost` and `127.0.0.1`.
 
 ## Verification evidence
 

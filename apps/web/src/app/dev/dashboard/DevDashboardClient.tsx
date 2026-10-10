@@ -352,6 +352,7 @@ export default function DevDashboardClient({ initialSection = "triage", initialU
 }
 
 interface ChangelogEntry {
+  releaseStatus?: "development" | "released";
   id?: string;
   date: string;
   version: string;
@@ -387,6 +388,7 @@ const EMPTY_ENTRY: Omit<ChangelogEntry, "date" | "id"> = {
   large: false,
   showOnNextLogin: false,
   published: false,
+  releaseStatus: "development",
 };
 
 const SKY_MARKDOWN_GUIDE = `## Standard Markdown
@@ -450,6 +452,7 @@ function ChangelogCMS() {
       slug: e.slug ?? "",
       large: e.large ?? false,
       showOnNextLogin: e.showOnNextLogin ?? false,
+      releaseStatus:e.releaseStatus,
       published: e.published ?? true,
     });
     setEditingVersion(e.version);
@@ -627,6 +630,7 @@ function ChangelogCMS() {
               <input value={form.ctaLink} onChange={e => setForm(f => ({ ...f, ctaLink: e.target.value }))} placeholder="CTA Link (optional)" style={{ ...inputStyle, flex: 1 }} />
             </div>
             <input value={form.slug} onChange={e => setForm(f => ({ ...f, slug: e.target.value }))} placeholder="Slug (optional, e.g. my-changelog-post)" style={inputStyle} />
+            <label className="text-sm">Deployment status<select value={form.releaseStatus??""} onChange={e=>setForm(f=>({...f,releaseStatus:e.target.value?e.target.value as "development"|"released":undefined}))} style={inputStyle}><option value="">Not classified</option><option value="development">In development · not deployed</option><option value="released">Released · verify deployment first</option></select></label>
             <div className="flex flex-wrap items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={!!form.large} onChange={e => setForm(f => ({ ...f, large: e.target.checked }))} />

@@ -13,8 +13,6 @@ New here? Try the [no-login Live Demo](https://skystyle.app/#demo) first to see 
 
 ## Guides
 
-- **[Dev Center](/web-app/dev-center)** — task-based support, monitoring and account tools for authorised developers.
-
 **Start here:**
 
 - **[Getting Started](/web-app/getting-started)** — a step-by-step walkthrough from sign-up to your first refined recommendation.
@@ -23,15 +21,17 @@ New here? Try the [no-login Live Demo](https://skystyle.app/#demo) first to see 
 **Feature reference:**
 
 - **[Dashboard & Closet](/web-app/dashboard)** — recommendation modes, weather planning panel, model switching, follow-up questions, BYOK, and your wardrobe.
-- **[Shop](./web-app/shop)** — your budget range, sourced product widgets, shared AI models, and source availability.
+- **[Everyday Outfits](/web-app/daily-outfits)** — development preview of structured wardrobes, saved outfits, swaps, comfort and time-window advice.
+- **[Shop](/web-app/shop)** — your budget range, sourced product widgets, shared AI models, and source availability.
 - **[Settings](/web-app/settings)** — profile, units, appearance, preferences, dashboard behaviour, layout & spacing, and tutorials.
 - **[Security & Privacy](/web-app/security-and-privacy)** — 2FA, passkeys, API keys, security log, data export, and account deletion.
-- **[Automatic Recommendations](/web-app/automatic-recommendations)** — schedule exact-time outfit recommendations with a manual location.
+- **[Automatic Recommendations](/web-app/automatic-recommendations)** — schedule outfit advice at a chosen time and review delivery results.
 - **[API Dashboard](/web-app/api-dashboard)** — manage API keys, allocate credits, and view per-key balances.
 - **[Account & Support](/web-app/account-and-support)** — the account hub, plans, feedback, inbox, changelog, and service status.
 
 **Advanced:**
 
+- **[Dev Center](/web-app/dev-center)** — task-based support, monitoring and account tools for authorised developers.
 - **[Custom Weather Sources](/web-app/custom-weather-sources)** — (Pro) add your own HTTPS weather sources with SSRF-safe validation.
 
 **Need help?**

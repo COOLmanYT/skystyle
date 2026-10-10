@@ -97,6 +97,7 @@ export default function PrivacyClient() {
               <li><strong>Gender preference</strong>{" "}— optional. Stored locally on your device and sent to the AI when generating recommendations.</li>
               <li><strong>Closet items</strong>{" "}— optional. Stored so AI can personalise recommendations.</li>
               <li><strong>Daily usage counts</strong>{" "}— for rate limiting only. No request content stored.</li>
+              <li><strong>Saved outfits and comfort</strong>{" "}— in the 6.3 development candidate, saved outfit text, item references, checklists and chosen context are private cloud records. Explicit comfort preferences can sync across devices or remain device-only. Cloud copies are included in exports and account deletion; local copies require removal in that browser.</li>
               <li><strong>Private style feedback</strong>{" "}— local by default, or cloud if you choose. Notes, votes, and a short outfit excerpt are sent to Mistral Small when you request an editable preference summary. Saved summaries personalize Style and Shop. Manage or delete feedback in Settings.</li>
               <li><strong>Shopping requests</strong>{" "}— when live search is connected, your clothing query and size go to the approved product source, and selected preferences and sourced products go to your chosen AI provider. We do not record shopping queries, products viewed, or clicks for analytics, and do not add affiliate links.</li>
             </ul>
@@ -109,10 +110,11 @@ export default function PrivacyClient() {
             <p>Some preferences are stored locally on your device, including:</p>
             <ul className="space-y-2 list-disc pl-5">
               <li>Gender preference (optional)</li>
-              <li>Bring Your Own Key — AI API key (optional, Pro/Dev only)</li>
+              <li>Bring Your Own Key — scoped to account/provider, session-only by default; remember-on-device is optional (Pro/Dev only)</li>
+              <li>Comfort preferences — cloud sync or device-only, with explicit removal controls</li>
               <li>UI preferences (theme, layout, spacing)</li>
             </ul>
-            <p>Browser preferences and BYOK keys are stored in this browser. Relevant preferences and your chosen key are sent through Sky Style to the selected provider when needed for an AI request; keys are not saved in our database. Clearing browser data removes local copies.</p>
+            <p>Browser preferences and BYOK keys are stored in this browser. Keys are scoped to your account and provider, session-only by default and cleared on sign-out. Remember-on-device explicitly persists until you clear it, including after sign-out. Relevant preferences and the selected key pass through Sky Style to your chosen provider; keys are never saved in our database. Browser storage is not an encrypted vault.</p>
           </div>
           <div
             className="rounded-2xl p-5 space-y-3"
@@ -214,13 +216,13 @@ export default function PrivacyClient() {
                 the AI can make personalised recommendations.
               </li>
               <li>
-                <strong>Settings</strong>{" "}— your unit preference, custom prompts, and custom weather
-                source URLs if you set them.
+                <strong>Settings</strong>{" "}— account preferences such as units and onboarding. Optional custom prompts and weather source URLs stay in your browser; they are sent when needed for a request.
               </li>
               <li>
-                <strong>Usage counts</strong>{" "}— daily counters for rate limiting (AI uses,
-                follow-ups, closet uses, source picks). No request content is stored.
+                <strong>Usage counts</strong>{" "}— counters for rate limiting (recommendations,
+                follow-ups, owned-only advice and source picks). These counters do not contain request text.
               </li>
+              <li><strong>Saved outfits and comfort</strong>{" "}— in the 6.3 development candidate, saved outfit text, item references, checklists and chosen context are private cloud records. Explicit comfort preferences can sync across devices or remain device-only. Cloud copies are included in exports and account deletion; local copies require removal in that browser.</li>
               <li><strong>Private style feedback</strong>{" "}— votes, optional notes, short outfit excerpts, and an editable summary. Stored on this device by default; cloud storage is optional. There is no automatic expiry. Cloud feedback is deleted with the account; device copies must be deleted in each browser. Mistral processes submitted feedback when you request a summary, and the saved summary is included with subsequent Style and Shop advice.</li>
               <li><strong>Shopping inputs</strong>{" "}— clothing queries, size and preferences are processed to search an approved source and rank its products. Sky Style does not persist shopping queries or product/click histories for analytics. Source requests and provider processing are subject to those services&apos; own terms.</li>
             </ul>
@@ -240,10 +242,11 @@ export default function PrivacyClient() {
 
           <section>
             <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Local storage</h2>
-            <p>Some preferences are stored locally on your device using browser local storage, including:</p>
+            <p>Some preferences use browser storage on your device, including:</p>
             <ul className="list-disc pl-5 space-y-1 mt-2">
               <li>Gender preference (optional)</li>
-              <li>Bring Your Own Key — AI API key (optional, Pro/Dev only)</li>
+              <li>Bring Your Own Key — scoped to account/provider, session-only by default; remember-on-device is optional (Pro/Dev only)</li>
+              <li>Comfort preferences — cloud sync or device-only, with explicit removal controls</li>
               <li>UI preferences (theme, layout, spacing)</li>
             </ul>
             <p className="mt-2">

@@ -41,3 +41,9 @@ The scheduler runs via **Supabase Cron** (not Vercel Cron) and invokes the secur
 :::
 
 See the [contributor guide](../development/#hosting-and-background-jobs) for background-job setup.
+
+## 6.3 development: durable delivery
+
+A schedule occurrence has one stable identity. The runner stores its generated output before atomically settling allowance, completing history and advancing the schedule. An interrupted finalization recovers that output without generating or charging again. An interrupted generation without stored output is marked failed instead of repeated. Inbox copies are independently retried and deduplicated by occurrence.
+
+Developer diagnostics count overdue schedules, expired workers, pending inbox copies, HTTP failures and unanswered invocations. A successful cron invocation alone does not prove recommendation delivery. Authentication configuration and a delivered production run remain release acceptance checks.

@@ -1,0 +1,196 @@
+--- a/apps/web/src/lib/automated-recommendations.ts
++++ b/apps/web/src/lib/automated-recommendations.ts
+@@ -1,5 +1,6 @@
++import { getScheduledModel } from "@/lib/scheduled-model";
+ import { supabaseAdmin } from "@/lib/supabase";
+-import { getStyleRecommendation, getDefaultModel, StyleRecommendation } from "@/lib/ai";
++import { getStyleRecommendation, StyleRecommendation } from "@/lib/ai";
+ import { getWeather, WeatherData } from "@/lib/weather";
+ import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
+ import { getCredits, deductCredit } from "@/lib/credits";
+@@ -110,6 +111,7 @@
+     throw runInsertError ?? new Error("Unable to create automatic recommendation run.");
+   }
+ 
++  let diagnosticStage = "account";
+   try {
+     const [controlResult, settingsResult, closetResult, profileResult] = await Promise.all([
+       supabaseAdmin.from("user_access_controls").select("*").eq("user_id", schedule.user_id).maybeSingle(),
+@@ -131,7 +133,9 @@
+     }
+ 
+     const generate = async () => {
++      diagnosticStage = "weather";
+       const weather: WeatherData = await getWeather(schedule.latitude, schedule.longitude);
++      diagnosticStage = "generation";
+       const recommendation: StyleRecommendation = await getStyleRecommendation({
+       weather,
+       closetItems: Array.isArray(closetResult.data?.items) ? closetResult.data.items : [],
+@@ -141,7 +145,7 @@
+       forceCloset: false,
+       shareLocation: false,
+       isDev,
+-      modelId: getDefaultModel(isPro, isDev).id,
++      modelId: getScheduledModel(isPro, isDev).id,
+       });
+       return { weather, recommendation };
+     };
+@@ -154,6 +158,7 @@
+       else if (!await incrementUsage(schedule.user_id, "ai_uses", isPro, isDev)) throw new Error("Daily AI limit reached.");
+     }
+ 
++    diagnosticStage = "persistence";
+     const completedAt = new Date().toISOString();
+     const nextRun = nextRunAt(schedule, new Date());
+     const [{ error: runUpdateError }, { error: scheduleUpdateError }] = await Promise.all([
+@@ -183,6 +188,8 @@
+     ); } catch { console.error("[automatic-recommendations] Completed run could not be copied to Inbox; it remains available in run history."); }
+     return { status: "completed" };
+   } catch (error) {
++    const diagnostic = error as { name?: unknown; code?: unknown; status?: unknown };
++    console.error("[automatic-recommendations] Stage failed", { stage: diagnosticStage, kind: typeof diagnostic?.name === "string" ? diagnostic.name : "unknown", code: typeof diagnostic?.code === "string" && /^[A-Z0-9_]{1,40}$/.test(diagnostic.code) ? diagnostic.code : undefined, status: typeof diagnostic?.status === "number" ? diagnostic.status : undefined });
+     const safeMessages = ["Automatic recommendations are disabled for this account.", "Insufficient App Credits.", "Daily AI limit reached.", "Account unavailable."];
+     const message = error instanceof EntitlementError ? error.message : error instanceof Error && safeMessages.includes(error.message) ? error.message : "Automatic recommendation failed. Check your settings and try again.";
+     try {
+--- /dev/null
++++ b/apps/web/src/lib/scheduled-model.ts
+@@ -0,0 +1,15 @@
++import { getAvailableModels, type ModelConfig } from "./ai";
++
++/** Scheduled jobs have no BYOK credential; choose a configured hosted model. */
++export function getScheduledModel(isPro: boolean, isDev: boolean): ModelConfig {
++  const keys = {
++    openai: process.env.OPENAI_API_KEY,
++    gemini: process.env.GEMINI_API_KEY,
++    mistral: process.env.MISTRAL_API_KEY,
++  };
++  const model = getAvailableModels(isPro, isDev, false).find(
++    (candidate) => Boolean(keys[candidate.provider]?.trim()),
++  );
++  if (!model) throw new Error("No hosted AI provider is configured for automatic recommendations.");
++  return model;
++}
+--- a/package.json
++++ b/package.json
+@@ -1,8 +1,10 @@
+ {
+   "name": "skystyle",
+-  "version": "6.1.0",
++  "version": "6.1.1",
+   "private": true,
+-  "workspaces": ["apps/*"],
++  "workspaces": [
++    "apps/*"
++  ],
+   "scripts": {
+     "dev": "next dev apps/web",
+     "build": "next build apps/web",
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "skystyle",
+-  "version": "6.1.0",
++  "version": "6.1.1",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "skystyle",
+-      "version": "6.1.0",
++      "version": "6.1.1",
+       "workspaces": [
+         "apps/*"
+       ],
+@@ -47,14 +47,14 @@
+     },
+     "apps/docs": {
+       "name": "skystyle-docs",
+-      "version": "6.1.0",
++      "version": "6.1.1",
+       "devDependencies": {
+         "vitepress": "^1.6.4"
+       }
+     },
+     "apps/web": {
+       "name": "skystyle-web",
+-      "version": "6.1.0",
++      "version": "6.1.1",
+       "dependencies": {
+         "@auth/supabase-adapter": "^1.11.1",
+         "@google/generative-ai": "^0.24.1",
+--- a/apps/web/package.json
++++ b/apps/web/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "skystyle-web",
+-  "version": "6.1.0",
++  "version": "6.1.1",
+   "private": true,
+   "scripts": {
+     "dev": "next dev",
+--- a/apps/web/package-lock.json
++++ b/apps/web/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "skystyle-web",
+-  "version": "6.0.0",
++  "version": "6.1.1",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "skystyle-web",
+-      "version": "6.0.0",
++      "version": "6.1.1",
+       "dependencies": {
+         "@auth/supabase-adapter": "^1.11.1",
+         "@google/generative-ai": "^0.24.1",
+--- a/apps/docs/package.json
++++ b/apps/docs/package.json
+@@ -1,6 +1,6 @@
+ {
+   "name": "skystyle-docs",
+-  "version": "6.1.0",
++  "version": "6.1.1",
+   "private": true,
+   "scripts": {
+     "dev": "vitepress dev .",
+--- a/apps/docs/package-lock.json
++++ b/apps/docs/package-lock.json
+@@ -1,12 +1,12 @@
+ {
+   "name": "skystyle-docs",
+-  "version": "6.0.0",
++  "version": "6.1.1",
+   "lockfileVersion": 3,
+   "requires": true,
+   "packages": {
+     "": {
+       "name": "skystyle-docs",
+-      "version": "6.0.0",
++      "version": "6.1.1",
+       "devDependencies": {
+         "vitepress": "^1.6.4"
+       }
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -2,7 +2,7 @@
+ 
+ This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
+ 
+-## Current version: 6.1.0
++## Current version: 6.1.1
+ 
+ This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
+ 
+--- a/.github/copilot-instructions.md
++++ b/.github/copilot-instructions.md
+@@ -1,6 +1,6 @@
+ # GitHub Copilot Instructions — Sky Style (skystyle)
+ 
+-## Current version: 6.1.0
++## Current version: 6.1.1
+ 
+ This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in `AGENTS.md` as well.) Remember, update the version number. 
+ 

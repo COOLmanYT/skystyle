@@ -1,107 +1,59 @@
 # Dashboard & Closet
 
-::: warning Accounting rollout
-Your account usage readout shows the allowance currently available to you. See [Usage limits](./how-it-works#usage-limits).
-:::
-
-The dashboard has a full-width **Style / Shop** navigation bar. **Style** is live weather, your preferences, and an outfit recommendation; **[Shop](./shop)** finds new clothes through an approved product source.
-
-Choose both workspaces, Style only, or Shop only during the first-use tour or in Settings. The sidebar shows the same enabled workspaces. This preference is saved per account in this browser; if storage is blocked, it lasts for the current visit only.
+The dashboard's **Style / Shop** bar connects outfit advice and clothing search. Choose both workspaces, Style only, or Shop only in onboarding or [Settings](./settings#dashboard-behaviour). This choice is saved per account in this browser; blocked storage uses a visit-only fallback.
 
 ## Dashboard layout
 
-Inside Style, the dashboard is split into a **weather panel** and a **settings panel**. The split is adjustable in [Settings → Layout & spacing](./settings#layout-and-spacing):
-
-- **Symmetrical Split** — both panels equal width.
-- **Large Weather** (default) — weather panel is wider.
-- **Large Settings** — settings panel is wider.
-
-When **Custom Column Spacing** is on, hover between the two panels to reveal a drag handle and resize them freely. The ratio is saved automatically.
+Style has weather and settings panels. [Layout & spacing](./settings#layout-and-spacing) offers Symmetrical Split, Large Weather and Large Settings. On a narrow screen, the panels stack. Custom Column Spacing enables a draggable divider on wider screens and saves its ratio.
 
 ## Location
 
-Choose how Sky Style locates you:
-
-- **GPS** — permit browser location access for the most accurate local weather.
-- **Manual** — type any city or coordinates.
-
-Your location consent is controlled in [Settings → Preferences](./settings#preferences).
+Use GPS with browser permission, or choose a city or coordinates manually. [Location sharing](./settings#preferences) controls whether location text is included in AI requests; fetching weather still requires coordinates.
 
 ## Recommendation modes
 
-Each recommendation can run at one of four complexity levels, selected in the Weather Planning panel:
+Weather Planning provides Simple, Simple+, Advanced and Pro levels, from concise advice to more detailed reasoning. This changes the requested depth, not your account plan. Choose a default in [Dashboard behaviour](./settings#dashboard-behaviour).
 
-| Mode | Description |
-| --- | --- |
-| Simple | A concise outfit suggestion. |
-| Simple+ | Slightly more detail. |
-| Advanced | Deeper reasoning and options. |
-| Pro | The most thorough recommendation. |
+## Your day and comfort
 
-Your default mode is configurable in [Settings → Dashboard behaviour](./settings#dashboard-behaviour).
+The [Everyday Outfits preview](./daily-outfits) adds explicit comfort preferences and a time window of up to 24 hours. Use **Your day & comfort** for temperature preference, fabric dislikes, coverage, footwear restrictions and a dress code. It also explains forecast coverage and the outfit's bring checklist.
 
 ## Follow-up questions
 
-Occasion, date/time, fragrance and your editable private preference summary remain with follow-ups. Budget ranges belong in Shop, where the maximum applies to sourced item totals (excluding delivery); they are not claimed as a verified wardrobe value in Style.
+After generating advice, ask a question such as “Should I bring an umbrella?” Occasion, time, fragrance and your current private preference summary remain available to follow-ups. Replace mode updates the current advice; Chat mode keeps a conversation. Choose the mode in [Settings](./settings#dashboard-behaviour).
 
-After a recommendation, ask follow-ups like "should I bring an umbrella?" or "what if I need formal shoes?". Follow-ups run in one of two modes:
-
-- **Replace mode** (default) — each follow-up overwrites the current outfit suggestion.
-- **Chat mode** — follow-ups append below, keeping a running conversation history.
-
-Switch modes in [Settings → Dashboard behaviour](./settings#dashboard-behaviour).
-
-::: tip Daily limits
-Follow-ups are limited per day based on your plan (Free: 40/day, Pro: 400/day). When you hit the limit, the dashboard shows your usage and the limit resets at midnight UTC.
-:::
+Budget ranges belong in [Shop](./shop), where a maximum applies to sourced item totals excluding delivery. Style does not claim to calculate the value of your wardrobe. Follow-ups have their own [usage counter](./how-it-works#usage-limits).
 
 ## Weather Planning panel
 
-The Weather Planning panel on the dashboard lets you control how a recommendation is generated:
+Use the panel to choose recommendation depth and a built-in source when your account permits it. Hourly forecasts show available temperatures, conditions, rain probabilities and wind. BOM readings also show station-distance accuracy. Missing forecasts are labelled unavailable; see [How It Works](./how-it-works#weather-sources).
 
-- **Recommendation mode** — Simple, Simple+, Advanced, or Pro (see [Recommendation modes](#recommendation-modes) above).
-- **Source picker** (Pro) — choose which built-in weather source to use for this recommendation. Free users get 4 source picks/day; Pro is unlimited. See [How It Works → Weather sources](./how-it-works#weather-sources).
-- **Hourly forecast** — when the selected source provides it, an hourly breakdown (time, temperature, description, rain chance, wind speed) is shown so you can plan around changing conditions.
-- **Accuracy** — for BOM (Australia) data, the panel shows the accuracy score based on distance to the nearest station (see [Accuracy score](./how-it-works#accuracy-score)).
-
-The panel's default state (always open, closed, or disabled) is configurable in [Settings → Dashboard behaviour](./settings#dashboard-behaviour).
+The panel can stay open, start closed, or be disabled in [Settings](./settings#dashboard-behaviour).
 
 ## Model switching
 
-You can change which AI model generates your recommendation. **Model switches are a separate daily counter** from AI uses:
-
-| Plan | Model switches |
-| --- | --- |
-| Free | 2/day |
-| Pro | Unlimited |
-| Dev | Unlimited |
-
-Switching counts even if the previous model was unavailable. See [How It Works → AI models](./how-it-works#ai-models) for the full model priority list.
+Choosing another AI model has a separate counter from generating a recommendation. A retry can use recommendation allowance as well as a model switch. Your Account page shows the limits that apply; the [usage reference](./how-it-works#usage-limits) explains default counters. Model availability depends on the configured providers.
 
 ## Bring Your Own Key (Pro & Dev)
 
-Pro and Dev users can supply their own AI provider key so recommendations are billed to their own account.
+Supported providers are OpenAI, Google Gemini, Mistral AI and Anthropic. A key is scoped to your account and provider. **Session only** is the default and clears on sign-out. **Remember on this device** explicitly keeps the key in browser storage until you clear it, including after sign-out. Browser storage is not an encrypted vault.
 
-- **Supported providers**: OpenAI, Google Gemini, Mistral AI, and Anthropic (Claude Haiku 4.5).
-- Keys are stored in this browser and transmitted through Sky Style for requests to the selected provider, never saved in the Sky Style database. Changing provider clears the previous key; follow-ups retain the provider. BYOK also works in Shop.
-- A **custom prompt** can replace the default Sky Style prompt — it must include JSON output instructions and is stored locally only.
+Requests send the key through Sky Style to the selected provider; it is never saved in the Sky Style database. Changing provider clears the active key. Follow-ups retain their provider, and the key is never sent to another provider. Style and Shop share these controls. Use **Clear saved keys for this account** to remove its saved provider credentials.
 
-::: tip BYOK is optional
-Without a BYOK key, Sky Style uses its own AI provider according to your plan tier. See [Plans](./account-and-support#plans).
-:::
+A custom AI prompt is optional and stored locally. It must retain JSON output instructions. Without BYOK, hosted models are used according to your account access. BYOK does not bypass app limits. See [Plans](./account-and-support#plans).
 
 ## Closet
 
-The **Closet** page (`/closet`) holds the clothes you own so the AI can tailor recommendations to your actual wardrobe.
+Open **Closet** from navigation or expand it within Style. In the [Everyday Outfits preview](./daily-outfits), each item has a stable ID and editable category, colour, warmth, waterproofing and availability. Revision checks preserve your draft if another tab changes the wardrobe before you save.
 
-- Items are returned in the order you added them.
-- Closet usage is limited per day on the Free plan (4 uses/day) and unlimited on Pro/Dev.
-- The closet panel can be expanded directly from the dashboard or managed on its own page.
+Clothing references highlight an owned item inline. Selecting one opens Closet, focuses its row and briefly highlights it. Stable IDs continue to work after a rename, and separate items with the same label remain distinct. Unavailable owned clothes still open Closet, where their availability is shown; items no longer owned prepare Shop instead.
 
-Demo sessions do not write to cloud Closet or Inbox tables. Sign in with a real account to save those features.
+Editing a closet uses no recommendation allowance. **Owned clothes only** checks the returned item IDs against available clothes and identifies wardrobe gaps. See [usage limits](./how-it-works#usage-limits).
+
+Demo closet changes stay in the current tab until sign-out. They are not saved to cloud Closet or Inbox tables. If browser storage is blocked, changes last only on that page.
 
 ## First-use tour and private feedback
 
-Onboarding and the dashboard tour are one flow: choose workspaces, follow spotlights over the real controls, and learn how to get your first recommendation. It does not generate advice or consume usage. Replay from Settings, not the Dashboard menu.
+The first-use tour highlights the actual controls and uses no AI allowance. Replay it from [Settings → Tutorials](./settings#tutorials).
 
-The **Record private style feedback** button opens a keyboard-accessible modal. In Settings you can still inspect/edit the summary, choose local or cloud storage, and delete feedback. Recording controls appear only in the modal.
+**Record private style feedback** opens a keyboard-accessible modal. Settings retains summary editing, local/cloud storage choice and deletion. Recording controls live in the modal; explicit [comfort preferences](./daily-outfits#your-day-and-comfort) are separate editable controls.

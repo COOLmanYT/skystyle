@@ -10,7 +10,9 @@ Style uses the weather/context and wardrobe details needed for your request. Sha
 
 Shop sends search/fit terms to the approved product API, then candidate metadata and preferences to the selected AI provider for ranking. No Sky Style product-impression, shopping-query or click analytics is added; no affiliate/referral parameters are used. Usage counters enforce the existing allowance without storing shopping queries/products. Retailers and AI providers apply their own privacy rules to the requests they receive.
 
-BYOK keys for OpenAI, Gemini, Mistral or Anthropic stay in browser storage between requests and are transmitted through Sky Style to the chosen provider, not saved in the database. Clear the key on shared devices; changing provider clears the previous key. Sourced product images use the app image proxy rather than direct browser-to-source requests.
+BYOK keys for OpenAI, Gemini, Mistral or Anthropic are scoped to account and provider. Session storage is the default and clears on sign-out. Remember-on-device explicitly persists until cleared, including after sign-out; browser storage is not an encrypted vault. Keys pass through Sky Style to the chosen provider and are not saved in the database. Changing provider clears the active key. See [key controls](./dashboard#bring-your-own-key-pro-dev). Sourced product images use the app image proxy rather than direct browser-to-source requests.
+
+Explicit comfort preferences have their own cloud or device-only storage control. Switching to device-only confirms removal of the cloud copy; a failed removal remains labelled unfinished. These preferences are separate from private feedback.
 
 Feedback is local by default. The user chooses cloud storage or Mistral summarization; deleting cloud feedback cannot erase an offline device copy or recall already processed provider requests. Recording controls open in a modal; storage, summary editing and deletion remain in Settings.
 
@@ -77,7 +79,8 @@ The **Privacy Hub** (`/settings/privacy`) controls your data. It is also embedde
 
 Download everything Sky Style stores about you as a structured JSON file:
 
-- Includes your profile, settings, closet, usage history, feedback, and security logs.
+- Includes your profile, settings, closet, usage history, feedback and security logs. The 6.3 candidate also includes structured wardrobe items, saved outfits and cloud comfort preferences.
+- Browser-only preferences, local feedback and provider keys are excluded from server exports.
 - Human-readable and machine-parseable, with a version stamp and export timestamp.
 
 Exports are rate-limited: non-Dev accounts can request one export every **12 hours**. A countdown shows when the next export is available.
@@ -93,5 +96,5 @@ Request permanent deletion of your account and all associated data:
 While a deletion is pending, a banner appears on the dashboard with quick links to manage the request or contact a developer.
 
 ::: warning Cancellation window
-You retain full access to Sky Style while a deletion request is pending review. Cancelling restores your account to normal immediately.
+A pending deletion can restrict AI and automatic recommendations. Privacy controls remain available so you can review or cancel the request. Cancelling removes the deletion restriction; other account restrictions can still apply.
 :::

@@ -748,3 +748,16 @@ describe('Followup API Route - Model Selection', () => {
     aiModule.getFollowUpRecommendation = originalGetFollowUpRecommendation;
   });
 });
+
+describe("6.3 usable-output charging",()=>{
+ it("does not charge unusable AI output",async()=>{
+  jest.requireMock('@/lib/ai').getFollowUpRecommendation.mockResolvedValueOnce({outfit:"",reasoning:"incomplete"});
+  expect((await POST(createMockNextRequest({message:"Change shoes",previousOutfit:"Cotton shirt",previousReasoning:"Warm enough",weather:mockWeatherData}))).status).toBe(502);
+  expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
+ });
+ it("returns an incomplete outfit without consuming allowance",async()=>{
+  jest.requireMock('@/lib/ai').getFollowUpRecommendation.mockResolvedValueOnce({...mockStyleRecommendation,chargeable:false});
+  expect((await POST(createMockNextRequest({message:"Change shoes",previousOutfit:"Cotton shirt",previousReasoning:"Warm enough",weather:mockWeatherData}))).status).toBe(200);
+  expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
+ });
+});

@@ -1,4 +1,5 @@
-import { clothingAction, clothingItemName, closetItemId, parseRecommendationAction, recommendationLinkInstructions } from "../recommendation-links";
+import { clothingAction, clothingItemName, clothingReference, closetItemId, parseRecommendationAction, recommendationLinkInstructions } from "../recommendation-links";
+import { newWardrobeItem } from "../wardrobe";
 import { sanitizeUrl } from "../sanitize-url";
 describe("Validated recommendation clothing actions", () => {
   it("uses exact owned names, including punctuation and Unicode, without ambiguous closet IDs", () => {
@@ -25,5 +26,22 @@ describe("Validated recommendation clothing actions", () => {
   it("rejects protocol-relative and backslash links in shared Markdown", () => {
     expect(sanitizeUrl("//evil.test")).toBeNull(); expect(sanitizeUrl("/\\evil.test")).toBeNull();
     expect(sanitizeUrl("/dashboard?section=shop&item=shirt")).not.toBeNull();
+  });
+  it("resolves duplicate labels through stable IDs and routes deleted IDs to Shop", () => {
+    const a = newWardrobeItem("11111111-1111-4111-8111-111111111111", "Coat");
+    const b = { ...a, id: "22222222-2222-4222-8222-222222222222" };
+    expect(parseRecommendationAction(`clothing:id/${b.id}`, [a.label, b.label], [a, b], "old label")).toMatchObject({ kind: "closet", itemId: b.id, item: b.label });
+    const instructions = recommendationLinkInstructions([a.label, b.label], [a, b]);
+    expect(instructions).toContain(`clothing:id/${a.id}`);
+    expect(instructions).toContain(`clothing:id/${b.id}`);
+    expect(parseRecommendationAction(`clothing:id/${b.id}`, [a.label], [a], "Coat")).toMatchObject({ kind: "shop", item: "Coat" });
+  });
+  it("normalises names without losing Unicode or real ownership", () => {
+    expect(parseRecommendationAction("clothing:COAT%20%20%C3%A9", ["Coat e\u0301"])?.kind).toBe("closet");
+    expect(clothingReference("Coat (rain)")).toBe("[Coat (rain)](clothing:Coat%20%28rain%29)");
+    expect(clothingItemName("\ud800")).toBeNull();
+  });
+  it.each(["clothing:%", "clothing:%00coat", "clothing:id/invalid", "clothing:", "clothing:coat shoes", "clothing:coat\\shoes"])("rejects invalid clothing references %s", href => {
+    expect(parseRecommendationAction(href, [])).toBeNull();
   });
 });

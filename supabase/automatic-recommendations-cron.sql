@@ -39,9 +39,14 @@ begin
   from vault.decrypted_secrets
   where name = 'skystyle_automatic_recommendations_cron_secret';
 
+  IF runner_secret LIKE '%REPLACE_WITH%' OR length(runner_secret)<32 THEN
+    RAISE EXCEPTION 'Sky Style runner authentication is not configured';
+  END IF;
+
   select net.http_get(
     url := 'https://skystyle.app/api/cron/automatic-recommendations',
-    headers := jsonb_build_object('Authorization', 'Bearer ' || runner_secret)
+    headers := jsonb_build_object('Authorization', 'Bearer ' || runner_secret),
+    timeout_milliseconds := 65000
   )
   into request_id;
 

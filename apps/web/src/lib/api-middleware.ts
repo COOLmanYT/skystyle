@@ -38,6 +38,7 @@ export interface ApiKeyContext {
   userId: string;
   /** Unix ms timestamp captured at the very start of the request. */
   startedAt: number;
+  timings?: Record<string, number>;
 }
 
 /**
@@ -53,7 +54,7 @@ function applyStandardHeaders(response: NextResponse): void {
   response.headers.set("Access-Control-Max-Age", "86400");
   response.headers.set(
     "Access-Control-Expose-Headers",
-    "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After, X-Credit-Warning"
+    "X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After, X-Credit-Warning, Server-Timing"
   );
   response.headers.set("X-Content-Type-Options", "nosniff");
   response.headers.set("Cache-Control", "no-store");
@@ -323,10 +324,12 @@ const V6_PURPOSE: Record<string, UsagePurpose> = {
 export function withApiAuth(handler: ApiHandler) {
   return async function (req: NextRequest): Promise<NextResponse> {
     const startedAt = Date.now();
+    const timings: Record<string,number> = {};
     const endpoint = req.nextUrl.pathname;
     const endpointCost = getEndpointCreditCost(endpoint);
     const requestInput = await captureRequestInput(req);
     const queueUsageLog = (apiKeyId: string | undefined, response: NextResponse) => {
+      response.headers.set("Server-Timing",Object.entries({...timings,total:Date.now()-startedAt}).map(([name,duration])=>`${name};dur=${Math.max(0,Math.round(duration))}`).join(", "));
       logApiUsage(apiKeyId, endpoint, response.status, startedAt, requestInput, req.method, response);
     };
 
@@ -347,8 +350,10 @@ export function withApiAuth(handler: ApiHandler) {
 
     // 2. Resolve key → (id, user_id)
     let keyRecord: Awaited<ReturnType<typeof resolveApiKey>>;
+    const authStarted=Date.now();
     try {
       keyRecord = await resolveApiKey(rawToken);
+      timings.auth=Date.now()-authStarted;
     } catch (err) {
       console.error("[api-middleware] API key lookup failed:", err);
       const res = NextResponse.json(
@@ -380,7 +385,8 @@ export function withApiAuth(handler: ApiHandler) {
     }
     const isDev = profile?.is_dev === true;
     let accounting;
-    try { accounting = await getActiveAccounting(keyRecord.userId); }
+    const accountingStarted=Date.now();
+    try { accounting = await getActiveAccounting(keyRecord.userId); timings.accounting=Date.now()-accountingStarted; }
     catch (error) {
       const res = NextResponse.json({ error: error instanceof EntitlementError ? error.code : "accounting_unavailable", message: error instanceof EntitlementError ? error.message : "Unable to verify account accounting." }, { status: error instanceof EntitlementError ? error.status : 503 });
       applyStandardHeaders(res); queueUsageLog(keyRecord.id, res); return res;
@@ -451,7 +457,7 @@ export function withApiAuth(handler: ApiHandler) {
     const ctx: ApiKeyContext = {
       apiKeyId: keyRecord.id,
       userId: keyRecord.userId,
-      startedAt,
+      startedAt, timings,
     };
 
     let response: NextResponse;
@@ -467,9 +473,9 @@ export function withApiAuth(handler: ApiHandler) {
         }
         response = await withV6Usage({ userId: keyRecord.userId, apiKeyId: keyRecord.id, purpose,
           ...accountingRequest(req.headers), validatedInput: { endpoint, method: req.method, input } },
-          () => handler(req, ctx), { shouldCharge: (result) => responseCharge(result, endpointCost) > 0,
+          async () => {const start=Date.now();try{return await handler(req,ctx);}finally{timings.handler=Date.now()-start;}}, { shouldCharge: (result) => responseCharge(result, endpointCost) > 0,
             finalCreditCharge: (result, reserved) => Math.min(reserved, responseCharge(result, endpointCost)) });
-      } else response = await handler(req, ctx);
+      } else {const start=Date.now();try{response=await handler(req,ctx);}finally{timings.handler=Date.now()-start;}}
     } catch (err) {
       console.error("[api-middleware] Unhandled handler error:", err);
       const res = NextResponse.json(

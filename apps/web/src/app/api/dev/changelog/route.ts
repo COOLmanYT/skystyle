@@ -7,6 +7,7 @@ export interface ChangelogEntry {
   id?: string;
   date: string;
   version: string;
+  releaseStatus?: "development" | "released";
   title: string;
   description: string;
   category?: string;
@@ -35,7 +36,7 @@ export async function GET() {
 
   const { data, error } = await supabaseAdmin
     .from("changelog_posts")
-    .select("id, version, title, body, image_url, published, created_at, category, type, content, image, cta, expanded, slug, large, show_on_next_login")
+    .select("*")
     .order("created_at", { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -46,6 +47,7 @@ export async function GET() {
       id: row.id as string,
       date: row.created_at as string,
       version: row.version as string,
+      releaseStatus: row.release_status === "development" || row.release_status === "released" ? row.release_status : undefined,
       title: row.title as string,
       description: (row.body as string) ?? "",
       category: (row.category as string | null) ?? undefined,
@@ -75,6 +77,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "version and title are required" }, { status: 400 });
   }
 
+  if(entry.releaseStatus !== undefined && !["development","released"].includes(entry.releaseStatus)) return NextResponse.json({error:"Invalid release status."},{status:400});
   const cta =
     entry.ctaLabel && entry.ctaLink
       ? { text: entry.ctaLabel, url: entry.ctaLink }
@@ -95,6 +98,7 @@ export async function POST(req: NextRequest) {
     large: entry.large ?? false,
     show_on_next_login: entry.showOnNextLogin ?? false,
     published: entry.published ?? true,
+    ...(entry.releaseStatus ? {release_status:entry.releaseStatus} : {}),
   });
 
   if (error) {
@@ -118,6 +122,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "title is required" }, { status: 400 });
   }
 
+  if(entry.releaseStatus !== undefined && !["development","released"].includes(entry.releaseStatus)) return NextResponse.json({error:"Invalid release status."},{status:400});
   const cta =
     entry.ctaLabel && entry.ctaLink
       ? { text: entry.ctaLabel, url: entry.ctaLink }
@@ -139,6 +144,7 @@ export async function PUT(req: NextRequest) {
       large: entry.large ?? false,
       show_on_next_login: entry.showOnNextLogin ?? false,
       published: entry.published ?? true,
+    ...(entry.releaseStatus ? {release_status:entry.releaseStatus} : {}),
       updated_at: new Date().toISOString(),
     })
     .eq("version", entry.version.trim())

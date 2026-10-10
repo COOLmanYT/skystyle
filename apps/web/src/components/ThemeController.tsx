@@ -5,11 +5,14 @@ import { useEffect } from "react";
 function applyTheme() {
   const root = document.documentElement;
   let mode = "system";
+  let reduceMotion = false;
   try {
     mode = localStorage.getItem("skystyle_theme_mode") ?? "system";
+    reduceMotion = localStorage.getItem("skystyle_reduce_motion") === "true";
   } catch {
     mode = "system";
   }
+  root.dataset.skystyleReduceMotion = String(reduceMotion);
 
   if (mode === "light" || mode === "dark") {
     root.setAttribute("data-theme", mode);
@@ -23,7 +26,7 @@ export default function ThemeController() {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
     const handleUpdate = () => applyTheme();
     const handleStorage = (event: StorageEvent) => {
-      if (!event.key || event.key === "skystyle_theme_mode") {
+      if (!event.key || event.key === "skystyle_theme_mode" || event.key === "skystyle_reduce_motion") {
         applyTheme();
       }
     };

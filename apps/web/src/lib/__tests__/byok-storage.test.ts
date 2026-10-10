@@ -1,0 +1,9 @@
+import { byokSnapshot, writeByok, clearByokSessions, clearSavedByok, subscribeByok } from "../byok-storage";
+describe("account-scoped BYOK",()=>{
+  let stop:()=>void;
+  beforeEach(()=>{localStorage.clear();Object.defineProperty(global,"sessionStorage",{value:{getItem:jest.fn(()=>null),setItem:jest.fn(),removeItem:jest.fn()},configurable:true});Object.defineProperty(global,"window",{value:{addEventListener:jest.fn(),removeEventListener:jest.fn()},configurable:true});stop=subscribeByok("alice",()=>{});clearSavedByok("alice");clearSavedByok("bob");});
+  afterEach(()=>{stop?.();delete (global as {window?:unknown}).window;delete (global as {sessionStorage?:unknown}).sessionStorage;});
+  it("never exposes Alice's key to Bob and defaults to session storage",()=>{writeByok("alice",{key:"synthetic-key"});expect(JSON.parse(byokSnapshot("bob")).key).toBe("");expect(Object.values(localStorage)).not.toContain("synthetic-key");clearByokSessions(false);expect(JSON.parse(byokSnapshot("alice")).key).toBe("");});
+  it("retains only opted-in credentials, then allows explicit deletion",()=>{writeByok("alice",{key:"remembered-synthetic",remember:true});expect(localStorage.getItem("skystyle_byok_v2_alice_openai")).toBe("remembered-synthetic");clearByokSessions(false);stop();stop=subscribeByok("alice",()=>{});expect(JSON.parse(byokSnapshot("alice")).key).toBe("remembered-synthetic");clearSavedByok("alice");expect(localStorage.getItem("skystyle_byok_v2_alice_openai")).toBeNull();});
+  it("does not transfer credentials across providers or adopt the old key",()=>{localStorage.setItem("skystyle_byok_key","unowned-synthetic");writeByok("alice",{key:"openai-synthetic"});writeByok("alice",{provider:"anthropic"});expect(JSON.parse(byokSnapshot("alice")).key).toBe("");expect(localStorage.getItem("skystyle_byok_key")).toBeNull();});
+});

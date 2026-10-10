@@ -1,10 +1,12 @@
 import { supabaseAdmin } from "@/lib/supabase";
-import { getStyleRecommendation, getDefaultModel, StyleRecommendation } from "@/lib/ai";
+import { getStyleRecommendation, StyleRecommendation } from "@/lib/ai";
+import { getScheduledModel } from "@/lib/scheduled-model";
 import { getWeather, WeatherData } from "@/lib/weather";
-import { canUseFeature, incrementUsage } from "@/lib/daily-usage";
-import { getCredits, deductCredit } from "@/lib/credits";
+import { parseComfort } from "@/lib/comfort";
+import { canUseFeature } from "@/lib/daily-usage";
+import { getCredits } from "@/lib/credits";
 import { getActiveAccounting, scheduledUsageId } from "@/lib/accounting";
-import { EntitlementError, withV6Usage } from "@/lib/entitlements";
+import { EntitlementError, reserveV6Usage, settleV6Usage, type UsageReservation } from "@/lib/entitlements";
 
 export type AutomaticRecurrence = "once" | "daily" | "weekly";
 
@@ -51,150 +53,70 @@ export function nextRunAt(schedule: AutomaticRecommendationSchedule, after?: Dat
   return new Date(candidate).toISOString();
 }
 
-async function addInboxMessage(
-  userId: string,
-  category: "recommendation" | "error",
-  title: string,
-  body: string,
-  metadata: Record<string, unknown>
-): Promise<void> {
-  const { error } = await supabaseAdmin.from("user_inbox").insert({
-    user_id: userId,
-    category,
-    title,
-    body,
-    metadata,
-  });
-  if (error) throw error;
+interface DurableRun { id: string; lease_token: string; weather: WeatherData | null; recommendation: StyleRecommendation | null; usage_receipt: UsageReservation | null; legacy_plan: string | null }
+async function runRpc(name: string, args: Record<string, unknown>) {
+  const { data, error } = await supabaseAdmin.rpc(name,args);
+  if(error) throw new Error("Automatic recommendation storage unavailable.");
+  return data;
 }
-
-async function failRun(
-  schedule: AutomaticRecommendationSchedule,
-  runId: string,
-  message: string
-): Promise<void> {
-  const [{ error: runError }, { error: scheduleError }] = await Promise.all([
-    supabaseAdmin
-      .from("automated_recommendation_runs")
-      .update({ status: "failed", error: message, completed_at: new Date().toISOString() })
-      .eq("id", runId),
-    supabaseAdmin
-      .from("automated_recommendation_schedules")
-      .update({ locked_at: null, next_run_at: nextRunAt(schedule, new Date()), active: schedule.recurrence !== "once", updated_at: new Date().toISOString() })
-      .eq("id", schedule.id),
-  ]);
-  if (runError) throw runError;
-  if (scheduleError) throw scheduleError;
-  await addInboxMessage(
-    schedule.user_id,
-    "error",
-    `Automatic recommendation failed: ${schedule.label}`,
-    message,
-    { scheduleId: schedule.id, runId }
-  );
-}
-
-export async function runAutomaticRecommendationSchedule(
-  schedule: AutomaticRecommendationSchedule
-): Promise<{ status: "completed" | "failed"; error?: string }> {
-  const { data: run, error: runInsertError } = await supabaseAdmin
-    .from("automated_recommendation_runs")
-    .insert({ schedule_id: schedule.id, user_id: schedule.user_id, status: "running" })
-    .select("id")
-    .single();
-  if (runInsertError || !run?.id) {
-    await supabaseAdmin
-      .from("automated_recommendation_schedules")
-      .update({ locked_at: null, updated_at: new Date().toISOString() })
-      .eq("id", schedule.id);
-    throw runInsertError ?? new Error("Unable to create automatic recommendation run.");
+export async function runAutomaticRecommendationSchedule(schedule: AutomaticRecommendationSchedule): Promise<{status:"completed"|"failed"|"recovering";error?:string}> {
+  const occurrenceId=scheduledUsageId(schedule.id,schedule.next_run_at);
+  const begun=await runRpc("v63_begin_auto_run",{p_schedule_id:schedule.id,p_occurrence_id:occurrenceId,p_occurrence_at:schedule.next_run_at});
+  if(begun?.action==="busy" || begun?.action==="skip") return {status:"recovering"};
+  if(!begun?.run?.id || !begun?.run?.lease_token) throw new Error("Automatic recommendation lease unavailable.");
+  const run=begun.run as DurableRun;
+  let receipt: UsageReservation | null=run.usage_receipt;
+  let staged=Boolean(run.recommendation);
+  let stagingAttempted=false;
+  async function finish(success:boolean,error?:string) {
+    const result=await runRpc("v63_finish_auto_run",{p_run_id:run.id,p_token:run.lease_token,p_next_run:nextRunAt(schedule,new Date()),p_success:success,p_error:error??null});
+    try { await runRpc("v63_deliver_auto_run",{p_run_id:run.id}); } catch { /* Delivery retries independently; completed history stays available. */ }
+    return {status:result.status as "completed"|"failed"};
   }
-
   try {
-    const [controlResult, settingsResult, closetResult, profileResult] = await Promise.all([
-      supabaseAdmin.from("user_access_controls").select("*").eq("user_id", schedule.user_id).maybeSingle(),
-      supabaseAdmin.from("settings").select("custom_system_prompt").eq("user_id", schedule.user_id).maybeSingle(),
-      supabaseAdmin.from("closet").select("items").eq("user_id", schedule.user_id).maybeSingle(),
-      supabaseAdmin.from("users").select("is_dev, is_pro").eq("id", schedule.user_id).maybeSingle(),
+    if(begun.action==="finalize") return await finish(true);
+    if(begun.action==="abandon") return await finish(false,"Automatic generation was interrupted. It was not repeated; create a new request to try again.");
+    const [controls,settings,closet,profile,accounting]=await Promise.all([
+      supabaseAdmin.from("user_access_controls").select("*").eq("user_id",schedule.user_id).maybeSingle(),
+      supabaseAdmin.from("settings").select("*").eq("user_id",schedule.user_id).maybeSingle(),
+      supabaseAdmin.from("closet").select("*").eq("user_id",schedule.user_id).maybeSingle(),
+      supabaseAdmin.from("users").select("is_dev,is_pro,pending_deletion").eq("id",schedule.user_id).maybeSingle(),
+      getActiveAccounting(schedule.user_id),
     ]);
-    for (const result of [controlResult, settingsResult, closetResult, profileResult]) {
-      if (result.error) throw result.error;
+    if([controls,settings,closet,profile].some(result=>result.error) || !profile.data || profile.data.pending_deletion || controls.data?.banned_at || controls.data?.app_blocked && (!controls.data.app_blocked_until || Date.parse(controls.data.app_blocked_until)>Date.now())) throw new Error("Account unavailable.");
+    const isPro=accounting?accounting.plan==="pro":profile.data.is_pro===true;
+    const isDev=accounting?accounting.isDev:profile.data.is_dev===true;
+    const plan=isDev?"dev":accounting?.plan??(isPro?"pro":"free");
+    if(!accounting&&!isDev){
+      if(isPro&&await getCredits(schedule.user_id)<=0)throw new Error("Insufficient allowance.");
+      if(!isPro&&!(await canUseFeature(schedule.user_id,"ai_uses",isPro,isDev)).allowed)throw new Error("Insufficient allowance.");
     }
-    if (controlResult.data?.banned_at || (controlResult.data?.app_blocked && (!controlResult.data?.app_blocked_until || Date.parse(controlResult.data.app_blocked_until) > Date.now()))) throw new Error("Automatic recommendations are disabled for this account.");
-    const accounting = await getActiveAccounting(schedule.user_id);
-    const isPro = accounting ? accounting.plan === "pro" : profileResult.data?.is_pro === true;
-    const isDev = accounting ? accounting.isDev : profileResult.data?.is_dev === true;
-    if (!profileResult.data) throw new Error("Account unavailable.");
-    if (!accounting && !isDev) {
-      if (isPro && await getCredits(schedule.user_id) <= 0) throw new Error("Insufficient App Credits.");
-      if (!isPro && !(await canUseFeature(schedule.user_id, "ai_uses", isPro, isDev)).allowed) throw new Error("Daily AI limit reached.");
-    }
-
-    const generate = async () => {
-      const weather: WeatherData = await getWeather(schedule.latitude, schedule.longitude);
-      const recommendation: StyleRecommendation = await getStyleRecommendation({
-      weather,
-      closetItems: Array.isArray(closetResult.data?.items) ? closetResult.data.items : [],
-      unitPreference: schedule.unit_preference,
-      customSystemPrompt: isPro || isDev ? settingsResult.data?.custom_system_prompt ?? undefined : undefined,
-      clientCustomPrompt: isPro || isDev ? schedule.prompt ?? undefined : undefined,
-      forceCloset: false,
-      shareLocation: false,
-      isDev,
-      modelId: getDefaultModel(isPro, isDev).id,
-      });
-      return { weather, recommendation };
-    };
-    const { weather, recommendation } = accounting ? await withV6Usage({ userId: schedule.user_id,
-      purpose: "recommendation", requestId: scheduledUsageId(schedule.id, schedule.next_run_at),
-      validatedInput: { scheduleId: schedule.id, occurrence: schedule.next_run_at, latitude: schedule.latitude,
-        longitude: schedule.longitude, unit: schedule.unit_preference, prompt: isPro || isDev ? schedule.prompt : null } }, generate) : await generate();
-    if (!accounting && !isDev) {
-      if (isPro) { if (!await deductCredit(schedule.user_id)) throw new Error("Insufficient App Credits."); }
-      else if (!await incrementUsage(schedule.user_id, "ai_uses", isPro, isDev)) throw new Error("Daily AI limit reached.");
-    }
-
-    const completedAt = new Date().toISOString();
-    const nextRun = nextRunAt(schedule, new Date());
-    const [{ error: runUpdateError }, { error: scheduleUpdateError }] = await Promise.all([
-      supabaseAdmin
-        .from("automated_recommendation_runs")
-        .update({ status: "completed", weather, recommendation, completed_at: completedAt })
-        .eq("id", run.id),
-      supabaseAdmin
-        .from("automated_recommendation_schedules")
-        .update({
-          active: schedule.recurrence !== "once",
-          next_run_at: nextRun,
-          locked_at: null,
-          last_run_at: completedAt,
-          updated_at: completedAt,
-        })
-        .eq("id", schedule.id),
-    ]);
-    if (runUpdateError) throw runUpdateError;
-    if (scheduleUpdateError) throw scheduleUpdateError;
-    try { await addInboxMessage(
-      schedule.user_id,
-      "recommendation",
-      `Automatic recommendation ready: ${schedule.label}`,
-      recommendation.outfit,
-      { scheduleId: schedule.id, runId: run.id, weather, recommendation }
-    ); } catch { console.error("[automatic-recommendations] Completed run could not be copied to Inbox; it remains available in run history."); }
-    return { status: "completed" };
-  } catch (error) {
-    const safeMessages = ["Automatic recommendations are disabled for this account.", "Insufficient App Credits.", "Daily AI limit reached.", "Account unavailable."];
-    const message = error instanceof EntitlementError ? error.message : error instanceof Error && safeMessages.includes(error.message) ? error.message : "Automatic recommendation failed. Check your settings and try again.";
-    try {
-      await failRun(schedule, run.id, message);
-    } catch (persistError) {
-      console.error("[automatic-recommendations] Failed to persist job failure:", persistError);
-    }
-    return { status: "failed", error: message };
+    if(accounting)receipt=await reserveV6Usage({userId:schedule.user_id,purpose:"recommendation",requestId:occurrenceId,validatedInput:{scheduleId:schedule.id,occurrence:schedule.next_run_at}});
+    // Record receipt before external work so interrupted workers can release it.
+    const recorded=await supabaseAdmin.from("automated_recommendation_runs").update({usage_receipt:receipt,legacy_plan:plan}).eq("id",run.id).eq("lease_token",run.lease_token).eq("status","running").gt("lease_ends_at",new Date().toISOString()).select("id").single();
+    if(recorded.error||!recorded.data)throw new Error("Unable to record automatic request.");
+    const weather=await getWeather(schedule.latitude,schedule.longitude);
+    const wardrobeItems=Array.isArray(closet.data?.wardrobe_items)?closet.data.wardrobe_items:[];
+    const recommendation=await getStyleRecommendation({weather,closetItems:wardrobeItems.filter((item:{available:boolean})=>item.available).map((item:{label:string})=>item.label),wardrobeItems,structuredOutfit:true,
+      unitPreference:schedule.unit_preference,customSystemPrompt:isPro||isDev?settings.data?.custom_system_prompt??undefined:undefined,
+      clientCustomPrompt:isPro||isDev?schedule.prompt??undefined:undefined,recommendationContext:settings.data?.comfort_preferences?{comfort:parseComfort(settings.data.comfort_preferences)}:undefined,forceCloset:false,shareLocation:false,isDev,modelId:getScheduledModel(isPro,isDev).id});
+    stagingAttempted=true;
+    await runRpc("v63_stage_auto_result",{p_run_id:run.id,p_token:run.lease_token,p_weather:weather,p_recommendation:recommendation,p_receipt:receipt,p_legacy_plan:plan});
+    staged=true;
+    return await finish(true);
+  } catch(error) {
+    if(staged || stagingAttempted)return {status:"recovering"}; // Stored output is retried, never regenerated or charged twice.
+    const message=error instanceof EntitlementError?error.message:"Automatic recommendation failed. No completed result was charged. Please try again.";
+    if(receipt) { try { await settleV6Usage(receipt,false,0); } catch { return {status:"recovering"}; } }
+    try { return {...await finish(false,message),error:message}; } catch { return {status:"recovering"}; }
   }
 }
 
 export async function claimAndRunAutomaticRecommendations(maxJobs = 1) {
+  // Retry durable inbox copies first, independent of claiming new work.
+  const pending = await supabaseAdmin.from("automated_recommendation_runs").select("id").eq("delivery_pending",true).limit(25);
+  if(pending.error)throw new Error("Automatic delivery storage unavailable.");
+  for(const run of pending.data??[]) { try { await runRpc("v63_deliver_auto_run",{p_run_id:run.id}); } catch { /* Report pending delivery through diagnostics. */ } }
   const { data, error } = await supabaseAdmin.rpc("claim_due_automated_recommendation_schedules", { max_jobs: maxJobs });
   if (error) throw error;
   const schedules = (data ?? []) as AutomaticRecommendationSchedule[];
@@ -207,6 +129,7 @@ export async function claimAndRunAutomaticRecommendations(maxJobs = 1) {
   return {
     claimed: schedules.length,
     completed: results.filter((result) => result.status === "completed").length,
+    recovering: results.filter(result=>result.status==="recovering").length,
     failed: results.filter((result) => result.status === "failed").length,
   };
 }

@@ -82,3 +82,17 @@ curl "https://skystyle.app/api/v1/weather?lat=35.6762&lon=139.6503&unit=metric" 
   "retrieved_at": "2026-04-17T12:00:00.000Z"
 }
 ```
+
+## Unavailable measurements {#unavailable-measurements}
+
+::: info Development candidate
+The additive fields below are part of the 6.3 candidate and have not been deployed.
+:::
+
+The existing numeric weather fields remain compatible and use zero as their legacy fallback. The additive `measurements` object distinguishes unavailable observations with `null`; new integrations should read it rather than treating a fallback zero as an observed value.
+
+```json
+{"humidity_pct":70,"wind_speed_kmh":12,"rain_chance_pct":null,"rain_period":"unknown","uv_index":null}
+```
+
+`wind_speed_kmh` is always metric. `rain_period` is `hour`, `three-hours`, `day`, or `unknown`; probabilities for different periods are not averaged together. Missing values do not dilute another provider’s measurement. Provider requests have five-second deadlines and the collection has an eight-second deadline. This describes the development candidate, pending deployment.

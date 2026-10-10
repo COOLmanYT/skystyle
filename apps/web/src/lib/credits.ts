@@ -7,7 +7,8 @@
 import { supabaseAdmin } from "./supabase";
 import { getActiveAccounting, requireLegacyWriter } from "./accounting";
 
-export const DAILY_APP_CREDITS = 50;
+import { LEGACY_DAILY_APP_CREDITS as DAILY_APP_CREDITS } from "./legacy-allowances";
+export { LEGACY_DAILY_APP_CREDITS as DAILY_APP_CREDITS } from "./legacy-allowances";
 export const PRO_MONTHLY_MONEY_CREDIT_CENTS = 100;
 
 export interface CreditRecord {

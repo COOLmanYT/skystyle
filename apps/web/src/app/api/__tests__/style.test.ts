@@ -605,3 +605,16 @@ describe('Style API Route - Dev Mode', () => {
     authModule.auth = originalAuth;
   });
 });
+
+describe("6.3 usable-output charging",()=>{
+ it("does not charge unusable AI output",async()=>{
+  jest.requireMock('@/lib/ai').getStyleRecommendation.mockResolvedValueOnce({outfit:"",reasoning:"incomplete"});
+  expect((await POST(createMockNextRequest({lat:51.5,lon:-0.1}))).status).toBe(502);
+  expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
+  expect(jest.requireMock('@/lib/credits').deductCredit).not.toHaveBeenCalled(); });
+ it("returns an incomplete outfit without consuming allowance",async()=>{
+  jest.requireMock('@/lib/ai').getStyleRecommendation.mockResolvedValueOnce({...mockStyleRecommendation,chargeable:false});
+  expect((await POST(createMockNextRequest({lat:51.5,lon:-0.1}))).status).toBe(200);
+  expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
+  expect(jest.requireMock('@/lib/credits').deductCredit).not.toHaveBeenCalled(); });
+});

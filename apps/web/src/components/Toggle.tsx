@@ -84,18 +84,26 @@ export default function Toggle({
           display: inline-flex;
           align-items: center;
           width: 44px;
-          height: 26px;
+          height: 44px;
           border-radius: 13px;
           border: none;
           cursor: pointer;
-          background: var(--card-border);
+          background: transparent;
           transition: background 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                       box-shadow 0.22s cubic-bezier(0.25, 0.46, 0.45, 0.94);
           outline: none;
           -webkit-tap-highlight-color: transparent;
           flex-shrink: 0;
         }
-        .sky-toggle[aria-checked="true"] {
+        .sky-toggle::before {
+          content: "";
+          position: absolute;
+          inset: 9px 0;
+          border-radius: 13px;
+          background: var(--card-border);
+          transition: background 0.22s ease;
+        }
+        .sky-toggle[aria-checked="true"]::before {
           background: var(--toggle-accent, var(--accent));
         }
         .sky-toggle:focus-visible {
@@ -107,7 +115,7 @@ export default function Toggle({
         }
         .sky-toggle__thumb {
           position: absolute;
-          top: 3px;
+          top: 12px;
           left: 3px;
           width: 20px;
           height: 20px;

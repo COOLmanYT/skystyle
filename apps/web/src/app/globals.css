@@ -68,6 +68,14 @@ body {
   scroll-behavior: auto !important;
   transition-duration: 0.01ms !important;
 }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
 
 /* ── Weather effect card overlays ── */
 .weather-card {
@@ -523,4 +531,18 @@ textarea:focus-visible {
 /* Keep guided-tour spotlights below the shared sticky navigation. */
 [data-tour] {
   scroll-margin-top: 5.5rem;
+}
+
+/* Shared controls stay readable and usable on narrow touch screens. */
+.form-control { width: 100%; min-width: 0; max-width: 100%; min-height: 44px; border: 1px solid var(--card-border); border-radius: 0.75rem; padding: 0.625rem 0.75rem; background: var(--background); color: var(--foreground); }
+.control-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0.5rem 0.75rem; border-radius: 0.75rem; text-underline-offset: 3px; }
+.control-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.primary-button { background: var(--accent); color: white; }
+:is(.form-control, .control-button, .clothing-reference):focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.clothing-reference { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; overflow-wrap: anywhere; }
+.clothing-reference-owned { padding: 1px 4px; border-radius: 4px; background: color-mix(in srgb, var(--accent) 12%, transparent); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+:is(.closet-manager, .outfit-actions, .daily-controls, .byok-controls) { min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 1024px), (pointer: coarse) {
+  main :is(input:not([type=checkbox]):not([type=range]), select, textarea) { min-width: 0; max-width: 100%; min-height: 44px; font-size: 16px; }
+  main button, .btn-interact { min-height: 44px; }
 }

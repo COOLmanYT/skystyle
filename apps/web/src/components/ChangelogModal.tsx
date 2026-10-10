@@ -7,6 +7,7 @@ import { sanitizeUrl } from "@/lib/sanitize-url";
 
 export interface ChangelogModalEntry {
   version: string;
+  releaseStatus?: "development" | "released";
   title: string;
   description?: string;
   imageUrl?: string;
@@ -115,7 +116,7 @@ export default function ChangelogModal({ entry, onClose, showChangelogLink }: Pr
                 border: "1px solid var(--card-border)",
               }}
             >
-              v{entry.version}
+              v{entry.version}{entry.releaseStatus && <span className="ml-2 text-xs font-normal">{entry.releaseStatus==="development"?"In development · not deployed":"Released"}</span>}
             </span>
           </div>
 

@@ -1,4 +1,4 @@
-/** Approved V6 policy. These values are not a rollout/checkout switch. */
+/** Monthly accounting policy. These values are not a rollout/checkout switch. */
 export const V6_PLAN_RULES = {
   free: {
     monthlyPriceAudCents: 0, minimumTopUpAudCents: null, creditsPerAud: 50,
@@ -29,7 +29,6 @@ export const V6_API_COSTS = { api_recommend: 2, api_recweather: 3, api_weather: 
 export const V6_RESET_TIME_ZONE = "UTC";
 export const V6_FREE_MODEL_SWITCHES_DAILY = 2;
 export const V6_CHECKOUT_AVAILABLE = false;
-export const V6_ROLLOUT_NOTICE = "Approved V6 plans are not active yet. Your current account allowance remains in effect. Checkout and credit purchases are unavailable.";
 
 export function formatAudCents(cents: number): string {
   return `A$${(cents / 100).toFixed(cents % 100 === 0 ? 0 : 2)}`;

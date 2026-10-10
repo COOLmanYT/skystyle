@@ -4,6 +4,8 @@ import path from "path";
 const workspaceRoot = path.resolve(__dirname, "../..");
 
 const nextConfig: NextConfig = {
+  // Both loopback hostnames are used for local browser verification.
+  allowedDevOrigins: ["127.0.0.1"],
   // Enable React Compiler for automatic memoization
   reactCompiler: true,
   

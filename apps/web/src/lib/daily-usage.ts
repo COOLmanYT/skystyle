@@ -42,13 +42,8 @@ export interface DailyLimitsInfo {
   model_switches: DailyLimitCounter;
 }
 
-export const LIMITS = {
-  free: { ai_uses: 20, follow_ups: 40, closet_uses: 4, source_picks: 4, model_switches: 2 },
-  // demo plan: 10× the standard free limits for preview-environment testing
-  demo: { ai_uses: 200, follow_ups: 400, closet_uses: 40, source_picks: 40, model_switches: 20 },
-  pro: { ai_uses: Infinity, follow_ups: 400, closet_uses: Infinity, source_picks: Infinity, model_switches: Infinity },
-  dev: { ai_uses: Infinity, follow_ups: Infinity, closet_uses: Infinity, source_picks: Infinity, model_switches: Infinity },
-} as const;
+export { LEGACY_LIMITS as LIMITS } from "./legacy-allowances";
+import { LEGACY_LIMITS as LIMITS } from "./legacy-allowances";
 
 type UsageField = "ai_uses" | "follow_ups" | "closet_uses" | "source_picks" | "model_switches";
 

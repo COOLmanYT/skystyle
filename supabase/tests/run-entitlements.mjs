@@ -7,6 +7,7 @@ import { join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { createServer } from 'node:net';
 import { randomUUID, createHash } from 'node:crypto';
+import { runV63Scenarios } from './v63-scenarios.mjs';
 const binIndex = process.argv.indexOf('--pg-bin');
 assert(binIndex > 0 && process.argv[binIndex + 1], 'Provide --pg-bin; no remote database URL is supported');
 const bin = resolve(process.argv[binIndex + 1]);
@@ -45,7 +46,7 @@ const base = await readFile(new URL('./isolated-base.sql',import.meta.url),'utf8
 const foundation = await readFile(new URL('../migrations/20260928221124_v6_entitlement_foundation.sql',import.meta.url),'utf8');
 assert.equal(createHash('sha256').update(foundation).digest('hex').toUpperCase(),'2E5EA8B6DC0223AF895A418CA6CDB79B6C9B4AE910EF3F1941EC0586E2A8B998','Frozen approved SQL must remain unchanged');
 try {
-  await run(exe('initdb'), ['-D',join(cluster,'data'),'-U','postgres','-A','trust','--no-locale','-E','UTF8']);
+  await run(exe('initdb'), ['-D',join(cluster,'data'),'-U','postgres','-A','trust','--no-locale','-E','UTF8'], '', 180000);
   started=true; // Also clean up if pg_ctl starts the server but loses its reply.
   await run(exe('pg_ctl'), ['start','-D',join(cluster,'data'),'-l',join(cluster,'server.log'),'-o',`-h 127.0.0.1 -p ${port}`,'-w','-t','30']);
   await sql('CREATE DATABASE skystyle_v6_isolated;'); database='skystyle_v6_isolated';
@@ -126,6 +127,7 @@ try {
     await sql('UPDATE public.v6_entitlement_rollout SET enabled=false;');
     await sql(await readFile(new URL('./v6-entitlements-regression.sql',import.meta.url),'utf8'));
   });
+  if (process.argv.includes('--v63')) await runV63Scenarios({sql,value,rpc,account,parallel,check,reserve});
   // Clock injection is TEST ONLY in a second disposable database. The frozen
   // migration above remains byte-identical. Do not call this production QA.
   database='postgres'; await sql('CREATE DATABASE skystyle_v6_clock_test;'); database='skystyle_v6_clock_test';

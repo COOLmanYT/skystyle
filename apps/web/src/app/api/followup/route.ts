@@ -1,3 +1,4 @@
+import { readWardrobe } from "@/lib/wardrobe-server";
 export const dynamic = "force-dynamic";
 /**
  * POST /api/followup
@@ -9,13 +10,14 @@ export const dynamic = "force-dynamic";
  * Free: 10/day, Pro: 100/day.
  */
 
+import { requireUsableRecommendation } from "@/lib/recommendation-validation";
 import { NextRequest, NextResponse } from "next/server";
 import { auth, DEMO_USER_ID } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getFollowUpRecommendation, ModelID, getDefaultModel, getModelById, isModelAvailable, BYOK_PROVIDERS, type ByokProvider } from "@/lib/ai";
 import { canUseFeature, incrementUsage, getDailyLimitsInfo } from "@/lib/daily-usage";
 import { syncPublicUser } from "@/lib/sync-user";
-import { matchEventForecast, parseRecommendationContext } from "@/lib/recommendation-context";
+import { matchEventForecast, matchWindowForecast, parseRecommendationContext } from "@/lib/recommendation-context";
 import type { WeatherData } from "@/lib/weather";
 import { getActiveAccounting, accountingRequest } from "@/lib/accounting";
 import { EntitlementError, withV6Usage } from "@/lib/entitlements";
@@ -42,6 +44,8 @@ export async function POST(req: NextRequest) {
     modelId?: string;
     recommendationContext?: unknown;
     useCredits?: unknown;
+    structuredOutfit?: boolean;
+    forceCloset?: boolean;
   };
   try {
     body = await req.json();
@@ -132,11 +136,12 @@ export async function POST(req: NextRequest) {
           { status: 429 }
         );
       }
-      // Deduct model switch
-      await incrementUsage(userId, "model_switches", isPro, isDev, isDemo);
+
     }
     
-    const generate = () => getFollowUpRecommendation({
+    const wardrobeItems = body.structuredOutfit || body.forceCloset ? isDemo ? [] : (await readWardrobe(userId)).wardrobeItems : undefined;
+    const generate = async () => requireUsableRecommendation(await getFollowUpRecommendation({
+      wardrobeItems, structuredOutfit: body.structuredOutfit === true, forceCloset: body.forceCloset === true,
       closetItems,
       previousOutfit: String(previousOutfit),
       previousReasoning: String(previousReasoning ?? ""),
@@ -150,19 +155,22 @@ export async function POST(req: NextRequest) {
       recommendationContext,
       eventForecast,
       modelId: accounting ? (modelId as ModelID | undefined) ?? getDefaultModel(isPro, isDev).id : modelId as ModelID | undefined,
-    });
+    }));
     recommendation = accounting ? await withV6Usage({ userId, purpose: "followup", ...requestAccounting,
-      modelSwitch: isModelSwitch, validatedInput: { message: message.trim(), previousOutfit, previousReasoning, weather, modelId, recommendationContext } }, generate) : await generate();
+      modelSwitch: isModelSwitch, validatedInput: { message: message.trim(), previousOutfit, previousReasoning, weather, modelId, recommendationContext } }, generate, { shouldCharge: result => result.chargeable !== false }) : await generate();
   } catch (err) {
     const msg = err instanceof Error ? err.message : "AI request failed";
     return NextResponse.json({ error: msg }, { status: err instanceof EntitlementError ? err.status : 502 });
   }
 
   // Increment follow-up usage (devs bypass)
-  if (!accounting && !isDev) {
+  if (recommendation.chargeable !== false && !accounting && !isDev) {
     await incrementUsage(userId, "follow_ups", isPro, isDev, isDemo);
   }
 
+  if (recommendation.chargeable !== false && !accounting && !isPro && !isDev && !isDemo && modelId && modelId !== getDefaultModel(isPro, isDev).id) {
+    await incrementUsage(userId, "model_switches", isPro, isDev, isDemo);
+  }
   const dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev, isDemo);
 
   return NextResponse.json({
@@ -173,6 +181,7 @@ export async function POST(req: NextRequest) {
       dailyLimits,
       recommendationContext,
       eventForecastStatus: eventForecast.status,
+      windowForecastStatus: matchWindowForecast(typedWeather.hourly,recommendationContext?.window).status,
     },
   });
 }

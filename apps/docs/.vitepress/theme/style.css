@@ -144,3 +144,21 @@ body {
 .VPFooter {
   border-top: 1px solid var(--skys-docs-border);
 }
+
+/* The full navigation is wider than tablets; retain the accessible menu there. */
+@media (min-width: 768px) and (max-width: 1099px) {
+  .VPNavBar .VPNavBarMenu,
+  .VPNavBar .VPNavBarAppearance,
+  .VPNavBar .VPNavBarSocialLinks,
+  .VPNavBar .VPNavBarExtra { display: none; }
+  .VPNavBar .VPNavBarHamburger { display: flex; }
+  .VPNav .VPNavScreen { display: block; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

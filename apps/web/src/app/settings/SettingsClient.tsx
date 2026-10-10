@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import Toggle from "@/components/Toggle";
 import Checkbox from "@/components/Checkbox";
@@ -9,6 +9,8 @@ import StyleFeedbackPanel from "@/components/StyleFeedbackPanel";
 import useDashboardSections from "@/components/useDashboardSections";
 import { DASHBOARD_SECTION_OPTIONS, type DashboardSections } from "@/lib/dashboard-sections";
 import { handleSignOut } from "@/app/actions";
+import { DEMO_USER_ID } from "@/lib/demo";
+import { decodeGenderPreference, decodePreferenceText, encodePreferenceText, saveSettingsPreferences } from "@/lib/browser-preferences";
 
 const MAX_GENDER_LENGTH = 30;
 
@@ -42,30 +44,19 @@ interface SettingsClientProps {
   canAccessDev?: boolean;
 }
 
-export default function SettingsClient({ initialUnitPreference, userId, canAccessDev = false }: SettingsClientProps) {
+const subscribeToHydration = () => () => {};
+export default function SettingsClient(props: SettingsClientProps) {
+  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
+  if (!hydrated) return <main id="main-content" className="mx-auto max-w-2xl px-4 py-8"><p role="status">Loading settings…</p></main>;
+  return <BrowserSettingsClient {...props} />;
+}
+
+function BrowserSettingsClient({ initialUnitPreference, userId, canAccessDev = false }: SettingsClientProps) {
   const { mode: sections, setMode: setSections } = useDashboardSections(userId);
   const [sectionMessage, setSectionMessage] = useState("");
-  const [gender, setGender] = useState<string>(() => {
-    const stored = getLocalStorage("skystyle_gender", "N/A");
-    if (!stored) return "N/A";
-    try {
-      // Decode stored gender; fall back to raw value if decoding fails
-      return atob(stored);
-    } catch {
-      return stored;
-    }
-  });
-  const [customGender, setCustomGender] = useState<string>(() => {
-    const stored = getLocalStorage("skystyle_custom_gender", "");
-    if (!stored) return "";
-    try {
-      // Decode stored custom gender; fall back to raw value if decoding fails
-      return atob(stored);
-    } catch {
-      return stored;
-    }
-  });
-  const [unitPreference, setUnitPreference] = useState<"metric" | "imperial">(initialUnitPreference);
+  const [gender, setGender] = useState<string>(() => decodeGenderPreference(getLocalStorage("skystyle_gender", "")));
+  const [customGender, setCustomGender] = useState<string>(() => decodePreferenceText(getLocalStorage("skystyle_custom_gender", "")).slice(0, MAX_GENDER_LENGTH));
+  const [unitPreference, setUnitPreference] = useState<"metric" | "imperial">(() => userId === DEMO_USER_ID && getLocalStorage("skystyle_demo_units", "metric") === "imperial" ? "imperial" : initialUnitPreference);
   const [themeMode, setThemeMode] = useState<ThemeMode>(
     () => (getLocalStorage("skystyle_theme_mode", "system") as ThemeMode)
   );
@@ -123,6 +114,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
   const settingsExtraSpacing = extraSpacing && extraSpacingPages.includes("settings");
 
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   // Reflect extra-spacing toggles instantly (before saving) so user sees live preview
 
@@ -144,57 +136,46 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
 
   function saveToLocalStorage() {
     // localStorage is used intentionally for client-side UI preferences (theme,
-    // layout, spacing). Gender preference and BYOK API keys are also stored
-    // client-side only — never sent to Sky Style servers except when required
-    // for AI requests.
+    // layout, spacing). Gender context stays local until an AI request needs it.
+    localStorage.setItem("skystyle_theme_mode", themeMode);
+    localStorage.setItem("skystyle_reduce_motion", String(reduceMotion));
+    localStorage.setItem("skystyle_location_consent", String(shareLocation));
+    localStorage.setItem("skystyle_weather_only", String(weatherOnly));
+    localStorage.setItem("skystyle_simple_mode", String(defaultSimpleMode));
+    localStorage.setItem("skystyle_layout_mode", layoutMode);
+    localStorage.setItem("skystyle_extra_spacing", String(extraSpacing));
+    localStorage.setItem("skystyle_extra_spacing_pages", extraSpacingPages.join(","));
+    localStorage.setItem("skystyle_custom_spacing", String(customSpacing));
+    localStorage.setItem("skystyle_weather_planning", weatherPlanningVisibility);
+    localStorage.setItem("skystyle_followup_mode", followUpMode);
+    localStorage.setItem("skystyle_show_diagnostics", String(showDiagnostics));
+    localStorage.setItem("skystyle_byok_open", String(byokOpenDefault));
+    // Update planning panel default complexity (merge into existing panel state)
+    const existing = localStorage.getItem("skystyle_planning_panel");
+    let panelState: Record<string, unknown> = {};
     try {
-      localStorage.setItem("skystyle_theme_mode", themeMode);
-      localStorage.setItem("skystyle_reduce_motion", String(reduceMotion));
-      localStorage.setItem("skystyle_location_consent", String(shareLocation));
-      localStorage.setItem("skystyle_weather_only", String(weatherOnly));
-      localStorage.setItem("skystyle_simple_mode", String(defaultSimpleMode));
-      localStorage.setItem("skystyle_layout_mode", layoutMode);
-      localStorage.setItem("skystyle_extra_spacing", String(extraSpacing));
-      localStorage.setItem("skystyle_extra_spacing_pages", extraSpacingPages.join(","));
-      localStorage.setItem("skystyle_custom_spacing", String(customSpacing));
-      localStorage.setItem("skystyle_weather_planning", weatherPlanningVisibility);
-      localStorage.setItem("skystyle_followup_mode", followUpMode);
-      localStorage.setItem("skystyle_show_diagnostics", String(showDiagnostics));
-      localStorage.setItem("skystyle_byok_open", String(byokOpenDefault));
-      // Update planning panel default complexity (merge into existing panel state)
-      try {
-        const existing = localStorage.getItem("skystyle_planning_panel");
-        const panelState = existing ? JSON.parse(existing) : {};
-        panelState.complexity = defaultComplexity;
-        localStorage.setItem("skystyle_planning_panel", JSON.stringify(panelState));
-      } catch { /* ignore */ }
-      try {
-        // Encode gender before storing
-        localStorage.setItem("skystyle_gender", btoa(gender));
-      } catch {
-        /* ignore encoding errors */
-      }
-      try {
-        // Encode custom gender before storing
-        localStorage.setItem("skystyle_custom_gender", btoa(customGender));
-      } catch {
-        /* ignore encoding errors */
-      }
-      window.dispatchEvent(new Event("skystyle-preferences-updated"));
-    } catch { /* ignore */ }
+      const parsed = existing ? JSON.parse(existing) : {};
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) panelState = parsed;
+    } catch { /* Replace malformed panel state. */ }
+    panelState.complexity = defaultComplexity;
+    localStorage.setItem("skystyle_planning_panel", JSON.stringify(panelState));
+    localStorage.setItem("skystyle_gender", encodePreferenceText(gender));
+    localStorage.setItem("skystyle_custom_gender", encodePreferenceText(customGender));
+    if (userId === DEMO_USER_ID) localStorage.setItem("skystyle_demo_units", unitPreference);
+    window.dispatchEvent(new Event("skystyle-preferences-updated"));
   }
 
   async function handleSave() {
-    saveToLocalStorage();
+    setSaving(true); setSavedMessage(null);
     try {
-      await fetch("/api/settings", {
+      const result = await saveSettingsPreferences(saveToLocalStorage, userId === DEMO_USER_ID ? undefined : async () => (await fetch("/api/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ unit_preference: unitPreference }),
-      });
-    } catch { /* ignore */ }
-    setSavedMessage("Settings saved!");
-    setTimeout(() => setSavedMessage(null), 2500);
+        signal: AbortSignal.timeout(8000),
+      })).ok);
+      setSavedMessage(result.message);
+    } finally { setSaving(false); }
   }
 
   const layoutIndex = LAYOUT_OPTIONS.findIndex((o) => o.value === layoutMode);
@@ -208,10 +189,11 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
         rightContent={
           <button
             onClick={handleSave}
+            disabled={saving}
             className="rounded-xl px-4 py-2 text-sm font-medium btn-interact"
             style={{ background: "var(--accent)", color: "#fff" }}
           >
-            Save
+            {saving ? "Saving…" : "Save"}
           </button>
         }
       />
@@ -219,7 +201,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
       {/* Content */}
       <main id="main-content">
       <aside className="hidden 2xl:block fixed left-6 top-24 w-40" aria-label="Settings sections">
-        <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>On this page</p>
+        <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.65 }}>On this page</p>
         <nav className="space-y-1 text-xs"><a href="#settings-profile" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Profile</a><a href="#settings-appearance" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Appearance</a><a href="#settings-preferences" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Preferences</a><a href="#settings-dashboard" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Dashboard</a><a href="#settings-spacing" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Layout & spacing</a><a href="#settings-tutorials" className="block py-1 hover:underline" style={{ color: "var(--foreground)", opacity: 0.65 }}>Tutorials</a></nav>
       </aside>
       <div
@@ -235,12 +217,12 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
             aria-live="polite"
             className="rounded-2xl p-4 text-sm text-center font-medium"
             style={{
-              background: "#34c75915",
-              border: "1px solid #34c75940",
-              color: "#34c759",
+              background: "var(--card)",
+              border: "1px solid var(--card-border)",
+              color: "var(--foreground)",
             }}
           >
-            <span aria-hidden="true">✅ </span>{savedMessage}
+            {savedMessage}
           </div>
         )}
 
@@ -249,7 +231,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           className="rounded-2xl p-5 space-y-3"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
-          <p id="settings-gender-label" className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <p id="settings-gender-label" className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.65 }}>
             Gender (for outfit recommendations)
           </p>
           <div className="flex flex-wrap gap-2" role="group" aria-labelledby="settings-gender-label">
@@ -291,7 +273,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           className="rounded-2xl p-5 space-y-3"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
-          <p id="settings-units-label" className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <p id="settings-units-label" className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.65 }}>
             Units
           </p>
           <div className="flex gap-2" role="group" aria-labelledby="settings-units-label">
@@ -318,7 +300,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           className="rounded-2xl p-5 space-y-3"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
-          <p id="settings-appearance-label" className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <p id="settings-appearance-label" className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: "var(--foreground)", opacity: 0.65 }}>
             Appearance
           </p>
           <div className="flex gap-2" role="group" aria-labelledby="settings-appearance-label">
@@ -351,7 +333,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           className="rounded-2xl p-5 space-y-4"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.65 }}>
             Preferences
           </p>
           <Checkbox
@@ -378,7 +360,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           className="rounded-2xl p-5 space-y-5"
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.65 }}>
             Dashboard Behaviour
           </p>
 
@@ -389,7 +371,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
               className="mt-2 w-full rounded-xl border p-3" style={{ background: "var(--background)", borderColor: "var(--card-border)" }}>
               {DASHBOARD_SECTION_OPTIONS.map((option) => <option key={option} value={option}>{option === "both" ? "Style and Shop" : `${option === "style" ? "Style" : "Shop"} only`}</option>)}
             </select>
-            <p className="mt-2 text-xs opacity-60">Updates the bar and sidebar immediately. Stored on this device, not synced to other browsers.</p>
+            <p className="mt-2 text-xs opacity-70">Updates the bar and sidebar immediately. Stored on this device, not synced to other browsers.</p>
             {sectionMessage && <p role="status" className="mt-2 text-xs">{sectionMessage}</p>}
           </div>
           {/* Weather Planning visibility */}
@@ -490,10 +472,10 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.65 }}>
               Dashboard Layout
             </p>
-            <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.5 }}>
+            <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.65 }}>
               Controls how the dashboard splits the weather and settings panels.
             </p>
           </div>
@@ -511,7 +493,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
               style={{ accentColor: "var(--accent)" }}
             />
             {/* Labels below slider */}
-            <div className="flex justify-between text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>
+            <div className="flex justify-between text-xs" style={{ color: "var(--foreground)", opacity: 0.65 }}>
               {LAYOUT_OPTIONS.map((o) => (
                 <span
                   key={o.value}
@@ -552,7 +534,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
               }}
             />
           </div>
-          <div className="flex text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+          <div className="flex text-xs" style={{ color: "var(--foreground)", opacity: 0.65 }}>
             <span style={{ flex: layoutMode === "symmetric" ? 1 : layoutMode === "large-weather" ? 1.5 : 1 }} className="text-center">Weather</span>
             <span style={{ flex: layoutMode === "symmetric" ? 1 : layoutMode === "large-settings" ? 1.5 : 1 }} className="text-center">Settings</span>
           </div>
@@ -572,7 +554,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
 
           {extraSpacing && (
             <div className="space-y-2 pt-1">
-              <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>Apply to pages:</p>
+              <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.65 }}>Apply to pages:</p>
               {(["dashboard", "account", "settings", "closet", "feedback", "inbox", "automatic-recommendations"] as const).map((page) => (
                 <Checkbox
                   key={page}
@@ -586,7 +568,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
         </div>
 
         <div id="settings-tutorials" className="rounded-2xl p-5 space-y-3" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
-          <div><p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>Tutorials</p><p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>Replay any guided tour whenever you need a refresher.</p></div>
+          <div><p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.65 }}>Tutorials</p><p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.45 }}>Replay any guided tour whenever you need a refresher.</p></div>
           <div className="flex flex-wrap gap-2">{[["dashboard", "first-use", "/dashboard"], ["api-dashboard", "API Dashboard", "/dashboard/api"], ["dev-dashboard", "Dev Dashboard", "/dev"] as const].filter(([id]) => id !== "dev-dashboard" || canAccessDev).map(([id, label, destination]) => <button key={id} onClick={() => replayTutorial(id as "dashboard" | "api-dashboard" | "dev-dashboard", destination)} className="rounded-xl px-3 py-2 text-xs font-medium btn-interact" style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}>Replay {label} tour</button>)}</div>
         </div>
 
@@ -614,7 +596,7 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
           <div className="flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.65 }}>
               Changelog
             </p>
             <Link
@@ -634,10 +616,10 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
         >
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.65 }}>
               Feedback
             </p>
-            <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.5 }}>
+            <p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.65 }}>
               Share a bug report, a suggestion, or just say hello — every message is read personally.
             </p>
           </div>
@@ -654,11 +636,11 @@ export default function SettingsClient({ initialUnitPreference, userId, canAcces
           </Link>
         </div>
 
-        <p className="text-xs text-center" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+        <p className="text-xs text-center" style={{ color: "var(--foreground)", opacity: 0.65 }}>
           These settings apply to your outfit recommendations on the dashboard.
         </p>
         {/* Quick links to security/privacy */}
-        <div className="flex items-center justify-center gap-4 text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
+        <div className="flex items-center justify-center gap-4 text-xs" style={{ color: "var(--foreground)", opacity: 0.65 }}>
           <Link href="/settings/security" className="underline hover:opacity-70">Security</Link>
           <Link href="/settings/privacy" className="underline hover:opacity-70">Privacy Hub</Link>
           <Link href="/account" className="underline hover:opacity-70">Account</Link>

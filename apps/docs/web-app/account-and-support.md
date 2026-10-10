@@ -48,7 +48,7 @@ The **Inbox** keeps recommendation, support, system, and changelog notices toget
 
 ## Changelog {#changelog}
 
-The **Changelog** page (`/changelog`) lists every published release. Entries can include:
+The **Changelog** page (`/changelog`) lists published announcements. Development entries carry a separate label; they do not establish that features are deployed. Entries can include:
 
 - A version number, title, and short description.
 - Extended Markdown content with inline images.

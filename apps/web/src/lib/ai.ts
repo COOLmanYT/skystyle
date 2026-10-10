@@ -1,3 +1,9 @@
+import { MODEL_PRIORITIES, ANTHROPIC_BYOK_MODEL, getModelById, type ModelConfig, type ModelProvider, type ByokProvider, type ModelID } from "./ai-models";
+export * from "./ai-models";
+import { parseOutfitDetails, ownedRecommendation, type OutfitDetails } from "./outfits";
+import { displayMeasurement } from "./weather-measurements";
+import type { WardrobeItem } from "./wardrobe";
+import { requireUsableRecommendation } from "./recommendation-validation";
 /**
  * AI styling logic.
  * Builds a prompt from weather data + closet items, then calls the configured AI API.
@@ -6,8 +12,8 @@
  * Supports BYOK (Bring Your Own Key) for Pro users.
  * 
  * Model Priority:
- * Pro: OpenAI -> Gemini -> Mistral Large -> Gemma -> Mistral Small -> Ministral
- * Free: Gemini -> Mistral Small -> Gemma -> Ministral
+ * Pro: OpenAI -> Gemini/Gemma -> Mistral Large -> Mistral Small -> Ministral
+ * Free: Gemini -> Mistral Small -> Ministral -> Gemma
  */
 
 import OpenAI from "openai";
@@ -21,42 +27,8 @@ import {
   formatEventLocalTime,
   formatRecommendationContext,
   selectFutureHourlyForecast,
+  matchWindowForecast,
 } from "./recommendation-context";
-
-// Model definitions and priorities
-export const MODEL_PRIORITIES = {
-  pro: [
-    // OpenAI models
-    { id: "gpt-4o", provider: "openai" as const, name: "GPT-4o" },
-    { id: "gpt-4o-mini", provider: "openai" as const, name: "GPT-4o Mini" },
-    // Gemini models
-    { id: "gemini-2.5-flash", provider: "gemini" as const, name: "Gemini 2.5 Flash" },
-    { id: "gemini-2.5-flash-lite", provider: "gemini" as const, name: "Gemini 2.5 Flash Lite" },
-    { id: "gemma-4-31b-it", provider: "gemini" as const, name: "Gemma 4 31B" },
-    { id: "gemma-4-26b-it", provider: "gemini" as const, name: "Gemma 4 26B" },
-    // Mistral models
-    { id: "mistral-large-latest", provider: "mistral" as const, name: "Mistral Large" },
-    { id: "mistral-small-latest", provider: "mistral" as const, name: "Mistral Small" },
-    { id: "ministral-8b-latest", provider: "mistral" as const, name: "Ministral 8B" },
-  ],
-  free: [
-    // Gemini models (free tier available)
-    { id: "gemini-2.5-flash", provider: "gemini" as const, name: "Gemini 2.5 Flash" },
-    { id: "gemini-2.5-flash-lite", provider: "gemini" as const, name: "Gemini 2.5 Flash Lite" },
-    // Mistral models (free tier available)
-    { id: "mistral-small-latest", provider: "mistral" as const, name: "Mistral Small" },
-    { id: "ministral-8b-latest", provider: "mistral" as const, name: "Ministral 8B" },
-    { id: "gemma-4-26b-it", provider: "gemini" as const, name: "Gemma 4 26B" },
-  ],
-} as const;
-
-// Extract model ID type from the priorities
-export type ModelConfig = (typeof MODEL_PRIORITIES)[keyof typeof MODEL_PRIORITIES][number];
-export type ModelProvider = ModelConfig["provider"];
-export type ByokProvider = ModelProvider | "anthropic";
-export const BYOK_PROVIDERS = ["openai", "gemini", "mistral", "anthropic"] as const;
-export const ANTHROPIC_BYOK_MODEL = "claude-haiku-4-5-20251001";
-export type ModelID = ModelConfig["id"];
 
 // Singleton instances for server-side clients
 let _openai: OpenAI | null = null;
@@ -148,11 +120,10 @@ function enforceStrictJsonOnly(raw: string): string {
 }
 
 /** Apply lead-in sanitization across recommendation fields before returning to clients. */
-function sanitizeRecommendationFields(recommendation: StyleRecommendation): StyleRecommendation {
+function sanitizeRecommendationFields(recommendation: StyleRecommendation, validate = true): StyleRecommendation {
   return {
     ...recommendation,
-    outfit: stripForbiddenJsonLeadIn(recommendation.outfit),
-    reasoning: stripForbiddenJsonLeadIn(recommendation.reasoning),
+    ...(validate ? requireUsableRecommendation({outfit:stripForbiddenJsonLeadIn(recommendation.outfit),reasoning:stripForbiddenJsonLeadIn(recommendation.reasoning)}) : {outfit:stripForbiddenJsonLeadIn(recommendation.outfit),reasoning:stripForbiddenJsonLeadIn(recommendation.reasoning)}),
     ...(recommendation.rawOutput ? { rawOutput: enforceStrictJsonOnly(recommendation.rawOutput) } : {}),
   };
 }
@@ -175,6 +146,8 @@ export interface PlanningData {
 export interface StyleInput {
   weather: WeatherData;
   closetItems: string[];
+  wardrobeItems?: WardrobeItem[];
+  structuredOutfit?: boolean;
   unitPreference: "metric" | "imperial";
   customSystemPrompt?: string;
   /** Pro BYOK: user-provided AI API key (not saved, used for this request only) */
@@ -205,6 +178,9 @@ export interface StyleInput {
 
 export interface FollowUpInput {
   closetItems?: string[];
+  wardrobeItems?: WardrobeItem[];
+  structuredOutfit?: boolean;
+  forceCloset?: boolean;
   previousOutfit: string;
   previousReasoning: string;
   weather: WeatherData;
@@ -222,6 +198,8 @@ export interface FollowUpInput {
 }
 
 export interface StyleRecommendation {
+  details?: OutfitDetails;
+  chargeable?: boolean;
   outfit: string;
   reasoning: string;
   /** Raw AI output — only included for dev mode users */
@@ -230,43 +208,6 @@ export interface StyleRecommendation {
   closetWarning?: string;
   /** AI model used for this response */
   modelUsed?: string;
-}
-
-/** Get available models for a user based on their plan */
-export function getAvailableModels(isPro: boolean, isDev: boolean, hasByok: boolean): readonly ModelConfig[] {
-  const tier = isDev ? "pro" : (isPro ? "pro" : "free");
-  const models = MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES];
-  void hasByok;
-  return models;
-}
-
-/** Get all models (including unavailable ones) for display purposes */
-export function getAllModels(): ModelConfig[] {
-  return [...MODEL_PRIORITIES.pro, ...MODEL_PRIORITIES.free].filter(
-    (model, index, all) => all.findIndex((candidate) => candidate.id === model.id) === index
-  );
-}
-
-/** Check if a model is available for a user's plan */
-export function isModelAvailable(modelId: ModelID, isPro: boolean, isDev: boolean): boolean {
-  const tier = isDev ? "pro" : (isPro ? "pro" : "free");
-  const availableModels = MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES];
-  return availableModels.some(m => m.id === modelId);
-}
-
-/** Get the default model for a user's plan */
-export function getDefaultModel(isPro: boolean, isDev: boolean): ModelConfig {
-  const tier = isDev ? "pro" : (isPro ? "pro" : "free");
-  return MODEL_PRIORITIES[tier as keyof typeof MODEL_PRIORITIES][0];
-}
-
-/** Get model by ID */
-export function getModelById(modelId: ModelID): ModelConfig | null {
-  for (const tier of ["pro", "free"] as const) {
-    const model = MODEL_PRIORITIES[tier].find(m => m.id === modelId);
-    if (model) return model;
-  }
-  return null;
 }
 
 /** Retry a provider response that hit its output limit with enough room to finish its JSON. */
@@ -280,60 +221,6 @@ function geminiResponseWasTruncated(response: {
   return response.candidates?.some(
     (candidate) => candidate.finishReason === "MAX_TOKENS"
   ) ?? false;
-}
-
-function decodeJsonLikeString(value: string): string {
-  const decodedParts: string[] = [];
-  for (let i = 0; i < value.length; i++) {
-    const char = value[i];
-    if (char !== "\\") {
-      decodedParts.push(char);
-      continue;
-    }
-    const next = value[i + 1];
-    if (next === undefined) break;
-    i++;
-    if (next === "n") decodedParts.push("\n");
-    else if (next === "r") decodedParts.push("\r");
-    else if (next === "t") decodedParts.push("\t");
-    else if (next === '"') decodedParts.push('"');
-    else if (next === "\\") decodedParts.push("\\");
-    else decodedParts.push(next);
-  }
-  return decodedParts.join("");
-}
-
-function extractJsonField(text: string, key: "outfit" | "reasoning"): string | null {
-  const keyIndex = text.indexOf(`"${key}"`);
-  if (keyIndex === -1) return null;
-  const colonIndex = text.indexOf(":", keyIndex);
-  if (colonIndex === -1) return null;
-  let start = colonIndex + 1;
-  while (start < text.length && /\s/.test(text[start])) {
-    start++;
-  }
-  if (text[start] !== '"') return null;
-  start++;
-  let escaped = false;
-  const valueParts: string[] = [];
-  for (let i = start; i < text.length; i++) {
-    const char = text[i];
-    if (escaped) {
-      valueParts.push(`\\${char}`);
-      escaped = false;
-      continue;
-    }
-    if (char === "\\") {
-      escaped = true;
-      continue;
-    }
-    if (char === '"') {
-      return decodeJsonLikeString(valueParts.join(""));
-    }
-    valueParts.push(char);
-  }
-  const decoded = decodeJsonLikeString(valueParts.join(""));
-  return decoded.trim() ? decoded : null;
 }
 
 function extractFirstJsonObject(text: string): string | null {
@@ -453,7 +340,8 @@ function formatTemp(celsius: number, unit: "metric" | "imperial"): string {
   return `${celsius}°C`;
 }
 
-function formatWind(kmh: number, unit: "metric" | "imperial"): string {
+function formatWind(kmh: number | null, unit: "metric" | "imperial"): string {
+  if (kmh === null) return "unavailable";
   if (unit === "imperial") {
     const mph = Math.round(kmh * 0.621371);
     return `${mph} mph`;
@@ -671,21 +559,21 @@ export async function getStyleRecommendation(
   let closetWarning: string | undefined;
   if (forceCloset) {
     if (closetItems.length === 0) {
-      closetWarning = "You have no closet items yet — recommendations will be general clothing.";
+      closetWarning = "Your wardrobe is empty. Add items to build an owned-only outfit.";
     } else if (closetItems.length === 1) {
-      closetWarning = "You have fewer than 2 closet items — recommendations may include items outside your wardrobe.";
+      closetWarning = "Your wardrobe may need more pieces for a complete outfit.";
     }
   }
 
   // Client-side custom prompt takes precedence over DB-stored one (Pro/Dev only)
-  const systemPrompt = (clientCustomPrompt ?? customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT) + recommendationLinkInstructions(closetItems);
+  const systemPrompt = (clientCustomPrompt ?? customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT) + recommendationLinkInstructions(closetItems, input.wardrobeItems) + structuredInstructions(input.wardrobeItems, input.structuredOutfit || forceCloset);
 
   const closetSection =
     closetItems.length > 0
       ? forceCloset
         ? `\nCRITICAL INSTRUCTION: You MUST build the entire outfit EXCLUSIVELY from the items listed below. Do NOT suggest, imply, or reference ANY clothing item not explicitly in this list. If the available items are insufficient for a complete outfit, explicitly tell the user which items are missing rather than inventing new ones. Violating this instruction is not acceptable under any circumstances.\nUser's available wardrobe:\n${closetItems.map((i) => `- ${i}`).join("\n")}`
         : `\nUser's available wardrobe (you may also suggest items not listed here):\n${closetItems.map((i) => `- ${i}`).join("\n")}`
-      : "\nUser has not added any wardrobe items — suggest general clothing.";
+      : forceCloset ? "\nThe available wardrobe is empty. Return no clothing slots and explain the wardrobe gap. Do not invent owned items." : "\nUser has not added any wardrobe items — suggest general clothing.";
 
   const alertSection =
     weather.alerts.length > 0
@@ -698,19 +586,21 @@ export async function getStyleRecommendation(
     sourcesSection = `\n\nWeather data from multiple sources:\n${weather.sources
       .map(
         (s) =>
-          `- ${s.source}: ${formatTemp(s.temp, unitPreference)}, feels like ${formatTemp(s.feelsLike, unitPreference)}, humidity ${s.humidity}%, wind ${formatWind(s.windSpeed, unitPreference)}, rain ${s.rainChance}%, "${s.description}"`
+          `- ${s.source}: ${formatTemp(s.temp, unitPreference)}, feels like ${formatTemp(s.feelsLike, unitPreference)}, humidity ${displayMeasurement(s.humidity,"%")}, wind ${formatWind(s.windSpeed, unitPreference)}, rain ${displayMeasurement(s.rainChance,"%")}, "${s.description}"`
       )
       .join("\n")}`;
   }
 
   // Include hourly forecast if available
   let hourlySection = "";
-  if (weather.hourly && weather.hourly.length > 0) {
+  const windowForecast = matchWindowForecast(weather.hourly, recommendationContext?.window);
+  if (recommendationContext?.window) hourlySection = `\nWindow coverage: ${windowForecast.status}. Use only these covered hourly measurements: ${JSON.stringify(windowForecast.hours)}. Explicitly label uncovered hours; do not use current conditions as their forecast.`;
+  if (!recommendationContext?.window && weather.hourly && weather.hourly.length > 0) {
     const nextHours = selectFutureHourlyForecast(weather.hourly, Date.now(), 12);
     hourlySection = `\n\nHourly forecast (next ${nextHours.length} hours):\n${nextHours
       .map(
         (h) =>
-          `- ${h.time}: ${formatTemp(h.temp, unitPreference)}, ${h.description}, rain ${h.rainChance}%, wind ${formatWind(h.windSpeed, unitPreference)}`
+          `- ${h.time}: ${formatTemp(h.temp, unitPreference)}, ${h.description}, rain ${displayMeasurement(h.rainChance,"%")}, wind ${formatWind(h.windSpeed, unitPreference)}`
       )
       .join("\n")}`;
   }
@@ -718,7 +608,7 @@ export async function getStyleRecommendation(
   let eventForecastSection = "";
   if (recommendationContext?.event && eventForecast?.status === "matched" && eventForecast.hour) {
     const hour = eventForecast.hour;
-    eventForecastSection = `\n\nForecast nearest the requested event time:\n- ${formatEventLocalTime(hour.time, recommendationContext.event.timeZone)}: ${formatTemp(hour.temp, unitPreference)}, ${hour.description}, rain ${hour.rainChance}%, wind ${formatWind(hour.windSpeed, unitPreference)}\nUse this event forecast and local time, rather than current conditions, for event-specific clothing advice.`;
+    eventForecastSection = `\n\nForecast nearest the requested event time:\n- ${formatEventLocalTime(hour.time, recommendationContext.event.timeZone)}: ${formatTemp(hour.temp, unitPreference)}, ${hour.description}, rain ${displayMeasurement(hour.rainChance,"%")}, wind ${formatWind(hour.windSpeed, unitPreference)}\nUse this event forecast and local time, rather than current conditions, for event-specific clothing advice.`;
   } else if (recommendationContext?.event && eventForecast?.status === "unavailable") {
     eventForecastSection = "\n\nThe requested event is outside the available hourly forecast range. Do not describe current conditions as the event forecast. Give general occasion advice and tell the user to refresh closer to the event for weather-specific guidance.";
   }
@@ -786,11 +676,11 @@ export async function getStyleRecommendation(
 
   const userMessage = `Current weather conditions (averaged across sources):
 - Temperature: ${formatTemp(weather.temp, unitPreference)} (feels like ${formatTemp(weather.feelsLike, unitPreference)})
-- Humidity: ${weather.humidity}%
+- Humidity: ${displayMeasurement(weather.humidity,"%")}
 - Wind: ${formatWind(weather.windSpeed, unitPreference)} from ${weather.windDir}
 - Conditions: ${weather.description}
-- Rain chance: ${weather.rainChance}%
-- UV Index: ${weather.uvIndex}
+- Rain chance: ${displayMeasurement(weather.rainChance,"%")}
+- UV Index: ${displayMeasurement(weather.uvIndex)}
 - Time of day: ${weather.isDay ? "Daytime" : "Night-time"}${genderSection}${locationSection}${alertSection}${sourcesSection}${hourlySection}${eventForecastSection}${customContextSection}${planningSection}${recommendationContextSection}${closetSection}
 
 ${complexityInstruction}
@@ -801,42 +691,14 @@ Please recommend an outfit.`;
   // JSON field, so 900 tokens can cut the response off before it closes the
   // JSON object. Leave enough room for the full recommendation and Markdown.
   const MAX_TOKENS_BY_COMPLEXITY: Record<number, number> = { 0: 300, 1: 600, 2: 1_000, 3: 1_800 };
-  const maxTokens = MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350;
+  const maxTokens = input.structuredOutfit || forceCloset ? Math.max(1200, MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350) : MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350;
 
   const { raw, modelUsed } = await callAIWithModel(
     systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, maxTokens
   );
   
-  const recommendation = parseRecommendationFromRaw(raw);
-  if (recommendation) {
-    return sanitizeRecommendationFields({
-      outfit: recommendation.outfit ?? "Unable to generate outfit recommendation.",
-      reasoning: recommendation.reasoning ?? "",
-      modelUsed,
-      ...(closetWarning ? { closetWarning } : {}),
-      ...(isDev ? { rawOutput: raw } : {}),
-    });
-  }
-
-  const partialOutfit = extractJsonField(raw, "outfit");
-  const partialReasoning = extractJsonField(raw, "reasoning");
-  if (partialOutfit || partialReasoning) {
-    return sanitizeRecommendationFields({
-      outfit: partialOutfit ?? "Unable to generate outfit recommendation.",
-      reasoning: partialReasoning ?? "",
-      modelUsed,
-      ...(closetWarning ? { closetWarning } : {}),
-      ...(isDev ? { rawOutput: raw } : {}),
-    });
-  }
-
-  return sanitizeRecommendationFields({
-    outfit: "Unable to generate outfit recommendation.",
-    reasoning: raw.trim(),
-    modelUsed,
-    ...(closetWarning ? { closetWarning } : {}),
-    ...(isDev ? { rawOutput: raw } : {}),
-  });
+  const recommendation = validateStructuredResponse(parseRecommendationFromRaw(raw), input.wardrobeItems, input.structuredOutfit || forceCloset, forceCloset === true);
+  return sanitizeRecommendationFields({ ...recommendation, modelUsed, ...(closetWarning ? { closetWarning } : {}), ...(isDev ? { rawOutput: raw } : {}) });
 }
 
 /** Dev mode: send a freeform message to the AI without weather context */
@@ -855,7 +717,7 @@ export async function getDevChatResponse(
     reasoning: recommendation?.reasoning ?? "",
     modelUsed,
     rawOutput: raw,
-  });
+  }, false);
 }
 
 /** Follow-up: modify an existing recommendation based on user input */
@@ -867,13 +729,13 @@ export async function getFollowUpRecommendation(
     customSystemPrompt, userApiKey, byokProvider, recommendationContext, eventForecast, modelId,
   } = input;
   const isDev = input.isDev === true;
-  const systemPrompt = (customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT) + recommendationLinkInstructions(input.closetItems ?? []);
+  const systemPrompt = (customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT) + recommendationLinkInstructions(input.closetItems ?? [], input.wardrobeItems) + structuredInstructions(input.wardrobeItems, input.structuredOutfit || input.forceCloset);
 
   const recommendationContextSection = formatRecommendationContext(recommendationContext);
   const eventForecastSection = recommendationContext?.event && eventForecast?.status === "unavailable"
     ? "\nThe event remains outside the available forecast range. Do not present current weather as the event forecast."
     : recommendationContext?.event && eventForecast?.status === "matched" && eventForecast.hour
-      ? `\nForecast nearest the event: ${formatEventLocalTime(eventForecast.hour.time, recommendationContext.event.timeZone)}, ${formatTemp(eventForecast.hour.temp, unitPreference)}, ${eventForecast.hour.description}, rain ${eventForecast.hour.rainChance}%.`
+      ? `\nForecast nearest the event: ${formatEventLocalTime(eventForecast.hour.time, recommendationContext.event.timeZone)}, ${formatTemp(eventForecast.hour.temp, unitPreference)}, ${eventForecast.hour.description}, rain ${displayMeasurement(eventForecast.hour.rainChance,"%")}.`
       : "";
 
   const userMessage = `Previous outfit recommendation:
@@ -882,7 +744,7 @@ ${previousOutfit}
 Previous reasoning:
 ${previousReasoning}
 
-Current weather: ${formatTemp(weather.temp, unitPreference)}, ${weather.description}, rain chance ${weather.rainChance}%, wind ${formatWind(weather.windSpeed, unitPreference)}
+Current weather: ${formatTemp(weather.temp, unitPreference)}, ${weather.description}, rain chance ${displayMeasurement(weather.rainChance,"%")}, wind ${formatWind(weather.windSpeed, unitPreference)}
 ${recommendationContextSection}${eventForecastSection}
 
 User follow-up question: "${followUpMessage}"
@@ -890,34 +752,26 @@ User follow-up question: "${followUpMessage}"
 Please update the outfit recommendation based on the follow-up question. Respond with the same JSON format.`;
 
   const { raw, modelUsed } = await callAIWithModel(
-    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, 500
+    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, input.structuredOutfit || input.forceCloset ? 1200 : 500
   );
   
-  const recommendation = parseRecommendationFromRaw(raw);
-  if (recommendation) {
-    return sanitizeRecommendationFields({
-      outfit: recommendation.outfit ?? "Unable to generate outfit recommendation.",
-      reasoning: recommendation.reasoning ?? "",
-      modelUsed,
-      ...(isDev ? { rawOutput: raw } : {}),
-    });
-  }
+  const recommendation = validateStructuredResponse(parseRecommendationFromRaw(raw), input.wardrobeItems, input.structuredOutfit || input.forceCloset, input.forceCloset === true);
+  return sanitizeRecommendationFields({ ...recommendation, modelUsed,  ...(isDev ? { rawOutput: raw } : {}) });
+}
 
-  const partialOutfit = extractJsonField(raw, "outfit");
-  const partialReasoning = extractJsonField(raw, "reasoning");
-  if (partialOutfit || partialReasoning) {
-    return sanitizeRecommendationFields({
-      outfit: partialOutfit ?? "Unable to generate outfit recommendation.",
-      reasoning: partialReasoning ?? "",
-      modelUsed,
-      ...(isDev ? { rawOutput: raw } : {}),
-    });
+function structuredInstructions(wardrobe: WardrobeItem[] | undefined, structured: boolean | undefined) {
+  if (!structured) return "";
+  return `\nReturn JSON with outfit, reasoning and details. details contains slots (up to 12 objects with id: a unique short lowercase slot name, category: top/bottom/one-piece/outerwear/footwear/accessory/other, label: description, itemId: exact available wardrobe UUID or null for a general suggestion), gaps: string[], bring: string[], changes: string[]. Keep lists short. Unknown item attributes are unknown, not promises. Honour explicit comfort restrictions; list unmet restrictions as gaps. Only claim waterproof protection for verified waterproof items. Available wardrobe data: ${JSON.stringify((wardrobe ?? []).filter(item => item.available))}.`;
+}
+function validateStructuredResponse(raw: Partial<StyleRecommendation> | null, wardrobe: WardrobeItem[] | undefined, structured: boolean | undefined, ownedOnly: boolean): StyleRecommendation {
+  if (!structured) return requireUsableRecommendation(raw);
+  const details = parseOutfitDetails(raw?.details, wardrobe ?? [], ownedOnly);
+  if (ownedOnly) {
+    const labels = new Set((wardrobe ?? []).filter(item=>item.available).map(item=>item.label.toLowerCase()));
+    details.bring = details.bring.filter(label=>labels.has(label.toLowerCase()));
+    // Provider prose cannot introduce unverified clothing in owned-only advice.
+    details.changes = details.slots.filter(slot=>slot.category === "outerwear").map(slot=>`Adjust ${slot.label} as conditions change.`);
+    return { ...ownedRecommendation(details), details, chargeable: details.gaps.length === 0 };
   }
-
-  return sanitizeRecommendationFields({
-    outfit: "Unable to generate outfit recommendation.",
-    reasoning: raw.trim(),
-    modelUsed,
-    ...(isDev ? { rawOutput: raw } : {}),
-  });
+  return { ...requireUsableRecommendation(raw), details, chargeable: details.gaps.length === 0 };
 }

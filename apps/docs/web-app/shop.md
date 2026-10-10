@@ -4,7 +4,7 @@ Shop helps you find clothing for an outfit. Choose **Shop** in the dashboard, or
 
 ## Move from Style to Shop
 
-Clothing already in your closet opens **Closet**, scrolls to the matching item and briefly highlights it. Other clothing opens Shop with the item name ready to edit. The latest outfit can provide context for the search.
+Owned clothing references are highlighted inline and open **Closet**, focusing and briefly highlighting the matching row. Stable item IDs continue to resolve after a rename. Unavailable owned clothes still open Closet; deleted items prepare Shop. Other clothing opens Shop with the item name ready to edit. The latest outfit can provide context for the search.
 
 Opening a link does not search or use an AI allowance. Edit the description, check your filters, then submit when ready. A new clothing link hides results from the previous item. **Clear item context** starts a fresh search.
 
@@ -12,7 +12,7 @@ Opening a link does not search or use an AI allowance. Edit the description, che
 
 Enter a clothing description, optional size/fit, clothing preference and occasion. You can set a minimum and maximum budget in the currency of your choice. Prices retain their source currency; currency conversion is unavailable. Nonmatching currencies are excluded from budget comparisons.
 
-Shop uses the same model list and account allowance as Style. Pro and Dev accounts can supply a supported provider key or custom AI preferences. BYOK settings are shared with Style, remain in this browser, and are sent through the server only for your selected provider's request.
+Shop uses the same model list and account allowance as Style. Pro and Dev accounts can supply a supported provider key or custom AI preferences. BYOK controls are shared with Style, scoped to account/provider and session-only by default. Remember-on-device is explicit. The key passes through the server only for your selected provider's request; see [key controls](./dashboard#bring-your-own-key-pro-dev).
 
 ## Results and source availability
 
