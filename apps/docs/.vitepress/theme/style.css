@@ -60,7 +60,8 @@ body {
     var(--vp-c-bg);
 }
 
-.VPNav,
+/* Filtering VPNav would contain and clip its fixed mobile menu. */
+.VPNavBar,
 .VPLocalNav {
   -webkit-backdrop-filter: saturate(140%) blur(10px);
   backdrop-filter: saturate(140%) blur(10px);
