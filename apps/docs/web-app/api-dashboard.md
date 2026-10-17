@@ -18,19 +18,23 @@ The **API Dashboard** (`/dashboard/api`) is the full key-management surface for 
 | Pro | 20 |
 | Dev | Unlimited |
 
-## Credits
+## Legacy credits — V6 accounting inactive
+
+The [approved V6 policy](../development/v6-entitlements) is account-level: 10 signup credits once on Free and 50 per explicit monthly Pro period, with zero new per-key grants. It is staged, **not enforced yet**. The legacy screens below are pending replacement; no checkout or credit purchase is live.
 
 Sky Style keeps three balances distinct. The API Dashboard is where you move value between them:
 
 | Balance | Use |
 | --- | --- |
-| **$ Credit (AUD)** | Convert $1.00 into 50 API Credit for a key you choose. Pro receives $1.00 each calendar month. |
+| **$ Credit (AUD)** | Legacy wallet/transfer UI. The verified live schema has no money wallet, so conversion and monthly money grants must not be assumed to work. |
 | **API Credit** | Per-key balance consumed by public API requests. |
 | **App Credit** | In-app balance, including developer gifts and API fallback when a key's API Credit is empty. Pro receives 50 App Credits each day. |
 
 ### Allocating credit
 
-When you have at least **$1.00** in $ Credit and at least one active API key:
+This is a legacy UI description, **not an available top-up flow** on the verified schema. It requires the old money wallet, which is absent. The new shared-wallet policy has no per-key allocation step.
+
+Historically, when a deployment had at least **$1.00** in $ Credit and at least one active API key:
 
 1. Select a key from the dropdown (shown with its folder and nickname).
 2. Click **Allocate $1 → 50 API Credit**.

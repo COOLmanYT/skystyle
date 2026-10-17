@@ -36,4 +36,6 @@ export function getSupabaseAdmin(): SupabaseClient {
 export const supabaseAdmin = {
   from: (...args: Parameters<SupabaseClient["from"]>) =>
     getSupabaseAdmin().from(...args),
+  rpc: (...args: Parameters<SupabaseClient["rpc"]>) =>
+    getSupabaseAdmin().rpc(...args),
 } as unknown as SupabaseClient;

@@ -4,6 +4,8 @@
 
 Sky Style is organized as a monorepo with multiple deployable applications.
 
+The approved V6 accounting foundation is installed but inactive. `entitlement-policy.ts` holds the selected plan values; `entitlements.ts` is the staged reservation/settlement adapter. Admins can record exact Pro periods without changing legacy access or collecting payments. See [accounting status and cutover gates](./v6-entitlements) before connecting or activating any charging path.
+
 ## Monorepo Structure
 
 ```

@@ -2,6 +2,16 @@
 
 Sky Style gives you full control over your account security and your data.
 
+## Style and shopping requests
+
+Style uses the weather/context and wardrobe details needed for your request. Sharing location text with AI is optional. A saved private preference summary can be included in both Style and Shop requests.
+
+Shop sends search/fit terms to the approved product API, then candidate metadata and preferences to the selected AI provider for ranking. No Sky Style product-impression, shopping-query or click analytics is added; no affiliate/referral parameters are used. Usage counters enforce the existing allowance without storing shopping queries/products. Retailers and AI providers apply their own privacy rules to the requests they receive.
+
+BYOK keys for OpenAI, Gemini, Mistral or Anthropic stay in browser storage between requests and are transmitted through Sky Style to the chosen provider, not saved in the database. Clear the key on shared devices; changing provider clears the previous key. Sourced product images use the app image proxy rather than direct browser-to-source requests.
+
+Feedback is local by default. The user chooses cloud storage or Mistral summarization; deleting cloud feedback cannot erase an offline device copy or recall already processed provider requests. Recording controls open in a modal; storage, summary editing and deletion remain in Settings.
+
 ## Security page
 
 The **Security** page (`/settings/security`) protects your account. It is also embedded in the [Account](./account-and-support) page.

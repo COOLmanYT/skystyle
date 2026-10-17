@@ -10,6 +10,9 @@
  */
 
 import { supabaseAdmin } from "./supabase";
+import { DEMO_USER_ID } from "./demo";
+import { getActiveAccounting, requireLegacyWriter } from "./accounting";
+import { V6_FREE_MODEL_SWITCHES_DAILY } from "./entitlement-policy";
 
 export interface DailyUsageRecord {
   user_id: string;
@@ -24,9 +27,14 @@ export interface DailyUsageRecord {
 export interface DailyLimitCounter {
   used: number;
   limit: number | null;
+  monthlyUsed?: number;
+  monthlyLimit?: number | null;
 }
 
 export interface DailyLimitsInfo {
+  accountingActive?: boolean;
+  dailyResetAt?: string;
+  monthlyResetAt?: string;
   ai: DailyLimitCounter;
   followUps: DailyLimitCounter;
   closet: DailyLimitCounter;
@@ -48,9 +56,19 @@ function today(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+let demoUsage: DailyUsageRecord | undefined;
+
 /** Get or create today's usage record for a user. */
 export async function getDailyUsage(userId: string): Promise<DailyUsageRecord> {
   const date = today();
+  if (userId === DEMO_USER_ID) {
+    if (demoUsage?.usage_date !== date) demoUsage = { user_id: userId, usage_date: date, ai_uses: 0, follow_ups: 0, closet_uses: 0, source_picks: 0, model_switches: 0 };
+    return { ...demoUsage };
+  }
+
+  const account = await getActiveAccounting(userId);
+  if (account) return { user_id: userId, usage_date: account.date, ai_uses: account.recommendations.daily,
+    follow_ups: account.followups.daily, model_switches: account.modelSwitchesToday, closet_uses: 0, source_picks: 0 };
 
   const { data, error } = await supabaseAdmin
     .from("daily_usage")
@@ -88,6 +106,19 @@ export async function canUseFeature(
   isDev: boolean = false,
   isDemo: boolean = false
 ): Promise<{ allowed: boolean; used: number; limit: number }> {
+  const account = await getActiveAccounting(userId, isDemo);
+  if (account) {
+    if (field === "closet_uses" || field === "source_picks" || account.isDev) return { allowed: true, used: 0, limit: Infinity };
+    if (field === "model_switches") {
+      const limit = account.plan === "pro" ? Infinity : V6_FREE_MODEL_SWITCHES_DAILY;
+      return { allowed: account.modelSwitchesToday < limit, used: account.modelSwitchesToday, limit };
+    }
+    const counts = field === "ai_uses" ? account.recommendations : account.followups;
+    const daily = (field === "ai_uses" ? account.rules.recommendationsDaily : account.rules.followupsDaily) ?? Infinity;
+    const monthly = (field === "ai_uses" ? account.rules.recommendationsMonthly : account.rules.followupsMonthly) ?? Infinity;
+    if (counts.monthly >= monthly) return { allowed: false, used: counts.monthly, limit: monthly };
+    return { allowed: counts.daily < daily, used: counts.daily, limit: daily };
+  }
   const usage = await getDailyUsage(userId);
   const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
   let limit = LIMITS[tier][field];
@@ -114,10 +145,19 @@ export async function incrementUsage(
   isDev: boolean = false,
   isDemo: boolean = false
 ): Promise<boolean> {
+  if (userId !== DEMO_USER_ID && !isDemo) {
+    const account = await getActiveAccounting(userId);
+    if (account && (field === "closet_uses" || field === "source_picks")) return true;
+    await requireLegacyWriter();
+  }
   const { allowed, used } = await canUseFeature(userId, field, isPro, isDev, isDemo);
   if (!allowed) return false;
 
   const date = today();
+  if (userId === DEMO_USER_ID) {
+    demoUsage = { ...await getDailyUsage(userId), [field]: used + 1 };
+    return true;
+  }
   await supabaseAdmin
     .from("daily_usage")
     .upsert({
@@ -134,6 +174,14 @@ export async function incrementUsage(
  *  (`JSON.stringify(Infinity)` produces `null` silently).
  */
 export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: boolean = false, isDemo: boolean = false): Promise<DailyLimitsInfo> {
+  const account = await getActiveAccounting(userId, isDemo);
+  if (account) return {
+    accountingActive: true, dailyResetAt: account.dailyResetAt, monthlyResetAt: account.monthlyResetAt,
+    ai: { used: account.recommendations.daily, limit: account.rules.recommendationsDaily, monthlyUsed: account.recommendations.monthly, monthlyLimit: account.rules.recommendationsMonthly },
+    followUps: { used: account.followups.daily, limit: account.rules.followupsDaily, monthlyUsed: account.followups.monthly, monthlyLimit: account.rules.followupsMonthly },
+    closet: { used: 0, limit: null }, sourcePicks: { used: 0, limit: null },
+    model_switches: { used: account.modelSwitchesToday, limit: account.isDev || account.plan === "pro" ? null : V6_FREE_MODEL_SWITCHES_DAILY },
+  };
   const usage = await getDailyUsage(userId);
   const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
   const fmt = (v: number): number | null => (v === Infinity ? null : v);

@@ -13,22 +13,23 @@ export default async function DevLandingPage() {
 
   return (
     <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <Tutorial id="dev-dashboard" title="Dev Dashboard tour" steps={[{ title: "Choose a workspace", body: "Open triage, support, changelog, health, or operations from this Dev Center." }, { title: "Monitor safely", body: "Operations shows sanitized API diagnostics and user controls." }, { title: "Publish carefully", body: "Use the Changelog CMS preview before changing public posts." }]} />
+      <Tutorial id="dev-dashboard" title="Dev Center tour" steps={[{ title: "Choose a workspace", body: "Open triage, support, changelog, health, or operations from these cards.", target: '[data-tour="dev-workspaces"]' }, { title: "Monitor safely", body: "Operations shows sanitized API diagnostics and user controls.", target: 'a[href="/dev/operations"]' }, { title: "Publish carefully", body: "Use the Changelog CMS preview before changing public posts.", target: 'a[href="/dev/changelog"]' }]} />
       <DevNavBar email={session.user.email} />
 
       <main id="main-content">
         <PageSpacingWrapper page="account" className="max-w-5xl mx-auto px-4 py-10 space-y-8">
 
-          <div className="text-center space-y-2">
+          <div className="space-y-3 rounded-3xl border p-6 sm:p-8" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+            <p className="text-xs font-semibold uppercase tracking-widest opacity-60">Developer workspace</p>
             <h1 className="text-3xl font-bold" style={{ color: "var(--foreground)" }}>
               Sky Style Dev Center
             </h1>
             <p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-              Restricted access. Every action is logged.
+              Support, content, and operations in one place. Restricted to verified developer accounts.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div data-tour="dev-workspaces" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {[
               {
                 href: "/dev/triage",
@@ -113,7 +114,7 @@ export default async function DevLandingPage() {
                 DEV_EMAILS
               </code>{" "}
               on every request. Access requires an active session with a verified dev email.
-              Destructive actions require re-authentication.
+              Review the relevant confirmation and authorization requirements before any destructive action.
             </p>
           </div>
 

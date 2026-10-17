@@ -32,6 +32,7 @@ export default defineConfig({
           { text: 'Getting Started', link: '/web-app/getting-started' },
           { text: 'How It Works', link: '/web-app/how-it-works' },
           { text: 'Dashboard & Closet', link: '/web-app/dashboard' },
+          { text: 'Shop', link: '/web-app/shop' },
           { text: 'Settings', link: '/web-app/settings' },
           { text: 'Security & Privacy', link: '/web-app/security-and-privacy' },
           { text: 'Automatic Recommendations', link: '/web-app/automatic-recommendations' },
@@ -54,6 +55,7 @@ export default defineConfig({
               { text: 'POST /recweather', link: '/api/recweather' },
               { text: 'GET /weather', link: '/api/weather' },
               { text: 'GET /closet', link: '/api/closet' },
+              { text: 'Health & Shop APIs', link: '/api/health' },
             ]
           },
           { text: 'Errors & Credits', link: '/api/errors' },
@@ -64,6 +66,7 @@ export default defineConfig({
         items: [
           { text: 'Overview', link: '/development' },
           { text: 'Architecture', link: '/development/architecture' },
+          { text: 'V6 Accounting Status', link: '/development/v6-entitlements' },
           { text: 'Testing', link: '/development/testing' },
         ]
       }

@@ -4,6 +4,9 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { SupabaseAdapter } from "@auth/supabase-adapter";
 import type { Adapter } from "next-auth/adapters";
+import { DEMO_USER_ID } from "@/lib/demo";
+import { getDevEmails } from "@/lib/dev-auth";
+export { DEMO_USER_ID } from "@/lib/demo";
 
 // On Vercel preview deployments, AUTH_URL is typically set to the production
 // domain. Override it with the deployment-specific VERCEL_URL so that NextAuth
@@ -12,9 +15,6 @@ import type { Adapter } from "next-auth/adapters";
 if (process.env.VERCEL_ENV === "preview" && process.env.VERCEL_URL) {
   process.env.AUTH_URL = `https://${process.env.VERCEL_URL}`;
 }
-
-/** Stable ID used for the demo/preview user. */
-export const DEMO_USER_ID = "demo-user-123";
 
 function isValidHttpUrl(str: string): boolean {
   try {
@@ -109,6 +109,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, user, token }) {
       if (session.user) {
         session.user.id = user?.id ?? token?.sub ?? "";
+        // Navigation hint only. All /dev routes still enforce access server-side.
+        (session.user as unknown as Record<string, unknown>).canAccessDev = getDevEmails().has(session.user.email?.toLowerCase() ?? "");
         // Propagate demo plan into the session so API routes can read it
         if (token?.plan === "demo") {
           (session.user as unknown as Record<string, unknown>).plan = "demo";

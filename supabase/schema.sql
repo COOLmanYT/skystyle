@@ -120,10 +120,29 @@ CREATE TABLE IF NOT EXISTS settings (
   custom_system_prompt text,          -- Pro only
   custom_source_url    text,          -- Pro only (saved weather source API key/URL)
   custom_weather_api_key text,        -- Pro only (saved weather source API key)
+  onboarding_completed_at timestamptz,
+  experience_mode      text CHECK (experience_mode IS NULL OR experience_mode IN ('guided', 'advanced')),
+  feedback_storage_mode text NOT NULL DEFAULT 'local' CHECK (feedback_storage_mode IN ('local', 'cloud')),
   UNIQUE (user_id)
 );
 
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
+
+-- Upgrade existing installations too; CREATE TABLE IF NOT EXISTS does not add columns.
+ALTER TABLE public.settings
+  ADD COLUMN IF NOT EXISTS feedback_storage_mode text NOT NULL DEFAULT 'local'
+  CHECK (feedback_storage_mode IN ('local', 'cloud'));
+
+-- V6 private feedback. NextAuth-owned access is checked in server routes;
+-- it must not be exposed through browser Supabase credentials.
+CREATE TABLE IF NOT EXISTS public.style_feedback_preferences (
+  user_id uuid PRIMARY KEY REFERENCES public.users(id) ON DELETE CASCADE,
+  entries jsonb NOT NULL DEFAULT '[]'::jsonb CHECK (jsonb_typeof(entries) = 'array'),
+  summary text NOT NULL DEFAULT '' CHECK (char_length(summary) <= 600),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE public.style_feedback_preferences ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON public.style_feedback_preferences FROM anon, authenticated;
 
 DROP POLICY IF EXISTS "Users can read own settings" ON settings;
 CREATE POLICY "Users can read own settings"

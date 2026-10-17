@@ -1,10 +1,14 @@
 import { signIn } from "@/auth";
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { getOnboardingState } from "@/lib/onboarding";
 
 export default async function LoginPage() {
   const session = await auth();
-  if (session?.user) redirect("/dashboard");
+  if (session?.user?.id) {
+    const onboarding = await getOnboardingState(session.user.id);
+    redirect(onboarding.complete ? "/dashboard" : "/onboarding");
+  }
 
   // Show demo button in preview environments and local development
   const isPreview =
@@ -36,7 +40,7 @@ export default async function LoginPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("github", { redirectTo: "/dashboard" });
+            await signIn("github", { redirectTo: "/onboarding" });
           }}
         >
           <button
@@ -55,7 +59,7 @@ export default async function LoginPage() {
         <form
           action={async () => {
             "use server";
-            await signIn("google", { redirectTo: "/dashboard" });
+            await signIn("google", { redirectTo: "/onboarding" });
           }}
         >
           <button
@@ -92,7 +96,7 @@ export default async function LoginPage() {
               ) {
                 return;
               }
-              await signIn("demo", { redirectTo: "/dashboard" });
+              await signIn("demo", { redirectTo: "/onboarding" });
             }}
           >
             <button

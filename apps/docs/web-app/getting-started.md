@@ -1,5 +1,9 @@
 # Getting Started
 
+::: warning Approved policy, inactive rollout
+The [approved V6 plan values](../development/v6-entitlements#authoritative-values) are staged, not yet enforced. Existing account limits remain legacy until the coordinated cutover. No live checkout or credit purchase is available.
+:::
+
 New to Sky Style? This walkthrough takes you from sign-up to your first refined recommendation in a few minutes.
 
 ## Step 1 — Create an account
@@ -12,13 +16,14 @@ You start on the **Free** plan: 20 AI recommendations, 40 follow-ups, and 4 clos
 
 ## Step 2 — Take the dashboard tour
 
-On your first visit to the dashboard, a guided tour appears automatically. It has three steps:
+Onboarding and the Dashboard tour are one first-use flow. It highlights the actual controls without generating an outfit or using credits:
 
-1. **Choose a location** — use the weather panel to enter a location or use GPS.
-2. **Set your preferences** — adjust planning and closet options before generating an outfit.
-3. **Continue the conversation** — use follow-ups to refine an outfit once it is ready.
+1. **Make it yours** — choose both workspaces, Style only, or Shop only, plus guided controls.
+2. **Style** — highlighted location, occasion/planning, and Fetch Weather & Style controls show how to make your first outfit and refine it with follow-ups.
+3. **Shop** — highlighted search controls show where to enter your budget, size and occasion. Product widgets require a connected approved source; direct search remains available.
 
 You can **replay the tour** anytime from [Settings → Tutorials](./settings#tutorials).
+There is no separate setup-guide menu item under Dashboard. Skip or Escape completes setup with your chosen controls; Back revisits a tour step.
 
 ## Step 3 — Pick a location
 

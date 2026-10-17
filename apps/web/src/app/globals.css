@@ -519,3 +519,8 @@ textarea:focus-visible {
   outline: 2px solid #ff9500;
   outline-offset: 2px;
 }
+
+/* Keep guided-tour spotlights below the shared sticky navigation. */
+[data-tour] {
+  scroll-margin-top: 5.5rem;
+}

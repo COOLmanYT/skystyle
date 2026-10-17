@@ -1,4 +1,5 @@
 "use server";
+import { getActiveAccounting } from "@/lib/accounting";
 
 import { signOut, auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
@@ -55,7 +56,8 @@ export async function submitFeedback(data: {
       .eq("id", userId)
       .single();
 
-    const plan = profile?.is_dev ? "dev" : profile?.is_pro ? "pro" : "free";
+    const account = await getActiveAccounting(userId);
+    const plan = account?.plan ?? (profile?.is_dev ? "dev" : profile?.is_pro ? "pro" : "free");
     const source = typeof data.source === "string" && data.source.trim()
       ? data.source.trim().slice(0, 80)
       : "Web app";

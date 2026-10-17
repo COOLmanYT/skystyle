@@ -5,6 +5,7 @@
  */
 
 import { supabaseAdmin } from "./supabase";
+import { getActiveAccounting, requireLegacyWriter } from "./accounting";
 
 export const DAILY_APP_CREDITS = 50;
 export const PRO_MONTHLY_MONEY_CREDIT_CENTS = 100;
@@ -17,6 +18,8 @@ export interface CreditRecord {
 
 /** Return the current credit balance for a user, resetting daily if needed. */
 export async function getCredits(userId: string): Promise<number> {
+  const account = await getActiveAccounting(userId);
+  if (account) return account.credits.total;
   const { data, error } = await supabaseAdmin
     .from("credits")
     .select("*")
@@ -54,6 +57,7 @@ export async function getCredits(userId: string): Promise<number> {
 
 /** Deduct one credit. Returns false if insufficient balance. */
 export async function deductCredit(userId: string): Promise<boolean> {
+  await requireLegacyWriter();
   const balance = await getCredits(userId);
   if (balance <= 0) return false;
 
@@ -67,6 +71,8 @@ export async function deductCredit(userId: string): Promise<boolean> {
 
 /** Read App Credit without creating the Pro daily allowance for a free user. */
 export async function getStoredAppCredits(userId: string): Promise<number> {
+  const account = await getActiveAccounting(userId);
+  if (account) return account.credits.total;
   const { data, error } = await supabaseAdmin
     .from("credits")
     .select("current_balance")
@@ -78,6 +84,7 @@ export async function getStoredAppCredits(userId: string): Promise<number> {
 
 /** Use a gifted App Credit without initialising a weekly Pro credit balance. */
 export async function deductStoredAppCredit(userId: string): Promise<boolean> {
+  await requireLegacyWriter();
   const balance = await getStoredAppCredits(userId);
   if (balance <= 0) return false;
   const { data, error } = await supabaseAdmin
@@ -93,6 +100,7 @@ export async function deductStoredAppCredit(userId: string): Promise<boolean> {
 
 /** Grant the private $1.00 AUD Pro allowance once per calendar month. */
 export async function getMoneyCreditCents(userId: string, isPro: boolean, isDev: boolean): Promise<number> {
+  if (await getActiveAccounting(userId)) return 0;
   if (isDev) return Number.MAX_SAFE_INTEGER;
   const month = new Date().toISOString().slice(0, 7) + "-01";
   const { data, error } = await supabaseAdmin.from("credit_wallets").select("money_credit_cents, last_pro_credit_month").eq("user_id", userId).maybeSingle();

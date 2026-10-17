@@ -13,7 +13,6 @@ export default {
     })
   },
   enhanceApp({ app, router, siteData }) {
-    // Inject Vercel Web Analytics
     if (typeof window !== 'undefined') {
       inject()
     }

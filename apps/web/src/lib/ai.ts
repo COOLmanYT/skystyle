@@ -14,6 +14,13 @@ import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Mistral } from "@mistralai/mistralai";
 import { WeatherData } from "./weather";
+import {
+  type EventForecastMatch,
+  type RecommendationContext,
+  formatEventLocalTime,
+  formatRecommendationContext,
+  selectFutureHourlyForecast,
+} from "./recommendation-context";
 
 // Model definitions and priorities
 export const MODEL_PRIORITIES = {
@@ -45,6 +52,9 @@ export const MODEL_PRIORITIES = {
 // Extract model ID type from the priorities
 export type ModelConfig = (typeof MODEL_PRIORITIES)[keyof typeof MODEL_PRIORITIES][number];
 export type ModelProvider = ModelConfig["provider"];
+export type ByokProvider = ModelProvider | "anthropic";
+export const BYOK_PROVIDERS = ["openai", "gemini", "mistral", "anthropic"] as const;
+export const ANTHROPIC_BYOK_MODEL = "claude-haiku-4-5-20251001";
 export type ModelID = ModelConfig["id"];
 
 // Singleton instances for server-side clients
@@ -171,7 +181,7 @@ export interface StyleInput {
   /** Pro/Dev client-side custom prompt (localStorage only, never persisted server-side) */
   clientCustomPrompt?: string;
   /** Which provider to use for the BYOK key ("openai" | "gemini" | "mistral", defaults to "openai") */
-  byokProvider?: ModelProvider;
+  byokProvider?: ByokProvider;
   /** Gender context for recommendations (e.g. "Male", "Female", "N/A", or custom text) */
   gender?: string;
   /** Whether the user consented to share their location with the AI */
@@ -184,6 +194,10 @@ export interface StyleInput {
   customContext?: string[];
   /** Weather planning data from the planning panel */
   planningData?: PlanningData;
+  /** Validated V6 planning context supplied for this recommendation. */
+  recommendationContext?: RecommendationContext;
+  /** Event-to-hour match computed from the fetched forecast. */
+  eventForecast?: EventForecastMatch;
   /** Specific model to use (for model switching feature) */
   modelId?: ModelID;
 }
@@ -196,6 +210,9 @@ export interface FollowUpInput {
   unitPreference: "metric" | "imperial";
   customSystemPrompt?: string;
   userApiKey?: string;
+  byokProvider?: ByokProvider;
+  recommendationContext?: RecommendationContext;
+  eventForecast?: EventForecastMatch;
   /** Dev mode: include raw AI output in response */
   isDev?: boolean;
   /** Specific model to use (for model switching feature) */
@@ -463,28 +480,30 @@ function normalizeMessageContent(content: unknown): string {
 }
 
 /** Call AI with a specific model or use default priority */
-async function callAIWithModel(
+export async function callAIWithModel(
   systemPrompt: string,
   userMessage: string,
   userApiKey: string | undefined,
   isDev: boolean,
   modelId: ModelID | undefined,
-  byokProvider: ModelProvider | undefined,
+  byokProvider: ByokProvider | undefined,
   maxTokens: number
 ): Promise<{ raw: string; modelUsed: string }> {
+  // Never send one provider's user key to a different provider or silently fall
+  // back to a server key. BYOK also takes precedence over the hosted default.
+  if (userApiKey) {
+    const provider = byokProvider || "openai";
+    if (provider === "anthropic") return callAnthropic(systemPrompt, userMessage, userApiKey, maxTokens);
+    const requested = modelId ? getModelById(modelId) : undefined;
+    const model = requested?.provider === provider ? requested : MODEL_PRIORITIES.pro.find((entry) => entry.provider === provider)!;
+    return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, model, maxTokens);
+  }
   // If a specific model is requested, use it
   if (modelId) {
     const model = getModelById(modelId);
     if (model) {
       return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, model, maxTokens);
     }
-  }
-
-  // BYOK takes precedence when user provides their own key
-  if (userApiKey) {
-    const provider = byokProvider || "openai";
-    const defaultModel = MODEL_PRIORITIES.pro.find(m => m.provider === provider) || MODEL_PRIORITIES.pro[0];
-    return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, defaultModel, maxTokens);
   }
 
   // Try server keys in priority order
@@ -538,6 +557,22 @@ async function callProvider(
     default:
       throw new Error(`Unknown provider: ${provider}`);
   }
+}
+
+/** Call OpenAI API */
+async function callAnthropic(system: string, message: string, key: string, maxTokens: number): Promise<{ raw: string; modelUsed: string }> {
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST", cache: "no-store", signal: AbortSignal.timeout(30_000),
+    headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "Content-Type": "application/json" },
+    body: JSON.stringify({ model: ANTHROPIC_BYOK_MODEL, max_tokens: maxTokens, system: `${system}\nReturn only valid JSON, without code fences.`, messages: [{ role: "user", content: message }] }),
+  });
+  // Provider bodies can contain request data: never forward/log them or the key.
+  if (!response.ok) throw new Error(`Anthropic request failed (HTTP ${response.status}). Check your key and provider quota.`);
+  const data = await response.json() as { content?: { type?: string; text?: string }[]; stop_reason?: string };
+  if (data.stop_reason === "max_tokens") throw new Error("Anthropic response was incomplete. Please try a shorter request.");
+  const raw = data.content?.filter((part) => part.type === "text").map((part) => part.text ?? "").join("");
+  if (!raw?.trim()) throw new Error("Anthropic returned no text.");
+  return { raw, modelUsed: ANTHROPIC_BYOK_MODEL };
 }
 
 /** Call OpenAI API */
@@ -628,7 +663,7 @@ export async function getStyleRecommendation(
   const {
     weather, closetItems, unitPreference, customSystemPrompt, clientCustomPrompt,
     userApiKey, byokProvider, gender, shareLocation, forceCloset, customContext, planningData,
-    modelId,
+    recommendationContext, eventForecast, modelId,
   } = input;
   const isDev = input.isDev === true;
   let closetWarning: string | undefined;
@@ -669,7 +704,7 @@ export async function getStyleRecommendation(
   // Include hourly forecast if available
   let hourlySection = "";
   if (weather.hourly && weather.hourly.length > 0) {
-    const nextHours = weather.hourly.slice(0, 12);
+    const nextHours = selectFutureHourlyForecast(weather.hourly, Date.now(), 12);
     hourlySection = `\n\nHourly forecast (next ${nextHours.length} hours):\n${nextHours
       .map(
         (h) =>
@@ -677,6 +712,16 @@ export async function getStyleRecommendation(
       )
       .join("\n")}`;
   }
+
+  let eventForecastSection = "";
+  if (recommendationContext?.event && eventForecast?.status === "matched" && eventForecast.hour) {
+    const hour = eventForecast.hour;
+    eventForecastSection = `\n\nForecast nearest the requested event time:\n- ${formatEventLocalTime(hour.time, recommendationContext.event.timeZone)}: ${formatTemp(hour.temp, unitPreference)}, ${hour.description}, rain ${hour.rainChance}%, wind ${formatWind(hour.windSpeed, unitPreference)}\nUse this event forecast and local time, rather than current conditions, for event-specific clothing advice.`;
+  } else if (recommendationContext?.event && eventForecast?.status === "unavailable") {
+    eventForecastSection = "\n\nThe requested event is outside the available hourly forecast range. Do not describe current conditions as the event forecast. Give general occasion advice and tell the user to refresh closer to the event for weather-specific guidance.";
+  }
+
+  const recommendationContextSection = formatRecommendationContext(recommendationContext);
 
   // Custom source context (RSS content, URL references)
   const customContextSection =
@@ -744,7 +789,7 @@ export async function getStyleRecommendation(
 - Conditions: ${weather.description}
 - Rain chance: ${weather.rainChance}%
 - UV Index: ${weather.uvIndex}
-- Time of day: ${weather.isDay ? "Daytime" : "Night-time"}${genderSection}${locationSection}${alertSection}${sourcesSection}${hourlySection}${customContextSection}${planningSection}${closetSection}
+- Time of day: ${weather.isDay ? "Daytime" : "Night-time"}${genderSection}${locationSection}${alertSection}${sourcesSection}${hourlySection}${eventForecastSection}${customContextSection}${planningSection}${recommendationContextSection}${closetSection}
 
 ${complexityInstruction}
 
@@ -796,10 +841,11 @@ Please recommend an outfit.`;
 export async function getDevChatResponse(
   message: string,
   userApiKey?: string,
-  modelId?: ModelID
+  modelId?: ModelID,
+  byokProvider?: ByokProvider
 ): Promise<StyleRecommendation> {
   const { raw, modelUsed } = await callAIWithModel(
-    DEFAULT_SYSTEM_PROMPT, message, userApiKey, true, modelId, undefined, 500
+    DEFAULT_SYSTEM_PROMPT, message, userApiKey, true, modelId, byokProvider, 500
   );
   const recommendation = parseRecommendationFromRaw(raw);
   return sanitizeRecommendationFields({
@@ -814,9 +860,19 @@ export async function getDevChatResponse(
 export async function getFollowUpRecommendation(
   input: FollowUpInput
 ): Promise<StyleRecommendation> {
-  const { previousOutfit, previousReasoning, weather, followUpMessage, unitPreference, customSystemPrompt, userApiKey, modelId } = input;
+  const {
+    previousOutfit, previousReasoning, weather, followUpMessage, unitPreference,
+    customSystemPrompt, userApiKey, byokProvider, recommendationContext, eventForecast, modelId,
+  } = input;
   const isDev = input.isDev === true;
   const systemPrompt = customSystemPrompt ?? DEFAULT_SYSTEM_PROMPT;
+
+  const recommendationContextSection = formatRecommendationContext(recommendationContext);
+  const eventForecastSection = recommendationContext?.event && eventForecast?.status === "unavailable"
+    ? "\nThe event remains outside the available forecast range. Do not present current weather as the event forecast."
+    : recommendationContext?.event && eventForecast?.status === "matched" && eventForecast.hour
+      ? `\nForecast nearest the event: ${formatEventLocalTime(eventForecast.hour.time, recommendationContext.event.timeZone)}, ${formatTemp(eventForecast.hour.temp, unitPreference)}, ${eventForecast.hour.description}, rain ${eventForecast.hour.rainChance}%.`
+      : "";
 
   const userMessage = `Previous outfit recommendation:
 ${previousOutfit}
@@ -825,13 +881,14 @@ Previous reasoning:
 ${previousReasoning}
 
 Current weather: ${formatTemp(weather.temp, unitPreference)}, ${weather.description}, rain chance ${weather.rainChance}%, wind ${formatWind(weather.windSpeed, unitPreference)}
+${recommendationContextSection}${eventForecastSection}
 
 User follow-up question: "${followUpMessage}"
 
 Please update the outfit recommendation based on the follow-up question. Respond with the same JSON format.`;
 
   const { raw, modelUsed } = await callAIWithModel(
-    systemPrompt, userMessage, userApiKey, isDev, modelId, undefined, 500
+    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, 500
   );
   
   const recommendation = parseRecommendationFromRaw(raw);

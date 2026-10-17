@@ -40,7 +40,7 @@ describe('API Keys Module - generateApiKey', () => {
   });
 
   it('should generate a preview with the correct length', () => {
-    const { key, preview } = generateApiKey();
+    const { preview } = generateApiKey();
     expect(preview.length).toBe(API_KEY_PREVIEW_LENGTH);
   });
 

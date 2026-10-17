@@ -1,12 +1,15 @@
-import { auth } from "@/auth";
+import { auth, DEMO_USER_ID } from "@/auth";
 import { redirect } from "next/navigation";
 import Dashboard from "@/components/Dashboard";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getCredits } from "@/lib/credits";
 import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
+import { getOnboardingState } from "@/lib/onboarding";
+import { getActiveAccounting } from "@/lib/accounting";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ tour?: string; section?: string }> }) {
+  const params = await searchParams;
   const session = await auth();
   if (!session?.user) redirect("/login");
 
@@ -18,8 +21,12 @@ export default async function DashboardPage() {
   let pendingDeletion = false;
   let initialCredits: number | null = null;
   let initialDailyLimits: DailyLimitsInfo | null = null;
+  let initialExperienceMode: "guided" | "advanced" | null = null;
+  let onboardingPersistenceAvailable = false;
 
-  if (userId) {
+  if (userId === DEMO_USER_ID) {
+    initialDailyLimits = await getDailyLimitsInfo(userId, false, false, true);
+  } else if (userId) {
     try {
       const { data } = await supabaseAdmin
         .from("users")
@@ -29,12 +36,18 @@ export default async function DashboardPage() {
       isPro = data?.is_pro ?? false;
       isDev = data?.is_dev ?? false;
       pendingDeletion = data?.pending_deletion ?? false;
-      if (isPro) {
+      const account = await getActiveAccounting(userId);
+      if (account) { isPro = account.plan === "pro"; isDev = account.isDev; initialCredits = account.isDev ? null : account.credits.total; }
+      else if (isPro) {
         initialCredits = await getCredits(userId);
       }
       initialDailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
+      const onboarding = await getOnboardingState(userId);
+      onboardingPersistenceAvailable = onboarding.persistenceAvailable;
+      initialExperienceMode = onboarding.experienceMode ?? (onboarding.persistenceAvailable ? "guided" : null);
     } catch {
-      // Non-fatal: dashboard still works without credits info
+      // Never present stale legacy Pro access when accounting cannot be verified.
+      isPro = false; initialCredits = null; initialDailyLimits = null;
     }
   }
 
@@ -89,11 +102,16 @@ export default async function DashboardPage() {
         </div>
       )}
       <Dashboard
+        userId={userId ?? "guest"}
         userName={name}
         isPro={isPro}
         isDev={isDev}
         initialCredits={initialCredits}
         initialDailyLimits={initialDailyLimits}
+        initialExperienceMode={initialExperienceMode}
+        startTour={params.tour === "1"}
+        onboardingPersistenceAvailable={onboardingPersistenceAvailable}
+        initialSection={params.section === "shop" ? "shop" : "style"}
       />
     </>
   );

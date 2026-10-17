@@ -26,6 +26,8 @@ Sky Style picks the first **available** model in your plan's priority list (see 
 
 ## Usage & limits
 
+The [approved V6 caps and credit rules](../development/v6-entitlements) are staged, not yet active. Until cutover, the account/dashboard usage readouts reflect legacy limits. Checkout and credit purchases are unavailable.
+
 ### I hit my daily limit — when does it reset?
 
 All daily counters reset at **midnight UTC**. The dashboard shows your current usage against each limit.
@@ -64,7 +66,7 @@ Each plan has a limit on **active** (non-revoked) keys: Free 3, Pro 20, Dev unli
 
 ### My API key has no credits
 
-Each key starts with 50 API Credit. When it's empty, Sky Style uses one available **App Credit** as a fallback and returns an `X-Credit-Warning` header. To top up a key, allocate `$1.00 → 50 API Credit` on the [API Dashboard](./api-dashboard#allocating-credit) (requires $ Credit, which Pro users receive monthly).
+Legacy key creation uses a configured per-key allowance (50 by default), and legacy middleware may fall back to one available App Credit. The approved V6 policy replaces this with account-level credits, zero new per-key grants and no silent fallback, but is not activated. Legacy money-wallet allocation is unavailable on the verified schema; do not assume a monthly money grant or a working top-up. See [API Dashboard](./api-dashboard#legacy-credits-v6-accounting-inactive).
 
 ::: tip Credit purchases
 API credit purchases are not live yet. The "Get credits" button opens an informational donation prompt — it doesn't process a purchase.

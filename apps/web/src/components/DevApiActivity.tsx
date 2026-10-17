@@ -18,7 +18,7 @@ export default function DevApiActivity() {
     else { setRequests(Array.isArray(data.requests) ? data.requests : []); setStats(data); setError(null); }
     setLoading(false);
   }, []);
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { queueMicrotask(() => { void load(); }); }, [load]);
   const cards = [["Requests (24h)", stats.totalRequests24h], ["Failures", stats.failedRequests24h], ["Error rate", stats.errorRate === null || stats.errorRate === undefined ? "—" : `${stats.errorRate}%`], ["Avg. response", stats.averageResponseMs === null || stats.averageResponseMs === undefined ? "—" : `${stats.averageResponseMs} ms`]];
   return <section className="space-y-5">
     <div className="flex flex-wrap items-end justify-between gap-3"><div><h1 className="text-2xl font-bold" style={{ color: "var(--foreground)" }}>API Activity</h1><p className="mt-1 text-sm" style={{ color: "var(--foreground)", opacity: .58 }}>All captured API requests, including failures and redacted diagnostics.</p></div><button onClick={() => void load()} className="rounded-lg px-3 py-2 text-sm" style={{ border: "1px solid var(--card-border)", color: "var(--foreground)" }}>Refresh</button></div>

@@ -5,11 +5,14 @@ import { getCredits, getMoneyCreditCents } from "@/lib/credits";
 import { getDailyLimitsInfo, type DailyLimitsInfo } from "@/lib/daily-usage";
 import Link from "next/link";
 import PageSpacingWrapper from "@/components/PageSpacingWrapper";
-import AccountUpgradeButton from "@/components/AccountUpgradeButton";
+import V6PlanOverview from "@/components/V6PlanOverview";
 import HamburgerNav from "@/components/HamburgerNav";
 import SecurityClient from "@/app/settings/security/SecurityClient";
 import PrivacyHubClient from "@/app/settings/privacy/PrivacyHubClient";
 import { handleSignOut } from "@/app/actions";
+import { getActiveAccounting, type AccountSnapshot } from "@/lib/accounting";
+import AccountCreditSummary from "@/components/AccountCreditSummary";
+import AccountingUsage from "@/components/AccountingUsage";
 
 function getDevEmails(): Set<string> {
   const raw = process.env.DEV_EMAILS ?? "";
@@ -33,6 +36,8 @@ export default async function AccountPage() {
   let moneyCreditCents = 0;
   let apiCredits = 0;
   let dailyLimits: DailyLimitsInfo | null = null;
+  let account: AccountSnapshot | null = null;
+  let accountingUnavailable = false;
 
   if (userId) {
     try {
@@ -44,14 +49,18 @@ export default async function AccountPage() {
       isPro = data?.is_pro ?? false;
       isDev = data?.is_dev ?? false;
       pendingDeletion = data?.pending_deletion ?? false;
-      if (isPro) {
+      account = await getActiveAccounting(userId);
+      if (account) { isPro = account.plan === "pro"; isDev = account.isDev; initialCredits = account.isDev ? null : account.credits.total; }
+      else if (isPro) {
         initialCredits = await getCredits(userId);
       }
+      if (!account) {
       moneyCreditCents = await getMoneyCreditCents(userId, isPro, isDev);
       const { data: apiKeys } = await supabaseAdmin.from("api_keys").select("credits_remaining, revoked").eq("user_id", userId);
       apiCredits = (apiKeys ?? []).filter((key) => !key.revoked).reduce((total, key) => total + Math.max(0, Number(key.credits_remaining ?? 0)), 0);
+      }
       dailyLimits = await getDailyLimitsInfo(userId, isPro, isDev);
-    } catch { /* Non-fatal */ }
+    } catch { accountingUnavailable = true; isPro = false; initialCredits = null; dailyLimits = null; }
     try {
       const { data: mfaRow } = await supabaseAdmin
         .from("mfa_secrets")
@@ -77,6 +86,7 @@ export default async function AccountPage() {
       {/* Content */}
       <main id="main-content">
       <PageSpacingWrapper page="account" className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+        {accountingUnavailable && <p role="alert">Account allowance could not be verified. No legacy balance is shown; try again later.</p>}
 
         {/* User Info */}
         <div
@@ -110,7 +120,7 @@ export default async function AccountPage() {
                   border: isDev || isPro ? "none" : "1px solid var(--card-border)",
                 }}
               >
-                {isDev ? "🛠️ Dev" : isPro ? "⭐ Pro" : "Free"}
+                {accountingUnavailable ? "Unverified" : isDev ? "🛠️ Dev" : isPro ? "⭐ Pro" : account?.plan === "payg" ? "PAYG" : "Free"}
               </span>
               {isPro && initialCredits !== null && (
                 <span
@@ -129,12 +139,7 @@ export default async function AccountPage() {
             You can add a GitHub or Google account to your profile by signing in with that provider.
           </p>
           {!isPro && !isDev && (
-            <AccountUpgradeButton
-              className="inline-block rounded-xl px-4 py-2 text-xs font-medium btn-interact"
-              style={{ background: "var(--accent)", color: "#fff" }}
-            >
-              ☕ Upgrade to Pro
-            </AccountUpgradeButton>
+            <Link href="/pricing" className="inline-block rounded-xl border px-4 py-2 text-xs font-medium" style={{ borderColor: "var(--card-border)", color: "var(--accent)" }}>View approved V6 plans</Link>
           )}
         </div>
 
@@ -182,7 +187,8 @@ export default async function AccountPage() {
                 </div>
               ))}
             </div>
-            {isPro && (
+            {dailyLimits.accountingActive && <AccountingUsage limits={dailyLimits} />}
+            {isPro && !dailyLimits.accountingActive && (
               <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
                 Pro users have higher limits. App Credits are refreshed daily.
               </p>
@@ -191,6 +197,7 @@ export default async function AccountPage() {
         )}
 
         <div className="max-w-3xl mx-auto rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
+          {accountingUnavailable ? <p>Credit information unavailable.</p> : account ? <AccountCreditSummary credits={account.credits} isDev={account.isDev} /> : <>
           <div><h2 className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--foreground)", opacity: 0.4 }}>Credits</h2><p className="text-xs mt-1" style={{ color: "var(--foreground)", opacity: 0.55 }}>Money credit converts to API Credit on the API Dashboard. App Credit supports in-app use and developer gifts.</p></div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">{[
             { label: "$ Credit (AUD)", value: isDev ? "Unlimited" : `$${(moneyCreditCents / 100).toFixed(2)}` },
@@ -198,6 +205,7 @@ export default async function AccountPage() {
             { label: "App Credit", value: isDev ? "Unlimited" : initialCredits ?? 0 },
           ].map((credit) => <div key={credit.label} className="rounded-xl p-3" style={{ background: "var(--background)" }}><p className="text-xs" style={{ color: "var(--foreground)", opacity: .5 }}>{credit.label}</p><p className="text-lg font-semibold mt-1" style={{ color: "var(--foreground)" }}>{credit.value}</p></div>)}</div>
           <div className="flex gap-3 flex-wrap"><Link href="/dashboard/api" className="text-xs underline" style={{ color: "var(--accent)" }}>Manage API Credit →</Link><a href="https://buymeacoffee.com/coolmanyt" target="_blank" rel="noreferrer" className="text-xs underline" style={{ color: "var(--accent)" }}>Support Sky Style →</a></div>
+          </>}
         </div>
 
         <div className="max-w-3xl mx-auto rounded-2xl p-6 space-y-4" style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}>
@@ -210,142 +218,7 @@ export default async function AccountPage() {
           ].map(([label, description, href]) => <Link key={href} href={href} className="rounded-xl p-3 btn-interact" style={{ background: "var(--background)", border: "1px solid var(--card-border)", color: "var(--foreground)" }}><p className="text-sm font-medium">{label}</p><p className="text-xs mt-1 opacity-55">{description}</p></Link>)}</div>
         </div>
 
-        {/* Pricing */}
-        <div className="max-w-6xl mx-auto space-y-4 px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h2 className="text-xl font-semibold" style={{ color: "var(--foreground)" }}>
-              Plans &amp; Pricing
-            </h2>
-            <p className="text-sm mt-1" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-              Start free, upgrade when you need more.
-            </p>
-          </div>
-
-          <div className={`grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 ${isDev ? "2xl:grid-cols-4" : ""}`}>
-            {/* Free */}
-            <div
-              className={`rounded-2xl p-6`}
-              style={{
-                background: "var(--card)",
-                border: !isPro && !isDev ? "2px solid var(--foreground)" : "1px solid var(--card-border)",
-              }}
-            >
-              {!isPro && !isDev && (
-                <span
-                  className="inline-block text-xs font-medium px-2 py-0.5 rounded-full mb-2"
-                  style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
-                >
-                  Current plan
-                </span>
-              )}
-              <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Free</h3>
-              <p className="text-3xl font-bold mb-4" style={{ color: "var(--foreground)" }}>A$0</p>
-              <ul className="text-sm space-y-2" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-                <li>✅ 5 AI recommendations/day</li>
-                <li>✅ 10 follow-ups/day</li>
-                <li>✅ Real-time multi-source weather</li>
-                <li>✅ Closet (1 use/day)</li>
-                <li>✅ Source picker (1/day)</li>
-                <li>✅ GPS &amp; manual location</li>
-              </ul>
-            </div>
-
-            {/* Monthly */}
-            <div
-              className="rounded-2xl p-6 relative"
-              style={{
-                background: "var(--card)",
-                border: isPro && !isDev ? "2px solid var(--accent)" : "1px solid var(--card-border)",
-              }}
-            >
-              {isPro && !isDev && (
-                <span
-                  className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1 rounded-full"
-                  style={{ background: "var(--accent)", color: "#fff" }}
-                >
-                  Current plan
-                </span>
-              )}
-              <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Pro Monthly</h3>
-              <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-                A$4<span className="text-sm font-normal opacity-60">/month</span>
-              </p>
-              <ul className="text-sm space-y-2 mt-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-                <li>✅ Everything in Free</li>
-                <li>✅ 50 App Credits per day</li>
-                <li>✅ 100 follow-ups/day</li>
-                <li>✅ Unlimited closet &amp; sources</li>
-                <li>✅ Custom AI prompts</li>
-                <li>✅ Bring your own AI key</li>
-                <li>✅ Custom weather sources</li>
-              </ul>
-              {!isPro && !isDev && (
-                <AccountUpgradeButton
-                  className="mt-4 block w-full text-center rounded-xl px-4 py-2 text-xs font-medium btn-interact"
-                  style={{ background: "var(--accent)", color: "#fff" }}
-                >
-                  ☕ Upgrade to Pro
-                </AccountUpgradeButton>
-              )}
-            </div>
-
-            {isDev && (
-              <div
-                className="rounded-2xl p-6 relative"
-                style={{
-                  background: "var(--card)",
-                  border: "2px solid #ff9500",
-                }}
-              >
-                <span
-                  className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1 rounded-full"
-                  style={{ background: "#ff9500", color: "#fff" }}
-                >
-                  Current plan
-                </span>
-                <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Dev</h3>
-                <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-                  Special Access
-                </p>
-                <ul className="text-sm space-y-2 mt-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-                  <li>✅ Invite-only developer tier</li>
-                  <li>✅ No daily rate limits</li>
-                  <li>✅ Raw AI output visibility</li>
-                  <li>✅ Dev chat access</li>
-                  <li>✅ Experimental feature access</li>
-                </ul>
-              </div>
-            )}
-
-            {/* Pay As You Go */}
-            <div
-              className="rounded-2xl p-6 relative"
-              style={{
-                background: "var(--card)",
-                border: "1px dashed var(--card-border)",
-                opacity: 0.75,
-              }}
-            >
-              <span
-                className="absolute -top-3 left-1/2 -translate-x-1/2 text-xs font-medium px-3 py-1 rounded-full"
-                style={{ background: "var(--foreground)", color: "var(--background)", opacity: 0.6 }}
-              >
-                Coming one day
-              </span>
-              <h3 className="font-semibold mb-1" style={{ color: "var(--foreground)" }}>Pay As You Go</h3>
-              <p className="text-3xl font-bold mb-1" style={{ color: "var(--foreground)" }}>
-                A$?<span className="text-sm font-normal opacity-60">/use</span>
-              </p>
-              <ul className="text-sm space-y-2 mt-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
-                <li>💡 Select what you want</li>
-                <li>💰 Pay only for what you use</li>
-                <li>🚫 No more overpaying</li>
-                <li>⚡ Priority support</li>
-                <li>📸 Image Upload add-on</li>
-              </ul>
-            </div>
-          </div>
-        </div>
+        <section className="max-w-6xl mx-auto" aria-label="Approved V6 plans"><V6PlanOverview /></section>
 
         {/* ── Security ── */}
         <div className="max-w-3xl mx-auto space-y-2">

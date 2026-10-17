@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import SmartBackButton from "@/components/SmartBackButton";
+import { formatAudCents, V6_PLAN_RULES, V6_ROLLOUT_NOTICE } from "@/lib/entitlement-policy";
 
 function SimpleToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -223,11 +224,14 @@ export default function TermsClient() {
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Free plan</h2>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Approved V6 plans — inactive</h2>
             <p>
-              Sky Style is free to use during its POC phase. Free accounts have daily limits
-              (5 AI uses, 10 follow-ups, 1 closet use, 1 source pick per day). These limits may
-              change. No paid plan is currently available.
+              {V6_ROLLOUT_NOTICE} Free is {formatAudCents(V6_PLAN_RULES.free.monthlyPriceAudCents)} with {V6_PLAN_RULES.free.recommendationsDaily} recommendations/day and {V6_PLAN_RULES.free.recommendationsMonthly}/month, plus {V6_PLAN_RULES.free.followupsDaily} follow-ups/day and {V6_PLAN_RULES.free.followupsMonthly}/month.
+              Pro is {formatAudCents(V6_PLAN_RULES.pro.monthlyPriceAudCents)}/month with {V6_PLAN_RULES.pro.recommendationsDaily} recommendations/day and {V6_PLAN_RULES.pro.recommendationsMonthly}/month, plus {V6_PLAN_RULES.pro.followupsDaily} follow-ups/day and {V6_PLAN_RULES.pro.followupsMonthly}/month. Both caps apply; resets are at midnight UTC and the start of the UTC calendar month.
+            </p>
+            <p className="mt-2">
+              Free allows {V6_PLAN_RULES.free.apiKeyLimit} active API keys and a once-only {V6_PLAN_RULES.free.signupCredits}-credit signup grant. Pro and PAYG allow {V6_PLAN_RULES.pro.apiKeyLimit} keys; Pro grants {V6_PLAN_RULES.pro.renewalCredits} credits per explicitly admin-managed monthly period, expiring at its end. PAYG purchases are unavailable; approved rates are {formatAudCents(V6_PLAN_RULES.payg.minimumTopUpAudCents)} minimum, {V6_PLAN_RULES.payg.creditsPerAud} credits per A$1, {V6_PLAN_RULES.payg.recommendationCreditCost} per standard recommendation and {V6_PLAN_RULES.payg.followupCreditCost} per follow-up. Purchased credits carry over, and eligible expiring grants spend first.
+              Included usage does not also spend credits or automatically switch to metered use. Closet/source setup and editing have no planned usage cap; AI generations do. App/API credits become account-level only after activation. No live payment collection, automatic renewal, premium-model or image charges are introduced.
             </p>
           </section>
 

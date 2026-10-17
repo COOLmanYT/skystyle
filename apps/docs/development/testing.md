@@ -45,22 +45,11 @@ apps/web/src/
         └── followup.test.ts    # Followup API route
 ```
 
-## Test Coverage
+## Test Evidence
+
+The latest V6 candidate check passed **22 suites and 249 tests** on 28 September 2026. Lint passed with zero errors/warnings, and the production build passed. See [V6 readiness](./v6-readiness) for the feature-to-test mapping, database evidence, and open browser/release gates. Coverage percentages are not claimed without a fresh coverage run.
 
 Coverage varies as tests are added; generate a current report with `npm run test:coverage`.
-
-| Module | Coverage |
-|--------|----------|
-| AI Module | ~90% |
-| API Keys | ~100% |
-| Credits | ~95% |
-| Weather | ~95% |
-| Weather Cache | ~100% |
-| Daily Usage | ~90% |
-| Style API | ~85% |
-| Followup API | ~85% |
-
-Values are approximate and intended as a guide, not a contract.
 
 ## Mocking
 

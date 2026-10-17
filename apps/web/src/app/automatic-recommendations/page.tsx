@@ -20,7 +20,9 @@ export default function AutomaticRecommendationsPage() {
     setSchedules(Array.isArray(data.schedules) ? data.schedules : []);
     setRuns(Array.isArray(data.runs) ? data.runs : []);
   }, []);
-  useEffect(() => { load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load.")); }, [load]);
+  useEffect(() => {
+    queueMicrotask(() => { load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load.")); });
+  }, [load]);
 
   async function createSchedule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { getDevEmails } from "@/lib/dev-auth";
+import { getEntitlementRollout } from "@/lib/entitlements";
+import { getAdminAccounting } from "@/lib/admin-accounting";
 
 async function requireDev() {
   const session = await auth();
@@ -66,10 +68,14 @@ export async function GET() {
   }
   const lastLogin = new Map<string, string>();
   for (const row of loginResult.data ?? []) if (!lastLogin.has(row.user_id)) lastLogin.set(row.user_id, row.created_at);
+  let accounting;
+  try { accounting = await getAdminAccounting(userRows.map((user)=>user.id)); }
+  catch { return NextResponse.json({error:"Unable to verify account accounting."},{status:503}); }
 
   return NextResponse.json(userRows.map((user) => ({
     ...user,
-    plan: user.is_dev ? "dev" : user.is_pro ? "pro" : "free",
+    accountingActive:accounting !== null,
+    plan: user.is_dev ? "dev" : accounting?.get(user.id)?.plan ?? (user.is_pro ? "pro" : "free"),
     joinedAt: user.created_at ?? null,
     pendingDeletion: user.pending_deletion || pendingDeletion.has(user.id),
     feedbackCount: feedbackCount.get(user.id) ?? 0,
@@ -79,8 +85,8 @@ export async function GET() {
     lastAiUse: lastAiUse.get(user.id) ?? null,
     controls: controls.get(user.id) ?? null,
     usage: todayUsage.get(user.id) ?? null,
-    credits: credits.get(user.id) ?? 0,
-    apiKeys: apiKeys.filter((key) => key.user_id === user.id).map((key) => ({ revoked: key.revoked, creditsRemaining: key.credits_remaining })),
+    credits: accounting ? accounting.get(user.id)?.plan === "uninitialized" ? null : accounting.get(user.id)?.credits.total ?? null : credits.get(user.id) ?? 0,
+    apiKeys: apiKeys.filter((key) => key.user_id === user.id).map((key) => ({ revoked: key.revoked, creditsRemaining: accounting ? null : key.credits_remaining })),
   })));
 }
 
@@ -89,6 +95,11 @@ export async function PATCH(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   const body = await req.json().catch(() => null) as Record<string, unknown> | null;
   if (!body || typeof body.userId !== "string") return NextResponse.json({ error: "userId is required" }, { status: 400 });
+  try {
+    if ((await getEntitlementRollout()).enabled && (typeof body.plan === "string" || [body.appCreditDelta, body.giftAppCredits, body.moneyCreditDelta, body.apiCreditDelta].some((value) => typeof value === "number" && value !== 0))) {
+      return NextResponse.json({ error:"Legacy plan/credit adjustments are disabled. Use verified Pro periods; account credit adjustments require a separate reviewed transaction." }, { status:409 });
+    }
+  } catch { return NextResponse.json({ error:"Unable to verify accounting. No changes were made." }, { status:503 }); }
   const updates: Record<string, unknown> = { user_id: body.userId, updated_by: session.user.id, updated_at: new Date().toISOString() };
   if (typeof body.appBlocked === "boolean") updates.app_blocked = body.appBlocked;
   if (typeof body.apiBlocked === "boolean") updates.api_blocked = body.apiBlocked;

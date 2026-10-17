@@ -31,7 +31,9 @@ export default function InboxPage() {
   }, []);
 
   useEffect(() => {
-    load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load inbox.")).finally(() => setLoading(false));
+    queueMicrotask(() => {
+      load().catch((err) => setError(err instanceof Error ? err.message : "Unable to load inbox.")).finally(() => setLoading(false));
+    });
   }, [load]);
 
   async function updateMessage(messageId: string, updates: Record<string, unknown>) {

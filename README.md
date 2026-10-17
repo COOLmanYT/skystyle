@@ -12,22 +12,34 @@ Production domain: **https://skystyle.app**
 - **AI outfit recommendations** — uses OpenAI GPT-4o or Google Gemini to suggest what to wear
 - **Follow-ups** — ask follow-up questions like "should I bring an umbrella?" or "what if I need formal shoes?"
 - **Digital closet** — add your wardrobe items so the AI knows what you own
-- **Bring Your Own Key** — Pro users can use their own AI API key (never stored)
+- **Style / Shop** — full-width workspaces, with account-scoped browser preferences for both, Style-only, or Shop-only
+- **Unified onboarding** — a replayable spotlight tour of the actual first-use controls
+- **Shopping** — size, occasion, budget range, shared AI models, and sourced product cards; official eBay Australia search is gated on approved production credentials (direct retailer search remains available)
+- **Bring Your Own Key** — Pro/Dev users can use OpenAI, Gemini, Mistral or Anthropic; keys stay in browser storage and are transmitted through the server for requested AI calls, not persisted in the database
+- **Private style feedback** — record feedback in a modal; manage local/cloud storage and editable preference summaries in Settings
+- **Health APIs** — bounded, cached public connectivity checks at `/api/v1/health`, `/db`, `/ai`, and `/weather`
 - **Custom weather sources** — Pro users can add their own weather data sources
 - **GPS & manual location** — use your browser's location or search for any city
 - **Dark mode** — automatic, based on system preference
 
-## Plans
+## Approved V6 plans — rollout inactive
 
-| | Free | Pro Monthly |
-|---|---|---|
-| Price | A$0 | A$4/mo |
-| AI uses | 20/day | 50 App Credits/day |
-| Follow-ups | 40/day | 400/day |
-| Closet | 4 uses/day | Unlimited |
-| Source picker | 4/day | Unlimited |
-| BYOK AI key | — | ✅ |
-| Custom prompts | — | ✅ |
+These values are approved, not yet enforced. The server-only accounting foundation is installed with enforcement and checkout **disabled**. Current legacy allowances remain in effect until every charging path is replaced and verified; no subscription or credit purchase flow is available.
+
+| | Free | Pro Monthly | Pay as you go |
+|---|---|---|---|
+| Price (AUD) | A$0 | A$6.99/month | A$5 minimum top-up; unavailable |
+| Recommendations | 5/day and 60/month | 25/day and 250/month | 2 credits each |
+| Follow-ups | 10/day and 120/month | 50/day and 500/month | 1 credit each |
+| Active API keys | 3 | 20 | 20 |
+| Account credit grant | 10 once at signup | 50 per admin-managed monthly period | None |
+| Closet/source setup and editing | Unlimited | Unlimited | Unlimited |
+
+Daily limits reset at 00:00 UTC; monthly caps use the UTC calendar month. Both caps apply. Style, Shop and automatic generations share recommendations. Included use does not double-spend credits or silently switch to metered use. Pro periods need exact verified dates, are not automatically renewed, and their grants expire at the period end. Signup/purchased credits have no scheduled expiry; purchased credits carry over. Expiring grants are consumed first. Credits are account-level after cutover, not new grants per API key.
+
+Approved conversion: **50 credits per A$1**. Existing API endpoint costs stay recommend 2 / recweather 3 / weather 1 / closet 1 / health 0; no new premium/image charges. Donations are not plan purchases or top-ups.
+
+Policy source: `apps/web/src/lib/entitlement-policy.ts`; transaction adapter: `entitlements.ts`; rollout bridge: `accounting.ts`. Active-accounting branches are integrated into Style, Shop, follow-ups, automatic generation, public API middleware and account/admin displays, but rollout remains off. Legacy enforcement currently remains Free 20 recommendations/day and 40 follow-ups/day, Pro daily App Credits, stable preview demo 200/400 and Dev unlimited. See [accounting status and cutover gates](apps/docs/development/v6-entitlements.md).
 
 ## Screenshots
 

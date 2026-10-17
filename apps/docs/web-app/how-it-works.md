@@ -96,17 +96,17 @@ Free users do not get OpenAI models (to control cost). The first available model
 
 ### Bring Your Own Key (BYOK)
 
-Pro and Dev users can override the server-side provider by entering their own key for OpenAI, Gemini, or Mistral in the dashboard's BYOK panel:
+Pro and Dev users can override the server-side provider by entering their own key for OpenAI, Gemini, Mistral or Anthropic in Style or Shop. Anthropic uses Claude Haiku 4.5 and is BYOK-only; it does not change the hosted tier model list.
 
 - When a BYOK key is set, requests for that provider use your key instead of Sky Style's.
-- BYOK keys are stored **only in your browser** and are sent solely for the AI request.
+- BYOK keys are stored in this browser and transmitted through Sky Style for the selected provider request, never saved in the database. Switching provider clears the previous key. Follow-ups keep the provider; an incompatible hosted model choice does not send your key to a different provider or fall back to a hosted key.
 - A custom prompt can replace the default Sky Style prompt (must include JSON output instructions).
 
 See [Dashboard → BYOK](./dashboard#bring-your-own-key-pro-dev).
 
 ## Usage limits {#usage-limits}
 
-Each plan has daily counters that reset at midnight UTC:
+The table below describes **legacy enforcement while V6 rollout is off**, not the approved V6 policy. The [approved daily/monthly caps and credit rules](../development/v6-entitlements#authoritative-values) are staged and not active. Current daily counters reset at midnight UTC:
 
 | Feature | Free | Demo | Pro | Dev |
 | --- | --- | --- | --- | --- |
@@ -120,4 +120,4 @@ Each plan has daily counters that reset at midnight UTC:
 **Model switches** (changing which AI model is used) are a separate daily counter from **AI uses**. On the Free plan you can switch models 2 times per day, independent of your 20 AI uses. Pro and Dev have unlimited switches.
 :::
 
-The **Demo** tier is only created automatically when the deployment is a preview/development environment; it multiplies the free limits by 10 for testing.
+The **Demo** tier is only created automatically in a preview/development environment. Its fixed 200/400 limits are preserved, not recalculated from the approved V6 Free caps.

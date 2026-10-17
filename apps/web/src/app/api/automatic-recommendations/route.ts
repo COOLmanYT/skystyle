@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { supabaseAdmin } from "@/lib/supabase";
 import { syncPublicUser } from "@/lib/sync-user";
+import { DEMO_USER_ID } from "@/auth";
 
 const RECURRENCES = new Set(["once", "daily", "weekly"]);
 
@@ -14,6 +15,7 @@ function validDate(value: unknown): string | null {
 async function currentUser() {
   const session = await auth();
   if (!session?.user?.id) return null;
+  if (session.user.id === DEMO_USER_ID) return null;
   await syncPublicUser(session);
   return session.user.id;
 }
@@ -40,10 +42,12 @@ export async function POST(req: NextRequest) {
   const latitude = body?.latitude;
   const longitude = body?.longitude;
   const recurrence = body?.recurrence;
-  if (!runAt || typeof latitude !== "number" || typeof longitude !== "number" || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || !RECURRENCES.has(String(recurrence))) {
+  if (!runAt || typeof latitude !== "number" || !Number.isFinite(latitude) || typeof longitude !== "number" || !Number.isFinite(longitude) || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180 || !RECURRENCES.has(String(recurrence))) {
     return NextResponse.json({ error: "A valid date, manual latitude/longitude, and recurrence are required." }, { status: 400 });
   }
   if (Date.parse(runAt) <= Date.now()) return NextResponse.json({ error: "The first automatic recommendation must be scheduled in the future." }, { status: 400 });
+  const timeZone = typeof body?.timeZone === "string" ? body.timeZone : "UTC";
+  try { new Intl.DateTimeFormat("en", { timeZone }).format(); } catch { return NextResponse.json({ error: "A valid IANA time zone is required." }, { status: 400 }); }
 
   const { data, error } = await supabaseAdmin
     .from("automated_recommendation_schedules")
@@ -56,12 +60,12 @@ export async function POST(req: NextRequest) {
       prompt: typeof body?.prompt === "string" ? body.prompt.trim().slice(0, 1_000) || null : null,
       run_at: runAt,
       recurrence,
-      time_zone: typeof body?.timeZone === "string" ? body.timeZone.slice(0, 80) : "UTC",
+      time_zone: timeZone,
       next_run_at: runAt,
     })
     .select("*")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Unable to save automatic recommendation." }, { status: 500 });
   return NextResponse.json({ schedule: data }, { status: 201 });
 }
 
@@ -88,6 +92,6 @@ export async function PATCH(req: NextRequest) {
     .eq("user_id", userId)
     .select("*")
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Unable to update this schedule." }, { status: 500 });
   return NextResponse.json({ schedule: data });
 }
