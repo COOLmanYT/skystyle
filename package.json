@@ -1,8 +1,10 @@
 {
   "name": "skystyle",
-  "version": "6.1.0",
+  "version": "6.4.2",
   "private": true,
-  "workspaces": ["apps/*"],
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
     "dev": "next dev apps/web",
     "build": "next build apps/web",
@@ -15,7 +17,12 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:ci": "jest --coverage --runInBand",
-    "test:debug": "jest --debug"
+    "test:debug": "jest --debug",
+    "typecheck": "tsc --project apps/web/tsconfig.json --noEmit",
+    "typecheck:tests": "tsc --project apps/web/tsconfig.test.json --noEmit",
+    "test:release-gate": "node --test scripts/verify-vercel-preview.test.mjs",
+    "release:gate": "node scripts/verify-vercel-preview.mjs",
+    "test:scheduler": "node supabase/tests/run-idle-scheduler.mjs"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.1",
@@ -25,7 +32,7 @@
     "@simplewebauthn/server": "^9.0.3",
     "@supabase/supabase-js": "^2.97.0",
     "bcryptjs": "^3.0.3",
-    "next": "16.2.3",
+    "next": "16.4.3",
     "next-auth": "^5.0.0-beta.30",
     "openai": "^6.24.0",
     "otpauth": "^9.5.0",
@@ -49,6 +56,7 @@
     "tailwindcss": "^4",
     "ts-jest": "^29.1.2",
     "typescript": "5.9.3",
-    "vitepress": "^1.6.4"
+    "vitepress": "^1.6.4",
+    "@electric-sql/pglite": "0.3.14"
   }
 }
