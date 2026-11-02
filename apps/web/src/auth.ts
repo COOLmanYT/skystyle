@@ -70,6 +70,8 @@ const optionalOAuth = getOptionalOAuthReadiness();
 export const { handlers, auth, signIn, signOut } = NextAuth({
   secret: process.env.AUTH_SECRET,
   trustHost: true,
+  // Only custom passkey registration uses SimpleWebAuthn 13. Auth.js's optional
+  // WebAuthn provider still expects v9 and must not be enabled with this override.
   providers: [
     GitHub,
     Google,

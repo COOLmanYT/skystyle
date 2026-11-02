@@ -4,8 +4,9 @@ import { syncPublicUser } from "@/lib/sync-user";
 import {
   generateRegistrationOptions,
   verifyRegistrationResponse,
+  type RegistrationResponseJSON,
+  type AuthenticatorTransportFuture,
 } from "@simplewebauthn/server";
-import type { RegistrationResponseJSON } from "@simplewebauthn/types";
 import { logSecurityEvent } from "@/lib/security";
 import { NextResponse, NextRequest } from "next/server";
 
@@ -34,14 +35,13 @@ export async function GET() {
   const options = await generateRegistrationOptions({
     rpName: RP_NAME,
     rpID: RP_ID,
-    userID: session.user.id,
+    userID: new TextEncoder().encode(session.user.id),
     userName: session.user.email,
     userDisplayName: session.user.name ?? session.user.email,
     attestationType: "none",
     excludeCredentials: (existing ?? []).map((c) => ({
       id: c.credential_id,
-      type: "public-key",
-      transports: c.transports ? (c.transports.split(",") as import("@simplewebauthn/types").AuthenticatorTransportFuture[]) : [],
+      transports: c.transports ? (c.transports.split(",") as AuthenticatorTransportFuture[]) : [],
     })),
     authenticatorSelection: {
       residentKey: "preferred",
@@ -105,13 +105,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Verification failed" }, { status: 400 });
   }
 
-  const { credentialID, credentialPublicKey, counter } =
+  const { credential: { id, publicKey, counter } } =
     verification.registrationInfo;
 
   const { error: credentialError } = await supabaseAdmin.from("passkeys").insert({
     user_id: session.user.id,
-    credential_id: Buffer.from(credentialID).toString("base64url"),
-    public_key: Buffer.from(credentialPublicKey).toString("base64"),
+    credential_id: id,
+    public_key: Buffer.from(publicKey).toString("base64"),
     counter,
     transports: body.response?.transports?.join(",") ?? null,
     display_name: body.displayName ?? "Passkey",
