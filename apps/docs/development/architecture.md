@@ -43,6 +43,6 @@ Automatic recommendations use a Supabase Cron worker. The [contributor overview]
 
 Accounting enforcement and checkout remain disabled. Their activation requires independent database review, a coordinated drain of old writers and real-account acceptance. Public plan display reads only the active accounting flag from `GET /api/plans`; unknown state hides allowances rather than guessing them. That read-only endpoint exposes no account data or credentials and does not enable purchases.
 
-The 6.3.1 candidate extends the 6.3 branch with clothing references, interface/error handling fixes and documentation alignment. It is local development work, not a deployed release. Review SQL under `supabase/review` must be approved separately before production installation. The frozen V6 foundation is unchanged. The local `SKYSTYLE_6_3_0_RELEASE.md` review records exact rollout gates and verification boundaries. It becomes available on GitHub after the branch is pushed.
+Review SQL under `supabase/review` must be approved separately before production installation. Release candidates require automated checks, authenticated acceptance and a successful app preview for the exact release commit. Follow the release gate in `AGENTS.md`; a published changelog entry does not establish deployment.
 
 Changelog data comes only from Supabase. Development posts are labelled separately from deployed releases; a version number alone does not establish deployment. Update version markers and run/verify the required changelog SQL after completed code work, following `AGENTS.md`.

@@ -52,7 +52,7 @@ function kmhToMph(kmh: number): number {
 
 async function handleRecWeath(
   req: NextRequest,
-  _ctx: ApiKeyContext  // eslint-disable-line @typescript-eslint/no-unused-vars
+  _ctx: ApiKeyContext
 ): Promise<NextResponse> {
   // 1. Parse and validate body
   let body: RecWeathBody;
@@ -107,6 +107,7 @@ async function handleRecWeath(
       shareLocation: false,
       forceCloset: false,
       isDev: false,
+      isPro: _ctx.modelAccess === "pro",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed.";

@@ -2,7 +2,7 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-## Current version: 6.3.5
+## Current version: 6.3.7
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 
@@ -84,7 +84,7 @@ The workflow checks non-production branch pushes and pull requests to `main`. Th
 
 ## Key codebase facts
 
-- **Build:** `npm run build` (Next.js 16.4.0 with Turbopack)
+- **Build:** `npm run build` (Next.js 16.4.3 with Turbopack)
 - **Lint:** `npm run lint` (targets `apps/web`)
 - **Tests:** `npm test -- --runInBand` (Jest); validate with tests, build, and lint.
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`)

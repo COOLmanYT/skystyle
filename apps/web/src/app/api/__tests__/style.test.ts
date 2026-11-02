@@ -622,6 +622,19 @@ describe("6.3 usable-output charging",()=>{
 });
 
 describe('legacy account model and credential access', () => {
+  it('a Free default request carries server-owned Free access', async () => {
+    setMockProfile(mockUser);
+    const ai = jest.requireMock('@/lib/ai');
+    const response = await POST(createMockNextRequest({ lat: -37.8, lon: 145 }));
+    expect(response.status).toBe(200);
+    expect(ai.getStyleRecommendation).toHaveBeenCalledWith(expect.objectContaining({ modelId: undefined, isDev: false, isPro: false }));
+  });
+  it.each([[mockUser, true, false], [mockProUser, false, true]] as const)('request-body plan claims do not override the profile', async (profile, claimed, expected) => {
+    setMockProfile(profile);
+    const response = await POST(createMockNextRequest({ lat: -37.8, lon: 145, isPro: claimed }));
+    expect(response.status).toBe(200);
+    expect(jest.requireMock('@/lib/ai').getStyleRecommendation).toHaveBeenCalledWith(expect.objectContaining({ isPro: expected }));
+  });
   it.each([{ modelId: 'gpt-4o' }, { userApiKey: 'synthetic-key' }])('rejects unavailable options before generation: %j', async options => {
     setMockProfile(mockUser);
     const ai = jest.requireMock('@/lib/ai');

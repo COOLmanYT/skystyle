@@ -1,4 +1,4 @@
-import { MODEL_PRIORITIES, ANTHROPIC_BYOK_MODEL, getModelById, type ModelConfig, type ModelProvider, type ByokProvider, type ModelID } from "./ai-models";
+import { MODEL_PRIORITIES, ANTHROPIC_BYOK_MODEL, getModelById, isModelAvailable, type ModelConfig, type ModelProvider, type ByokProvider, type ModelID } from "./ai-models";
 export * from "./ai-models";
 import { parseOutfitDetails, ownedRecommendation, type OutfitDetails } from "./outfits";
 import { displayMeasurement } from "./weather-measurements";
@@ -164,6 +164,8 @@ export interface StyleInput {
   forceCloset?: boolean;
   /** Dev mode: include raw AI output in response */
   isDev?: boolean;
+  /** Trusted account access supplied by the server, never request-body claims. */
+  isPro?: boolean;
   /** Additional context from user's custom sources (RSS content, URL references) */
   customContext?: string[];
   /** Weather planning data from the planning panel */
@@ -193,6 +195,8 @@ export interface FollowUpInput {
   eventForecast?: EventForecastMatch;
   /** Dev mode: include raw AI output in response */
   isDev?: boolean;
+  /** Trusted account access supplied by the server, never request-body claims. */
+  isPro?: boolean;
   /** Specific model to use (for model switching feature) */
   modelId?: ModelID;
 }
@@ -377,7 +381,8 @@ export async function callAIWithModel(
   isDev: boolean,
   modelId: ModelID | undefined,
   byokProvider: ByokProvider | undefined,
-  maxTokens: number
+  maxTokens: number,
+  isPro = false
 ): Promise<{ raw: string; modelUsed: string }> {
   // Never send one provider's user key to a different provider or silently fall
   // back to a server key. BYOK also takes precedence over the hosted default.
@@ -391,25 +396,21 @@ export async function callAIWithModel(
   // If a specific model is requested, use it
   if (modelId) {
     const model = getModelById(modelId);
-    if (model) {
-      return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, model, maxTokens);
+    if (!model || !isModelAvailable(modelId, isPro, isDev)) throw new Error("This hosted model is unavailable for the account plan.");
+    return callSpecificModel(systemPrompt, userMessage, userApiKey, isDev, model, maxTokens);
+  }
+
+  // Defaults and fallbacks use the same trusted access as explicit selection.
+  const tier = isDev || isPro ? "pro" : "free";
+  for (const model of MODEL_PRIORITIES[tier]) {
+    try {
+      return await callSpecificModel(systemPrompt, userMessage, undefined, isDev, model, maxTokens);
+    } catch (err) {
+      console.warn(`[ai] Model ${model.id} failed:`, err instanceof Error ? err.message : err);
     }
   }
 
-  // Try server keys in priority order
-  for (const tier of ["pro", "free"] as const) {
-    for (const model of MODEL_PRIORITIES[tier]) {
-      try {
-        const result = await callSpecificModel(systemPrompt, userMessage, undefined, isDev, model, maxTokens);
-        return result;
-      } catch (err) {
-        console.warn(`[ai] Model ${model.id} failed:`, err instanceof Error ? err.message : err);
-        // Continue to next model
-      }
-    }
-  }
-
-  throw new Error("No AI API key configured. Set OPENAI_API_KEY, GEMINI_API_KEY, or MISTRAL_API_KEY.");
+  throw new Error("No allowed hosted AI model is available. Check configured providers and try again.");
 }
 
 /** Call a specific AI model */
@@ -660,8 +661,8 @@ export async function getStyleRecommendation(
 
   // Complexity modifier — shapes the detail level and format of the AI response
   const COMPLEXITY_INSTRUCTIONS: Record<number, string> = {
-    // Simple: absolute minimum — one terse sentence, no explanation whatsoever
-    0: `RESPONSE STYLE — SIMPLE: Be extremely terse. The "outfit" field MUST be a single sentence (e.g. "Wear jeans, a t-shirt, and a hoodie."). The "reasoning" field MUST be an empty string "". Ignore any word-count limits in the system prompt — one sentence only.`,
+    // Simple: one short sentence per field, consistent with output validation.
+    0: `RESPONSE STYLE — SIMPLE: Be extremely terse. The "outfit" field MUST be a single sentence (e.g. "Wear jeans, a t-shirt, and a hoodie."). The "reasoning" field MUST be one short sentence explaining the weather choice. Ignore any word-count limits in the system prompt — one sentence per field only.`,
     // Simple+: brief recommendation with one short reason
     1: `RESPONSE STYLE — SIMPLE+: Keep it short. The "outfit" field should be 1–2 sentences naming the key pieces. The "reasoning" field should be at most 1–2 sentences linking the weather to the choice. Do not use bullet points or headers.`,
     // Advanced: structured prose with layering/accessories notes
@@ -694,7 +695,7 @@ Please recommend an outfit.`;
   const maxTokens = input.structuredOutfit || forceCloset ? Math.max(1200, MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350) : MAX_TOKENS_BY_COMPLEXITY[complexityLevel] ?? 350;
 
   const { raw, modelUsed } = await callAIWithModel(
-    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, maxTokens
+    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, maxTokens, input.isPro === true
   );
   
   const recommendation = validateStructuredResponse(parseRecommendationFromRaw(raw), input.wardrobeItems, input.structuredOutfit || forceCloset, forceCloset === true);
@@ -752,7 +753,7 @@ User follow-up question: "${followUpMessage}"
 Please update the outfit recommendation based on the follow-up question. Respond with the same JSON format.`;
 
   const { raw, modelUsed } = await callAIWithModel(
-    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, input.structuredOutfit || input.forceCloset ? 1200 : 500
+    systemPrompt, userMessage, userApiKey, isDev, modelId, byokProvider, input.structuredOutfit || input.forceCloset ? 1200 : 500, input.isPro === true
   );
   
   const recommendation = validateStructuredResponse(parseRecommendationFromRaw(raw), input.wardrobeItems, input.structuredOutfit || input.forceCloset, input.forceCloset === true);

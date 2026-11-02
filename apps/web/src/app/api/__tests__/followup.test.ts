@@ -766,6 +766,12 @@ describe("6.3 usable-output charging",()=>{
 });
 
 describe('legacy account model and credential access', () => {
+  it.each([[mockUser, true, false], [mockProUser, false, true]] as const)('follow-up plan access comes from the profile', async (profile, claimed, expected) => {
+    setMockProfile(profile);
+    const response = await POST(createMockNextRequest({ message: 'Adjust it', previousOutfit: 'Shirt', weather: mockWeatherData, isPro: claimed }));
+    expect(response.status).toBe(200);
+    expect(jest.requireMock('@/lib/ai').getFollowUpRecommendation).toHaveBeenCalledWith(expect.objectContaining({ isPro: expected }));
+  });
   it.each([{ modelId: 'gpt-4o' }, { userApiKey: 'synthetic-key' }])('rejects unavailable options before generation: %j', async options => {
     setMockProfile(mockUser);
     const ai = jest.requireMock('@/lib/ai');

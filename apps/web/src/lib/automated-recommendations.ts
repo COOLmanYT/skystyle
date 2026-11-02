@@ -99,7 +99,7 @@ export async function runAutomaticRecommendationSchedule(schedule: AutomaticReco
     const wardrobeItems=Array.isArray(closet.data?.wardrobe_items)?closet.data.wardrobe_items:[];
     const recommendation=await getStyleRecommendation({weather,closetItems:wardrobeItems.filter((item:{available:boolean})=>item.available).map((item:{label:string})=>item.label),wardrobeItems,structuredOutfit:true,
       unitPreference:schedule.unit_preference,customSystemPrompt:isPro||isDev?settings.data?.custom_system_prompt??undefined:undefined,
-      clientCustomPrompt:isPro||isDev?schedule.prompt??undefined:undefined,recommendationContext:settings.data?.comfort_preferences?{comfort:parseComfort(settings.data.comfort_preferences)}:undefined,forceCloset:false,shareLocation:false,isDev,modelId:getScheduledModel(isPro,isDev).id});
+      clientCustomPrompt:isPro||isDev?schedule.prompt??undefined:undefined,recommendationContext:settings.data?.comfort_preferences?{comfort:parseComfort(settings.data.comfort_preferences)}:undefined,forceCloset:false,shareLocation:false,isDev,isPro,modelId:getScheduledModel(isPro,isDev).id});
     stagingAttempted=true;
     await runRpc("v63_stage_auto_result",{p_run_id:run.id,p_token:run.lease_token,p_weather:weather,p_recommendation:recommendation,p_receipt:receipt,p_legacy_plan:plan});
     staged=true;

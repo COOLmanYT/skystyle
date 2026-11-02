@@ -151,7 +151,7 @@ export async function POST(req: NextRequest) {
       customSystemPrompt,
       userApiKey: (isPro || isDev) ? userApiKey : undefined,
       byokProvider: (body.byokProvider ?? "openai") as ByokProvider,
-      isDev,
+      isDev, isPro,
       recommendationContext,
       eventForecast,
       modelId: accounting ? (modelId as ModelID | undefined) ?? getDefaultModel(isPro, isDev).id : modelId as ModelID | undefined,

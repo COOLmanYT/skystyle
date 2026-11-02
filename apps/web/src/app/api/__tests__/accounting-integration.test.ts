@@ -83,6 +83,17 @@ beforeEach(()=>{
   (getFollowUpRecommendation as jest.Mock).mockImplementation(async()=>{events.push("followup-provider");return mockStyleRecommendation;});
   (searchShop as jest.Mock).mockImplementation(async()=>{events.push("shop-provider");return {status:"ok",products:[{name:"synthetic shirt"}]};});
 });
+describe('server-owned public API model access',()=>{
+  it.each([
+    [true,'free','free'], [true,'pro','pro'], [false,'free','pro'],
+  ] as const)('uses accounting=%s plan=%s rather than client claims',async(active,plan,expected)=>{
+    enabled=active;account.plan=plan;
+    const handler=jest.fn(async(_req:NextRequest,context:{modelAccess?:string})=>NextResponse.json({access:context.modelAccess}));
+    const response=await withApiAuth(handler)(request({isPro:expected!=='pro'},'/api/v1/recommend'));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({access:expected});
+  });
+});
 const cases=[
   ["Style",style,{lat:-37.8,lon:145},"style-provider","recommendation"],
   ["follow-ups",followup,{message:"Shorter please",previousOutfit:"Shirt",weather:mockWeatherData},"followup-provider","followup"],

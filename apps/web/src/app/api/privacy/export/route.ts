@@ -36,19 +36,22 @@ export async function GET(req: NextRequest) {
     savedOutfits,
   ] = await Promise.all([
     supabaseAdmin.from("users").select("*").eq("id", userId).single(),
-    supabaseAdmin.from("settings").select("*").eq("user_id", userId).single(),
-    supabaseAdmin.from("closet").select("*").eq("user_id", userId).single(),
+    supabaseAdmin.from("settings").select("*").eq("user_id", userId).maybeSingle(),
+    supabaseAdmin.from("closet").select("*").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("daily_usage").select("*").eq("user_id", userId).order("usage_date", { ascending: false }),
     supabaseAdmin.from("feedback").select("category, rating, comment, created_at").eq("user_id", userId).order("created_at", { ascending: false }),
     supabaseAdmin.from("security_logs").select("event_type, metadata, ip_address, created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(500),
     supabaseAdmin.from("passkeys").select("display_name, transports, created_at").eq("user_id", userId),
-    supabaseAdmin.from("deletion_requests").select("status, reason, created_at").eq("user_id", userId).single(),
+    supabaseAdmin.from("deletion_requests").select("status, reason, created_at").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("style_feedback_preferences").select("entries, summary, updated_at").eq("user_id", userId).maybeSingle(),
     supabaseAdmin.from("saved_outfits").select("*").eq("user_id",userId).order("created_at"),
   ]);
 
-  if (stylePreferences.error || savedOutfits.error) {
-    return NextResponse.json({ error: "Unable to include private style feedback. Please retry your export." }, { status: 503 });
+  // Optional single rows may legitimately be absent. Transport/query failures
+  // must never be presented as an empty, complete export.
+  const queries = [userRow, settingsRow, closetRow, deletionReq, dailyUsage, feedbackRows, securityLogs, passkeys, stylePreferences, savedOutfits];
+  if (!userRow.data || queries.some(result => result.error)) {
+    return NextResponse.json({ error: "Unable to include all account data. Please retry your export." }, { status: 503 });
   }
 
   const exportData = {

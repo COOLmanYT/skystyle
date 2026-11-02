@@ -108,7 +108,7 @@ export async function POST(req: NextRequest) {
   const { credentialID, credentialPublicKey, counter } =
     verification.registrationInfo;
 
-  await supabaseAdmin.from("passkeys").insert({
+  const { error: credentialError } = await supabaseAdmin.from("passkeys").insert({
     user_id: session.user.id,
     credential_id: Buffer.from(credentialID).toString("base64url"),
     public_key: Buffer.from(credentialPublicKey).toString("base64"),
@@ -116,6 +116,10 @@ export async function POST(req: NextRequest) {
     transports: body.response?.transports?.join(",") ?? null,
     display_name: body.displayName ?? "Passkey",
   });
+
+  if (credentialError) {
+    return NextResponse.json({ error: "Could not save your passkey. Please retry registration." }, { status: 503 });
+  }
 
   // Clean up challenge
   await supabaseAdmin

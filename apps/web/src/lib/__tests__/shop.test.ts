@@ -64,7 +64,7 @@ describe("Grounded Shop sourcing", () => {
   it("fails safely when the source is down or AI invents all product ids", async () => {
     source(); (callAIWithModel as jest.Mock).mockResolvedValue({ raw: '{"items":[{"id":"invented"}]}', modelUsed: "Gemini" });
     await expect(searchShop(parseShopInput({ query: "shirt" }), { isPro: true, isDev: false, byokProvider: "anthropic", userApiKey: "user-test-key" })).rejects.toThrow("no valid sourced products");
-    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), "user-test-key", false, "gemini-2.5-flash", "anthropic", 1200);
+    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), "user-test-key", false, "gemini-2.5-flash", "anthropic", 1200, true);
     (fetch as jest.Mock).mockReset().mockResolvedValue({ ok: false });
     await expect(searchShop(parseShopInput({ query: "shirt" }), { isPro: false, isDev: false })).rejects.toThrow("temporarily unavailable");
   });

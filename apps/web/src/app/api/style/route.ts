@@ -254,7 +254,7 @@ export async function POST(req: NextRequest) {
       byokProvider: (isPro || isDev) ? byokProvider : undefined,
       gender: typeof gender === "string" ? gender.slice(0, 30) : undefined,
       shareLocation: shareLocation === true, forceCloset: forceCloset === true,
-      isDev, customContext: weather.customContext, planningData, recommendationContext, eventForecast,
+      isDev, isPro, customContext: weather.customContext, planningData, recommendationContext, eventForecast,
       modelId: accounting ? (modelId as ModelID | undefined) ?? getDefaultModel(isPro, isDev).id : modelId as ModelID | undefined,
     });
     return { weather, eventForecast, recommendation:requireUsableRecommendation(recommendation) };

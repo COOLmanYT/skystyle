@@ -39,13 +39,13 @@ describe("AI swap provider availability", () => {
     const response = await POST(request());
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ payload: { slots: [{ itemId: replacement.id }] } });
-    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), undefined, true, "gemini-2.5-flash", undefined, 200);
+    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), undefined, true, "gemini-2.5-flash", undefined, 200, false);
   });
 
   it("keeps BYOK usable without any hosted provider credentials", async () => {
     const response = await POST(request({ userApiKey: "synthetic-user-key", byokProvider: "mistral" }));
     expect(response.status).toBe(200);
-    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), "synthetic-user-key", true, "gpt-4o", "mistral", 200);
+    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), "synthetic-user-key", true, "gpt-4o", "mistral", 200, false);
   });
 
   it("fails recoverably without calling a provider when none is configured", async () => {

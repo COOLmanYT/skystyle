@@ -39,6 +39,8 @@ export interface ApiKeyContext {
   /** Unix ms timestamp captured at the very start of the request. */
   startedAt: number;
   timings?: Record<string, number>;
+  /** Server-derived access for hosted AI; never taken from the request body. */
+  modelAccess?: "free" | "pro";
 }
 
 /**
@@ -458,6 +460,7 @@ export function withApiAuth(handler: ApiHandler) {
       apiKeyId: keyRecord.id,
       userId: keyRecord.userId,
       startedAt, timings,
+      modelAccess: (accounting ? accounting.isDev || accounting.plan === "pro" : isDev || profile?.is_pro === true) ? "pro" : "free",
     };
 
     let response: NextResponse;

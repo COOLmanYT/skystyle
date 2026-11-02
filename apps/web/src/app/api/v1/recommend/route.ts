@@ -49,7 +49,7 @@ function kmhToMph(kmh: number): number {
 
 async function handleRecommend(
   req: NextRequest,
-  _ctx: ApiKeyContext  // eslint-disable-line @typescript-eslint/no-unused-vars
+  _ctx: ApiKeyContext
 ): Promise<NextResponse> {
   // 1. Parse and validate request body
   let body: RecommendBody;
@@ -104,6 +104,7 @@ async function handleRecommend(
       shareLocation: false,
       forceCloset: false,
       isDev: false,
+      isPro: _ctx.modelAccess === "pro",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed.";
