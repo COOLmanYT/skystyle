@@ -9,7 +9,7 @@ jest.mock("@/lib/supabase", () => ({ supabaseAdmin: { from: jest.fn() } }));
 jest.mock("@/lib/sync-user", () => ({ syncPublicUser: jest.fn() }));
 describe("Preview-only cloud data", () => {
   it("returns explicit empty reads without creating a demo account", async () => {
-    expect(await (await inbox()).json()).toMatchObject({ messages: [], preferences: null });
+    expect(await (await inbox({ nextUrl: new URL("http://localhost/api/inbox") } as NextRequest)).json()).toMatchObject({ messages: [], preferences: null });
     expect(await (await closet()).json()).toMatchObject({ items: [] });
     expect(await (await settings()).json()).toEqual({});
     expect(supabaseAdmin.from).not.toHaveBeenCalled(); expect(syncPublicUser).not.toHaveBeenCalled();

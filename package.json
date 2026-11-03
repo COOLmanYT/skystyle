@@ -1,6 +1,6 @@
 {
   "name": "skystyle",
-  "version": "6.3.8",
+  "version": "6.5.0",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -21,7 +21,9 @@
     "typecheck": "tsc --project apps/web/tsconfig.json --noEmit",
     "typecheck:tests": "tsc --project apps/web/tsconfig.test.json --noEmit",
     "test:release-gate": "node --test scripts/verify-vercel-preview.test.mjs",
-    "release:gate": "node scripts/verify-vercel-preview.mjs"
+    "release:gate": "node scripts/verify-vercel-preview.mjs",
+    "test:scheduler": "node supabase/tests/run-idle-scheduler.mjs",
+    "test:daily-outfits": "node supabase/tests/run-v63-smoke.mjs"
   },
   "dependencies": {
     "@auth/supabase-adapter": "^1.11.3",
@@ -59,6 +61,7 @@
     "tailwindcss": "^4",
     "ts-jest": "^29.1.2",
     "typescript": "5.9.3",
-    "vitepress": "^1.6.4"
+    "vitepress": "^1.6.4",
+    "@electric-sql/pglite": "0.3.14"
   }
 }

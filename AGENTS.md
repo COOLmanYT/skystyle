@@ -2,7 +2,13 @@
 
 This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Claude, etc.).
 
-## Current version: 6.3.8
+## Task notes and working artifacts
+
+- Keep task-specific implementation notes, investigation reports, QA summaries, handoff notes, and scratch files outside this repository, including its ignored directories.
+- Store these artifacts in the chat's external artifact directory or a system temporary directory, and link to them from the chat.
+- Only add these kinds of notes to the repository when the user explicitly requests a repository file. Maintained project documentation, source code, tests, and required SQL belong in their appropriate repository locations.
+
+## Current version: 6.5.0
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 

@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useDashboardSections from "./useDashboardSections";
 import { visibleDashboardSections } from "@/lib/dashboard-sections";
+import { startInboxIndicatorPolling } from "@/lib/inbox-indicator";
 
 export type NavPage = "dashboard" | "closet" | "account" | "settings" | "feedback" | "other";
 
@@ -47,22 +48,7 @@ export default function HamburgerNav({
   const router = useRouter();
   const { mode, canAccessDev } = useDashboardSections();
 
-  useEffect(() => {
-    let active = true;
-    const loadInboxIndicator = async () => {
-      try {
-        const res = await fetch("/api/inbox");
-        if (!res.ok || !active) return;
-        const data = await res.json();
-        setInboxUnread(Array.isArray(data.messages) && data.messages.some((message: { read_at?: string | null }) => !message.read_at));
-      } catch {
-        // The indicator is helpful but must never interfere with navigation.
-      }
-    };
-    void loadInboxIndicator();
-    const interval = window.setInterval(loadInboxIndicator, 60_000);
-    return () => { active = false; window.clearInterval(interval); };
-  }, []);
+  useEffect(() => startInboxIndicatorPolling(setInboxUnread), []);
 
   // Close menu on outside click
   useEffect(() => {

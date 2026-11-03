@@ -11,9 +11,17 @@ async function currentUser() {
   return session.user.id;
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const userId = await currentUser();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (req.nextUrl.searchParams.get("view") === "unread") {
+    const headers = { "Cache-Control": "private, no-store" };
+    if (userId === DEMO_USER_ID) return NextResponse.json({ unread: false }, { headers });
+    const { data, error } = await supabaseAdmin.from("user_inbox").select("id")
+      .eq("user_id", userId).is("dismissed_at", null).is("read_at", null).limit(1);
+    if (error) return NextResponse.json({ error: "Failed to load inbox." }, { status: 500, headers });
+    return NextResponse.json({ unread: Boolean(data?.length) }, { headers });
+  }
   if (userId === DEMO_USER_ID) return NextResponse.json({ messages: [], preferences: null, persistence: "unavailable-in-demo" });
   const [messagesResult, preferencesResult] = await Promise.all([
     supabaseAdmin.from("user_inbox").select("*").eq("user_id", userId).is("dismissed_at", null).order("created_at", { ascending: false }).limit(200),

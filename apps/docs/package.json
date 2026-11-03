@@ -1,6 +1,6 @@
 {
   "name": "skystyle-docs",
-  "version": "6.3.8",
+  "version": "6.5.0",
   "private": true,
   "scripts": {
     "dev": "vitepress dev .",
@@ -9,5 +9,8 @@
   },
   "devDependencies": {
     "vitepress": "^1.6.4"
+  },
+  "dependencies": {
+    "@vercel/analytics": "^2.0.1"
   }
 }

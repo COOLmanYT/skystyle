@@ -54,6 +54,7 @@ apps/web/node_modules
 apps/web/.next
 .env*.local
 
-# generated documentation
+# Workspace dependencies and generated documentation
+**/node_modules/
 /apps/docs/.vitepress/dist/
 /apps/docs/.vitepress/cache/
