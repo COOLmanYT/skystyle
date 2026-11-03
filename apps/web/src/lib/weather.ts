@@ -7,14 +7,22 @@ export async function weatherFetch(url: string, options: RequestInit & { next?: 
   const signal = AbortSignal.any(signals);
   signal.throwIfAborted();
   const target = new URL(url);
-  if (!target.username && !target.password && !target.port && (
-    target.protocol === 'http:' && target.hostname === 'www.bom.gov.au' ||
-    target.protocol === 'https:' && (
-      target.hostname === 'api.openweathermap.org' || target.hostname === 'api.weatherapi.com' ||
-      target.hostname === 'weather.visualcrossing.com' || target.hostname === 'api.pirateweather.net' ||
-      target.hostname === 'api.open-meteo.com'
-    )
-  )) return fetch(target, { ...options, redirect: 'error', signal });
+  // A dynamic path/query can never replace the fixed provider authority.
+  const providerPath = target.pathname.slice(1) + target.search;
+  const init = { ...options, redirect: 'error' as const, signal };
+  if (!target.username && !target.password && !target.port) {
+    if (target.protocol === 'http:' && target.hostname === 'www.bom.gov.au') return fetch('http://www.bom.gov.au/' + providerPath, init);
+    if (target.protocol === 'https:') {
+      switch (target.hostname) {
+        case 'www.bom.gov.au': return fetch('https://www.bom.gov.au/' + providerPath, init);
+        case 'api.openweathermap.org': return fetch('https://api.openweathermap.org/' + providerPath, init);
+        case 'api.weatherapi.com': return fetch('https://api.weatherapi.com/' + providerPath, init);
+        case 'weather.visualcrossing.com': return fetch('https://weather.visualcrossing.com/' + providerPath, init);
+        case 'api.pirateweather.net': return fetch('https://api.pirateweather.net/' + providerPath, init);
+        case 'api.open-meteo.com': return fetch('https://api.open-meteo.com/' + providerPath, init);
+      }
+    }
+  }
   return fetchPublicWeatherUrl(url, signal, options.next?.revalidate);
 }
 function requiredTemperature(value: unknown): number {

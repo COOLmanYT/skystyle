@@ -27,4 +27,10 @@ describe("bounded weather provider collection",()=>{
     expect(fetchMock.mock.calls[0][1]).toMatchObject({next:{revalidate:600},headers:{Accept:"application/json"}});
     expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
+  it("keeps path and query input inside the fixed provider origin",async()=>{
+    const fetchMock=jest.spyOn(global,"fetch").mockResolvedValue({ok:true} as Response);
+    await weatherFetch("https://api.openweathermap.org//127.0.0.1/admin?redirect=http://169.254.169.254/");
+    expect(new URL(String(fetchMock.mock.calls[0][0])).origin).toBe('https://api.openweathermap.org');
+    expect(fetchMock.mock.calls[0][1]?.redirect).toBe('error');
+  });
 });
