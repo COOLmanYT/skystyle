@@ -23,7 +23,7 @@ describe("bounded weather provider collection",()=>{
   });
   it("preserves a caller's options while attaching an abort signal",async()=>{
     const fetchMock=jest.spyOn(global,"fetch").mockResolvedValue({ok:true} as Response);
-    await weatherFetch("https://example.com",{next:{revalidate:600},headers:{Accept:"application/json"}});
+    await weatherFetch("https://api.openweathermap.org/data/2.5/weather",{next:{revalidate:600},headers:{Accept:"application/json"}});
     expect(fetchMock.mock.calls[0][1]).toMatchObject({next:{revalidate:600},headers:{Accept:"application/json"}});
     expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });

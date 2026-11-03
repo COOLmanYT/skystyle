@@ -179,8 +179,10 @@ export function parseRecommendationContext(input: unknown): RecommendationContex
   if (raw.window !== undefined) {
     const window = raw.window as Record<string, unknown>;
     if (!window || typeof window !== "object" || Array.isArray(window) || typeof window.start !== "string" || typeof window.end !== "string" || typeof window.timeZone !== "string" || !isTimeZone(window.timeZone)) return { ok: false, error: "Invalid day window or time zone" };
+    const zonedDate = (value: string) => value.length <= 64 && value.includes('T') && /(?:Z|[+-]\d{2}:\d{2})$/.test(value);
+    if (!zonedDate(window.start) || !zonedDate(window.end)) return { ok: false, error: "Choose either an event or a positive day window up to 24 hours" };
     const start = Date.parse(window.start), end = Date.parse(window.end);
-    if (!/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(window.start) || !/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(window.end) || !Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > 86400000 || raw.event !== undefined) return { ok: false, error: "Choose either an event or a positive day window up to 24 hours" };
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > 86400000 || raw.event !== undefined) return { ok: false, error: "Choose either an event or a positive day window up to 24 hours" };
     value.window = { start: new Date(start).toISOString(), end: new Date(end).toISOString(), timeZone: window.timeZone };
   }
   if (raw.comfort !== undefined) {

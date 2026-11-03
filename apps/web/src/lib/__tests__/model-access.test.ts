@@ -12,6 +12,16 @@ beforeEach(()=>{
   mockMistral.mockReset().mockResolvedValue({choices:[{message:{content:raw}}]});
 });
 function ai(){return jest.requireActual<typeof import('../ai')>('../ai');}
+
+test.each(['initial','followup'])('%s keeps wardrobe and custom styling input out of system authority',async(kind)=>{
+  const marker='UNTRUSTED_STYLE_SENTINEL';
+  const shared={weather:mockWeatherData,unitPreference:'metric' as const,isPro:true,closetItems:[marker],customSystemPrompt:marker};
+  if(kind==='initial')await ai().getStyleRecommendation(shared);
+  else await ai().getFollowUpRecommendation({...shared,previousOutfit:'Shirt',previousReasoning:'Mild',followUpMessage:'Warmer'});
+  const {messages}=mockOpenAI.mock.calls[0][0];
+  expect(messages.find((message:{role:string})=>message.role==='system').content).not.toContain(marker);
+  expect(messages.find((message:{role:string})=>message.role==='user').content).toContain(marker);
+});
 test('a default Free recommendation never attempts OpenAI',async()=>{
   const result=await ai().getStyleRecommendation({weather:mockWeatherData,closetItems:[],unitPreference:'metric',isPro:false});
   expect(result.modelUsed).toBe('gemini-2.5-flash');expect(mockOpenAI).not.toHaveBeenCalled();

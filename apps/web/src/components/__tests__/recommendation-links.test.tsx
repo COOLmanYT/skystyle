@@ -9,7 +9,7 @@ describe("Clothing links across recommendation formatting", () => {
   it("links owned names inside bold text and table cells, without substring matches", () => {
     const markup = renderToStaticMarkup(createElement(MarkdownRenderer, { content: "**Coat** and raincoat\n\n| Outfit |\n| --- |\n| **Coat** |", closetItems: ["Coat"], recommendationLinks: true }));
     expect(markup.match(/href="\/closet\?highlight=Coat"/g)).toHaveLength(2);
-    expect(markup.replace(/<[^>]*>/g, "")).toContain("raincoat");
+    expect(markup).not.toContain('highlight=raincoat');
   });
   it("renders encoded, owned and nonowned AI links with canonical destinations", () => {
     const markup = renderToStaticMarkup(createElement(MarkdownRenderer, { content: "[coat](/dashboard?section=shop&item=coat) and [linen shirt](/dashboard?section=shop&item=linen%20shirt)", closetItems: ["Coat"], recommendationLinks: true }));

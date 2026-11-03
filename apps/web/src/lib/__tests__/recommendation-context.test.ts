@@ -15,6 +15,12 @@ const hour = (time: string) => ({
 });
 
 describe("recommendation context", () => {
+  it.each(['start','end'] as const)('bounds attacker-controlled window %s before date parsing', (field) => {
+    const window = {start:'2026-11-03T09:00:00Z',end:'2026-11-03T10:00:00Z',timeZone:'UTC'};
+    expect(parseRecommendationContext({window:{...window,[field]:'T'.repeat(100_000)+'!'}}).ok).toBe(false);
+    expect(parseRecommendationContext({window}).ok).toBe(true);
+    expect(parseRecommendationContext({window:{...window,start:'2026-11-03T09:00:00+11:00',end:'2026-11-03T10:00:00+11:00'}}).ok).toBe(true);
+  });
   it("replaces or removes stale feedback without changing the outfit context", () => {
     const original = { occasion: { kind: "date" as const }, feedbackSummary: "Old summary" };
     expect(withCurrentFeedback(original, " New summary ")).toEqual({ occasion: { kind: "date" }, feedbackSummary: "New summary" });
