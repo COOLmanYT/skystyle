@@ -2,28 +2,21 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import { measurement, roundedMeasurement, meanMeasurements, type RainPeriod } from "./weather-measurements";
 import { fetchPublicWeatherUrl } from './public-weather-fetch';
 const weatherDeadline = new AsyncLocalStorage<AbortSignal>();
-export async function weatherFetch(url: string, options: RequestInit & { next?: { revalidate: number } } = {}) {
-  const signals = [AbortSignal.timeout(5000), ...(weatherDeadline.getStore() ? [weatherDeadline.getStore()!] : [])];
-  const signal = AbortSignal.any(signals);
+function weatherRequestSignal(): AbortSignal {
+  const signal = AbortSignal.any([AbortSignal.timeout(5000), ...(weatherDeadline.getStore() ? [weatherDeadline.getStore()!] : [])]);
   signal.throwIfAborted();
+  return signal;
+}
+// Only built-in provider adapters use this transport. Custom URLs always use
+// fetchPublicWeatherUrl, which pins the connection to a validated public IP.
+export async function weatherFetch(url: string, options: RequestInit & { next?: { revalidate: number } } = {}) {
   const target = new URL(url);
-  // A dynamic path/query can never replace the fixed provider authority.
-  const providerPath = target.pathname.slice(1) + target.search;
-  const init = { ...options, redirect: 'error' as const, signal };
-  if (!target.username && !target.password && !target.port) {
-    if (target.protocol === 'http:' && target.hostname === 'www.bom.gov.au') return fetch('http://www.bom.gov.au/' + providerPath, init);
-    if (target.protocol === 'https:') {
-      switch (target.hostname) {
-        case 'www.bom.gov.au': return fetch('https://www.bom.gov.au/' + providerPath, init);
-        case 'api.openweathermap.org': return fetch('https://api.openweathermap.org/' + providerPath, init);
-        case 'api.weatherapi.com': return fetch('https://api.weatherapi.com/' + providerPath, init);
-        case 'weather.visualcrossing.com': return fetch('https://weather.visualcrossing.com/' + providerPath, init);
-        case 'api.pirateweather.net': return fetch('https://api.pirateweather.net/' + providerPath, init);
-        case 'api.open-meteo.com': return fetch('https://api.open-meteo.com/' + providerPath, init);
-      }
-    }
+  const providerHosts = ['www.bom.gov.au', 'api.openweathermap.org', 'api.weatherapi.com', 'weather.visualcrossing.com', 'api.pirateweather.net', 'api.open-meteo.com'];
+  if (target.username || target.password || target.port || !providerHosts.includes(target.hostname)
+    || (target.protocol !== 'https:' && !(target.protocol === 'http:' && target.hostname === 'www.bom.gov.au'))) {
+    throw new Error('Invalid built-in weather provider URL');
   }
-  return fetchPublicWeatherUrl(url, signal, options.next?.revalidate);
+  return fetch(url, { ...options, redirect: 'error', signal: weatherRequestSignal() });
 }
 function requiredTemperature(value: unknown): number {
   const temp = roundedMeasurement(value, -100, 70);
@@ -344,10 +337,10 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
   if (isPrivateHost(host)) {
     throw new Error("Custom source URL must point to a public host");
   }
-  // weatherFetch validates and pins the actual connection to a public IP.
+  // Pin the actual custom-source connection to a validated public IP.
 
 
-  const res = await weatherFetch(parsed.toString(), { next: { revalidate: 300 } });
+  const res = await fetchPublicWeatherUrl(parsed.toString(), weatherRequestSignal(), 300);
   if (!res.ok) throw new Error(`Custom source fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
@@ -481,7 +474,7 @@ async function fetchPirateWeather(lat: number, lon: number, apiKey?: string): Pr
 
   const safeLat = encodeURIComponent(lat.toFixed(6));
   const safeLon = encodeURIComponent(lon.toFixed(6));
-  const url = `https://api.pirateweather.net/forecast/${key}/${safeLat},${safeLon}?units=ca`;
+  const url = `https://api.pirateweather.net/forecast/${encodeURIComponent(key)}/${safeLat},${safeLon}?units=ca`;
   const res = await weatherFetch(url, { next: { revalidate: 600 } });
   if (!res.ok) throw new Error(`Pirate Weather fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -672,10 +665,7 @@ async function fetchRssFeed(url: string): Promise<string> {
   // Enforce strict SSRF-safe validation of the target URL
   await validatePublicHttpsUrlForRss(parsed);
 
-  const res = await weatherFetch(parsed.toString(), {
-    headers: { "User-Agent": "SkyStyle/1.0 (weather-stylist app)" },
-    next: { revalidate: 600 },
-  });
+  const res = await fetchPublicWeatherUrl(parsed.toString(), weatherRequestSignal(), 600);
   if (!res.ok) throw new Error(`RSS fetch failed: ${res.status}`);
   const xml = await res.text();
 
