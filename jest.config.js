@@ -8,7 +8,7 @@ module.exports = {
   ],
   transform: {
     '^.+\\.(ts|tsx)$': ['ts-jest', {
-      tsconfig: 'apps/web/tsconfig.json'
+      tsconfig: 'apps/web/tsconfig.test.json'
     }]
   },
   collectCoverageFrom: [
