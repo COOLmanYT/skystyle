@@ -42,15 +42,24 @@ export interface DailyLimitsInfo {
   model_switches: DailyLimitCounter;
 }
 
-export const LIMITS = {
-  free: { ai_uses: 20, follow_ups: 40, closet_uses: 4, source_picks: 4, model_switches: 2 },
-  // demo plan: 10× the standard free limits for preview-environment testing
-  demo: { ai_uses: 200, follow_ups: 400, closet_uses: 40, source_picks: 40, model_switches: 20 },
-  pro: { ai_uses: Infinity, follow_ups: 400, closet_uses: Infinity, source_picks: Infinity, model_switches: Infinity },
-  dev: { ai_uses: Infinity, follow_ups: Infinity, closet_uses: Infinity, source_picks: Infinity, model_switches: Infinity },
-} as const;
+export { LEGACY_LIMITS as LIMITS } from "./legacy-allowances";
+import { LEGACY_LIMITS as LIMITS } from "./legacy-allowances";
 
 type UsageField = "ai_uses" | "follow_ups" | "closet_uses" | "source_picks" | "model_switches";
+
+/** Keep displayed allowances and legacy admission on the same account cap. */
+async function getLegacyAiLimit(userId: string, tierLimit: number, isDev: boolean, isDemo: boolean): Promise<number> {
+  if (isDev || isDemo) return tierLimit;
+  const { data, error } = await supabaseAdmin
+    .from("user_access_controls")
+    .select("app_daily_ai_limit")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (error) throw error;
+  return typeof data?.app_daily_ai_limit === "number"
+    ? Math.min(tierLimit, data.app_daily_ai_limit)
+    : tierLimit;
+}
 
 function today(): string {
   return new Date().toISOString().split("T")[0];
@@ -121,18 +130,9 @@ export async function canUseFeature(
   }
   const usage = await getDailyUsage(userId);
   const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
-  let limit = LIMITS[tier][field];
-  if (field === "ai_uses" && !isDev && !isDemo) {
-    const { data: accessControl, error } = await supabaseAdmin
-      .from("user_access_controls")
-      .select("app_daily_ai_limit")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (error) throw error;
-    if (typeof accessControl?.app_daily_ai_limit === "number") {
-      limit = Math.min(limit, accessControl.app_daily_ai_limit);
-    }
-  }
+  const limit = field === "ai_uses"
+    ? await getLegacyAiLimit(userId, LIMITS[tier][field], isDev, isDemo)
+    : LIMITS[tier][field];
   const used = usage[field];
   return { allowed: used < limit, used, limit };
 }
@@ -184,9 +184,10 @@ export async function getDailyLimitsInfo(userId: string, isPro: boolean, isDev: 
   };
   const usage = await getDailyUsage(userId);
   const tier = isDev ? "dev" : isDemo ? "demo" : (isPro ? "pro" : "free");
+  const aiLimit = await getLegacyAiLimit(userId, LIMITS[tier].ai_uses, isDev, isDemo);
   const fmt = (v: number): number | null => (v === Infinity ? null : v);
   return {
-    ai: { used: usage.ai_uses, limit: fmt(LIMITS[tier].ai_uses) },
+    ai: { used: usage.ai_uses, limit: fmt(aiLimit) },
     followUps: { used: usage.follow_ups, limit: fmt(LIMITS[tier].follow_ups) },
     closet: { used: usage.closet_uses, limit: fmt(LIMITS[tier].closet_uses) },
     sourcePicks: { used: usage.source_picks, limit: fmt(LIMITS[tier].source_picks) },

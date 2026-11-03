@@ -8,7 +8,7 @@ Sky Style exposes a versioned REST API for external developers. All endpoints ar
 https://skystyle.app/api/v1
 ```
 
-## Available Endpoints
+## Available endpoints
 
 | Method | Path | Description | Credits |
 |--------|------|-------------|---------|
@@ -34,6 +34,6 @@ All responses are `application/json`. Error responses always include a top-level
 { "error": "lat must be a number between -90 and 90, and lon between -180 and 180." }
 ```
 
-See the full [Error Reference](./errors) for status codes.
+See [Errors & Credits](./errors) for status codes. Recommendation strings are Markdown; see [Clothing References](./clothing-references) for the development candidate's item syntax and rendering behaviour.
 
 The web application's **Shop** endpoint is `POST /api/shop`, outside `v1`. It requires a web session, not an API key, and uses the current app recommendation allowance. See [Shop request and source limits](./health#authenticated-shop-endpoint).

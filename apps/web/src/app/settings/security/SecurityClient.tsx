@@ -663,7 +663,7 @@ function PasskeyRegisterButton({ onSuccess }: { onSuccess: () => void }) {
       if (!optRes.ok) throw new Error("Failed to get options");
       const options = await optRes.json();
 
-      const credential = await startRegistration(options);
+      const credential = await startRegistration({ optionsJSON: options });
 
       const verifyRes = await fetch("/api/passkeys/register", {
         method: "POST",

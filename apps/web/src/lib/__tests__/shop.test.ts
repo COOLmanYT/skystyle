@@ -23,6 +23,12 @@ describe("Grounded Shop sourcing", () => {
   it("does not invent product details when missing", () => {
     const [product] = parseEbayProducts({ itemSummaries: [{ ...item, price: { value: "invalid", currency: "AUD" }, image: {} }] }, "now");
     expect(product.price).toBeNull(); expect(product.image).toBeNull(); expect(product.rating).toBeNull();
+    expect(parseEbayProducts({ itemSummaries: [{ ...item, price: { value: "", currency: "AUD" } }] }, "now")[0].price).toBeNull();
+  });
+  it("preserves bounded Style context and rejects malformed or excessive excerpts", () => {
+    const context = { item: "linen shirt", outfit: "Pair with navy trousers" };
+    expect(parseShopInput({ query: "shirt", styleContext: context }).styleContext).toEqual(context);
+    for (const styleContext of [null, [], { item: "", outfit: "x" }, { item: "shirt", outfit: "x".repeat(1501) }]) expect(() => parseShopInput({ query: "shirt", styleContext })).toThrow();
   });
   it("fails closed without approved source credentials and never calls AI", async () => {
     const result = await searchShop(parseShopInput({ query: "shirt" }), { isPro: false, isDev: false });
@@ -58,7 +64,7 @@ describe("Grounded Shop sourcing", () => {
   it("fails safely when the source is down or AI invents all product ids", async () => {
     source(); (callAIWithModel as jest.Mock).mockResolvedValue({ raw: '{"items":[{"id":"invented"}]}', modelUsed: "Gemini" });
     await expect(searchShop(parseShopInput({ query: "shirt" }), { isPro: true, isDev: false, byokProvider: "anthropic", userApiKey: "user-test-key" })).rejects.toThrow("no valid sourced products");
-    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), "user-test-key", false, "gemini-2.5-flash", "anthropic", 1200);
+    expect(callAIWithModel).toHaveBeenCalledWith(expect.any(String), expect.any(String), "user-test-key", false, "gemini-2.5-flash", "anthropic", 1200, true);
     (fetch as jest.Mock).mockReset().mockResolvedValue({ ok: false });
     await expect(searchShop(parseShopInput({ query: "shirt" }), { isPro: false, isDev: false })).rejects.toThrow("temporarily unavailable");
   });

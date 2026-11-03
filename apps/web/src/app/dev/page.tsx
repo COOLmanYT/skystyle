@@ -1,125 +1,32 @@
-import { auth } from "@/auth";
-import { redirect } from "next/navigation";
-import PageSpacingWrapper from "@/components/PageSpacingWrapper";
-import DevNavBar from "@/components/DevNavBar";
 import Link from "next/link";
-import { getDevEmails } from "@/lib/dev-auth";
 import Tutorial from "@/components/Tutorial";
+import { devNavigation } from "@/lib/dev-navigation";
 
-export default async function DevLandingPage() {
-  const session = await auth();
-  if (!session?.user?.email) redirect("/login");
-  if (!getDevEmails().has(session.user.email.toLowerCase())) redirect("/dashboard?access=denied");
+const groups = [
+  { name: "Support", icon: "◎", heading: "Help someone", description: "Start with the conversation or request that needs a response." },
+  { name: "Monitoring", icon: "↗", heading: "Check the system", description: "Use health for connectivity and API activity for request failures." },
+  { name: "Accounts", icon: "◷", heading: "Manage accounts", description: "Find a user before changing access, limits or account data." },
+  { name: "Publishing", icon: "✎", heading: "Share an update", description: "Preview changelog content before making it public." },
+] as const;
 
-  return (
-    <div className="min-h-screen" style={{ background: "var(--background)" }}>
-      <Tutorial id="dev-dashboard" title="Dev Center tour" steps={[{ title: "Choose a workspace", body: "Open triage, support, changelog, health, or operations from these cards.", target: '[data-tour="dev-workspaces"]' }, { title: "Monitor safely", body: "Operations shows sanitized API diagnostics and user controls.", target: 'a[href="/dev/operations"]' }, { title: "Publish carefully", body: "Use the Changelog CMS preview before changing public posts.", target: 'a[href="/dev/changelog"]' }]} />
-      <DevNavBar email={session.user.email} />
-
-      <main id="main-content">
-        <PageSpacingWrapper page="account" className="max-w-5xl mx-auto px-4 py-10 space-y-8">
-
-          <div className="space-y-3 rounded-3xl border p-6 sm:p-8" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
-            <p className="text-xs font-semibold uppercase tracking-widest opacity-60">Developer workspace</p>
-            <h1 className="text-3xl font-bold" style={{ color: "var(--foreground)" }}>
-              Sky Style Dev Center
-            </h1>
-            <p className="text-sm" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-              Support, content, and operations in one place. Restricted to verified developer accounts.
-            </p>
-          </div>
-
-          <div data-tour="dev-workspaces" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-            {[
-              {
-                href: "/dev/triage",
-                emoji: "🗂️",
-                title: "Triage",
-                desc: "Review and action pending deletion requests",
-                color: "#ff9500",
-              },
-              {
-                href: "/dev/chat",
-                emoji: "💬",
-                title: "User Chat",
-                desc: "Read and reply to user messages",
-                color: "var(--accent)",
-              },
-              {
-                href: "/dev/changelog",
-                emoji: "📝",
-                title: "Changelog CMS",
-                desc: "Publish and manage changelog posts",
-                color: "#30d158",
-              },
-              {
-                href: "/dev/health",
-                emoji: "📊",
-                title: "System Health",
-                desc: "API usage, error rates, and diagnostics",
-                color: "#bf5af2",
-              },
-              {
-                href: "/dev/operations",
-                emoji: "🛠️",
-                title: "Operations",
-                desc: "Monitor API activity, manage access, and reply to feedback",
-                color: "#0a84ff",
-              },
-            ].map((card) => (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="rounded-2xl p-6 block btn-interact"
-                style={{
-                  background: "var(--card)",
-                  border: "1px solid var(--card-border)",
-                  textDecoration: "none",
-                }}
-              >
-                <span className="text-3xl">{card.emoji}</span>
-                <h2
-                  className="text-base font-semibold mt-3 mb-1"
-                  style={{ color: "var(--foreground)" }}
-                >
-                  {card.title}
-                </h2>
-                <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.55 }}>
-                  {card.desc}
-                </p>
-                <div
-                  className="mt-4 h-0.5 rounded-full"
-                  style={{ background: card.color, opacity: 0.6, width: "40%" }}
-                />
-              </Link>
-            ))}
-          </div>
-
-          <div
-            className="rounded-2xl p-5"
-            style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
-          >
-            <p
-              className="text-xs font-semibold uppercase tracking-widest mb-3"
-              style={{ color: "var(--foreground)", opacity: 0.4 }}
-            >
-              Security Notice
-            </p>
-            <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.6 }}>
-              All actions in the Dev Center are server-verified against{" "}
-              <code
-                className="px-1 py-0.5 rounded"
-                style={{ background: "var(--background)", fontFamily: "monospace" }}
-              >
-                DEV_EMAILS
-              </code>{" "}
-              on every request. Access requires an active session with a verified dev email.
-              Review the relevant confirmation and authorization requirements before any destructive action.
-            </p>
-          </div>
-
-        </PageSpacingWrapper>
-      </main>
-    </div>
-  );
+export const metadata = { title: "Overview — Dev Center" };
+export default function DevLandingPage() {
+  return <main id="main-content" className="space-y-8">
+    <Tutorial id="dev-dashboard" title="Dev Center tour" steps={[
+      { title: "Find your task", body: "Support, monitoring, accounts and publishing each have a dedicated workspace.", target: '[data-tour="dev-workspaces"]' },
+      { title: "Keep your place", body: "Use the workspace navigation to move between tools. The current page stays highlighted.", target: 'aside' },
+      { title: "Preview an update", body: "Review the Changelog preview before publishing.", target: 'a[href="/dev/changelog"]' },
+    ]} />
+    <header className="relative overflow-hidden rounded-3xl border p-6 sm:p-9" style={{ background: "linear-gradient(125deg, color-mix(in srgb, var(--accent) 14%, var(--card)), var(--card))", borderColor: "var(--card-border)" }}>
+      <p className="text-xs font-semibold uppercase tracking-widest opacity-55">Sky Style · Developer workspace</p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight sm:text-4xl">What needs your attention?</h1>
+      <p className="mt-3 max-w-xl text-sm leading-relaxed opacity-65">One place for support, service checks and account tools. Choose a task below, or jump straight to a workspace.</p>
+      <div className="mt-6 flex flex-wrap gap-3"><Link href="/dev/operations/feedback" className="rounded-xl px-4 py-3 text-sm font-semibold" style={{ background: "var(--accent)", color: "white" }}>Open feedback tickets →</Link><Link href="/dev/health" className="rounded-xl border px-4 py-3 text-sm font-medium" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>Check service health</Link></div>
+    </header>
+    <div data-tour="dev-workspaces" className="grid gap-5 xl:grid-cols-2">{groups.map((group) => <section key={group.name} className="rounded-2xl border p-5 sm:p-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
+      <div className="flex items-start gap-4"><span aria-hidden="true" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-2xl" style={{ background: "color-mix(in srgb, var(--accent) 12%, var(--background))", color: "var(--accent)" }}>{group.icon}</span><div><h2 className="text-lg font-semibold">{group.heading}</h2><p className="mt-1 text-sm leading-relaxed opacity-60">{group.description}</p></div></div>
+      <ul className="mt-5 space-y-1">{devNavigation.filter((item) => item.group === group.name).map((item) => <li key={item.href}><Link href={item.href} className="group flex items-center justify-between gap-4 rounded-xl px-3 py-3 transition-colors hover:bg-[var(--background)]"><div><span className="text-sm font-semibold">{item.label}</span><p className="mt-1 text-xs leading-relaxed opacity-60">{item.description}</p></div><span aria-hidden="true" className="opacity-40 transition-transform group-hover:translate-x-1">→</span></Link></li>)}</ul>
+    </section>)}</div>
+    <p className="px-1 text-xs leading-relaxed opacity-55">Developer access is restricted. Account changes and exports are audited; approving a deletion request does not itself delete the account.</p>
+  </main>;
 }

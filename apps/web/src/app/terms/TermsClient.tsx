@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import SmartBackButton from "@/components/SmartBackButton";
-import { formatAudCents, V6_PLAN_RULES, V6_ROLLOUT_NOTICE } from "@/lib/entitlement-policy";
+
 
 function SimpleToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
   return (
@@ -58,7 +59,7 @@ export default function TermsClient() {
         Terms of Service
       </h1>
       <p className="text-sm mb-4" style={{ color: "var(--foreground)", opacity: 0.5 }}>
-        Last updated: April 2026
+        Last updated: 1 October 2026
       </p>
 
       {/* Simple Mode toggle */}
@@ -76,6 +77,14 @@ export default function TermsClient() {
           </p>
         </div>
       </div>
+
+      <section className="mb-8 rounded-2xl border p-5 text-sm leading-relaxed space-y-3" style={{ background: "var(--card)", borderColor: "var(--card-border)" }} aria-labelledby="terms-62">
+        <h2 id="terms-62" className="text-base font-semibold">Sign-in, recommendations and shopping</h2>
+        <p>Use a configured sign-in provider to access your account. Accounts are not automatically linked by matching email; use your original sign-in method to access existing closet items and settings.</p>
+        <p>AI clothing links help you locate an owned item or prepare an editable Shop search. They do not confirm ownership, suitability, stock or price. An item removed from your closet may no longer be found. A link click does not start a paid or metered request; submitting a successful Shop AI selection uses the applicable recommendation allowance or App Credits.</p>
+        <p>Live shopping requires an approved product-source connection. If unavailable or empty, Sky Style offers a direct retailer search and does not charge for a selection. Source prices keep their original currency, exclude delivery unless stated, and may change. Retailers handle purchases, delivery, returns and their own terms. Sky Style adds no affiliate parameters or shopping click tracking and does not operate checkout.</p>
+        <p>Health endpoints show cached connectivity checks, not an uptime promise or a guarantee that recommendations will succeed. These terms do not remove any rights or remedies that cannot lawfully be excluded, including applicable Australian consumer guarantees.</p>
+      </section>
 
       {simple ? (
         /* ── Simple Mode ── */
@@ -105,10 +114,9 @@ export default function TermsClient() {
             className="rounded-2xl p-5 space-y-3"
             style={{ background: "var(--card)", border: "1px solid var(--card-border)" }}
           >
-            <p className="text-base font-semibold" style={{ opacity: 1 }}>⚠️ Zero liability</p>
+            <p className="text-base font-semibold" style={{ opacity: 1 }}>⚠️ Use your judgement</p>
             <p>
-              AI outfit suggestions are just suggestions — we&apos;re not liable if you dress wrong for the weather.
-              This is a fun helper, not professional advice. Use your own judgement.
+              AI outfit suggestions can be wrong. Check weather warnings and use your own judgement. This is a helper, not professional advice; applicable legal rights still apply.
             </p>
           </div>
           <div
@@ -117,7 +125,7 @@ export default function TermsClient() {
           >
             <p className="text-base font-semibold" style={{ opacity: 1 }}>👤 Your data</p>
             <p>
-              We store your name and email (from Google/GitHub login) so you can sign in. We track daily
+              We store available profile details from your sign-in provider so you can sign in. We count daily
               usage counts for rate-limiting. We don&apos;t sell your data or track you across the web.
             </p>
           </div>
@@ -217,22 +225,16 @@ export default function TermsClient() {
           <section>
             <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Your account</h2>
             <p>
-              You sign in via GitHub or Google OAuth. We store your user ID, name, email, and
+              You sign in via a configured OAuth provider. We store your user ID, available name, email, and
               profile image so you can log in again. We do not create a separate password for you.
               You are responsible for keeping your OAuth credentials secure.
             </p>
           </section>
 
           <section>
-            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Approved V6 plans — inactive</h2>
-            <p>
-              {V6_ROLLOUT_NOTICE} Free is {formatAudCents(V6_PLAN_RULES.free.monthlyPriceAudCents)} with {V6_PLAN_RULES.free.recommendationsDaily} recommendations/day and {V6_PLAN_RULES.free.recommendationsMonthly}/month, plus {V6_PLAN_RULES.free.followupsDaily} follow-ups/day and {V6_PLAN_RULES.free.followupsMonthly}/month.
-              Pro is {formatAudCents(V6_PLAN_RULES.pro.monthlyPriceAudCents)}/month with {V6_PLAN_RULES.pro.recommendationsDaily} recommendations/day and {V6_PLAN_RULES.pro.recommendationsMonthly}/month, plus {V6_PLAN_RULES.pro.followupsDaily} follow-ups/day and {V6_PLAN_RULES.pro.followupsMonthly}/month. Both caps apply; resets are at midnight UTC and the start of the UTC calendar month.
-            </p>
-            <p className="mt-2">
-              Free allows {V6_PLAN_RULES.free.apiKeyLimit} active API keys and a once-only {V6_PLAN_RULES.free.signupCredits}-credit signup grant. Pro and PAYG allow {V6_PLAN_RULES.pro.apiKeyLimit} keys; Pro grants {V6_PLAN_RULES.pro.renewalCredits} credits per explicitly admin-managed monthly period, expiring at its end. PAYG purchases are unavailable; approved rates are {formatAudCents(V6_PLAN_RULES.payg.minimumTopUpAudCents)} minimum, {V6_PLAN_RULES.payg.creditsPerAud} credits per A$1, {V6_PLAN_RULES.payg.recommendationCreditCost} per standard recommendation and {V6_PLAN_RULES.payg.followupCreditCost} per follow-up. Purchased credits carry over, and eligible expiring grants spend first.
-              Included usage does not also spend credits or automatically switch to metered use. Closet/source setup and editing have no planned usage cap; AI generations do. App/API credits become account-level only after activation. No live payment collection, automatic renewal, premium-model or image charges are introduced.
-            </p>
+            <h2 className="text-lg font-semibold mb-2" style={{ opacity: 1 }}>Plans and usage</h2>
+            <p>Your account page shows the allowance and credits currently available to you. Default plan details are listed on the <Link href="/pricing" className="underline">plans page</Link>. Usage may be subject to daily and monthly limits, account restrictions and available credits. AI requests only use allowance after a usable result is returned.</p>
+            <p className="mt-2">Checkout, credit purchases and automatic renewal are unavailable. Pro access is managed for your account. Donations do not purchase a plan, credits or a promise of access. We do not silently change an included request into paid usage.</p>
           </section>
 
           <section>

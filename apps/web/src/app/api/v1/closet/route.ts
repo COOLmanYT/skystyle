@@ -25,12 +25,14 @@ async function handleCloset(
 ): Promise<NextResponse> {
   const { userId } = ctx;
 
+  const databaseStarted=Date.now();
   const { data, error } = await supabaseAdmin
     .from("closet")
     .select("items")
     .eq("user_id", userId)
     .single();
 
+  if(ctx.timings)ctx.timings.closet_db=Date.now()-databaseStarted;
   if (error && error.code !== "PGRST116") {
     return NextResponse.json({ error: "Failed to fetch closet." }, { status: 500 });
   }

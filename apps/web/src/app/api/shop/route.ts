@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
       validatedInput: { input, modelId: body.modelId, customPrompt: body.clientCustomPrompt } }, search,
       { shouldCharge: (value) => value.status === "ok" && value.products.length > 0 }) : await search();
     // No charge when the source is unavailable, empty, or AI validation failed.
-    if (!accounting && result.status === "ok" && !isDev) {
+    if (!accounting && result.status === "ok" && result.products.length > 0 && !isDev) {
       if (isPro) { if (!await deductCredit(userId)) throw new ShopError("App Credit balance changed; retry after checking your balance.", 402); }
       else if (!await incrementUsage(userId, "ai_uses", isPro, isDev, isDemo)) throw new ShopError("Daily AI limit changed; check your allowance before retrying.", 429);
     }

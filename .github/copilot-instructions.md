@@ -1,6 +1,6 @@
 # GitHub Copilot Instructions — Sky Style (skystyle)
 
-## Current version: 6.4.2
+## Current version: 6.5.0
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in `AGENTS.md` as well.) Remember, update the version number. 
 
@@ -74,6 +74,12 @@ VALUES (
 > [!IMPORTANT]
 > Make sure to tell the user if anything in the supabase folder was changed.
 
+## Mandatory release gate
+
+Before merging a release candidate, deploying/promoting to production, or announcing a deployed release, require a successful Vercel **Sky Style app preview for the exact release commit SHA**. Run `npm run release:gate -- <full-commit-sha>` and record the SHA, deployment ID and preview URL. The `Vercel preview release gate` GitHub Actions check must pass for that candidate. Local builds, older previews, documentation previews and production deployments do not satisfy it. Missing, pending, failed, canceled or inaccessible evidence blocks release. Any code change requires a new preview and gate check. Preserve the existing SQL, accounting, checkout and real-account acceptance gates.
+
+The workflow checks non-production branch pushes and pull requests to `main`. The gate is mandatory in the release procedure: do not proceed with a failing check or missing preview evidence. Preview success proves hosted build success, while authenticated behavior and production rollout require separate evidence.
+
 ## Codebase conventions
 
 - **Build:** `npm run build` · **Lint:** `npm run lint` (targets `apps/web`) · **Tests:** `npm test -- --runInBand` (Jest).
@@ -81,6 +87,6 @@ VALUES (
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`).
 - **Auth:** NextAuth v5 JWT — `auth()` server-side, `/api/auth/session` client-side. Demo user: `DEMO_USER_ID` from `@/auth`.
 - **DB:** Supabase admin client at `apps/web/src/lib/supabase.ts`. Always set `onConflict` on upserts for tables with non-PK unique constraints.
-- **Current enforcement:** Legacy Free 20 AI/day and 40 follow-ups/day; preview demo 200/400; Pro uses daily credits; dev unlimited. Approved V6 values live in `entitlement-policy.ts`. Active branches are integrated but rollout stays disabled pending coordinated writer drain, revocation SQL approval, atomic access/finalization review and real-account acceptance. Local concurrency/controlled-clock tests pass; no current real Pro accounts need date backfill. Checkout stays disabled.
+- **Current enforcement:** Legacy Free 20 AI/day and 40 follow-ups/day; preview demo 200/400; Pro uses daily credits; dev unlimited. Monthly allowance policy values live in `entitlement-policy.ts`. Active branches are integrated but rollout stays disabled pending coordinated writer drain, revocation SQL approval, atomic access/finalization review and real-account acceptance. Local concurrency/controlled-clock tests pass; no current real Pro accounts need date backfill. Checkout stays disabled.
 - **localStorage prefix:** all keys start with `skystyle_` (e.g. `skystyle_last_seen_changelog`).
 - **TypeScript:** `tsconfig` uses `jsx: react-jsx` so React is in scope without an explicit import; use `React.ReactNode`, `React.CSSProperties`, etc. as needed.

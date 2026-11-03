@@ -1,6 +1,6 @@
 {
   "name": "skystyle",
-  "version": "6.4.2",
+  "version": "6.5.0",
   "private": true,
   "workspaces": [
     "apps/*"
@@ -22,24 +22,30 @@
     "typecheck:tests": "tsc --project apps/web/tsconfig.test.json --noEmit",
     "test:release-gate": "node --test scripts/verify-vercel-preview.test.mjs",
     "release:gate": "node scripts/verify-vercel-preview.mjs",
-    "test:scheduler": "node supabase/tests/run-idle-scheduler.mjs"
+    "test:scheduler": "node supabase/tests/run-idle-scheduler.mjs",
+    "test:daily-outfits": "node supabase/tests/run-v63-smoke.mjs"
   },
   "dependencies": {
-    "@auth/supabase-adapter": "^1.11.1",
+    "@auth/supabase-adapter": "^1.11.3",
     "@google/generative-ai": "^0.24.1",
     "@mistralai/mistralai": "^1.0.0",
-    "@simplewebauthn/browser": "^9.0.1",
-    "@simplewebauthn/server": "^9.0.3",
+    "@simplewebauthn/browser": "13.3.0",
+    "@simplewebauthn/server": "13.3.2",
     "@supabase/supabase-js": "^2.97.0",
     "bcryptjs": "^3.0.3",
     "next": "16.4.3",
-    "next-auth": "^5.0.0-beta.30",
+    "next-auth": "^5.0.0-beta.32",
     "openai": "^6.24.0",
     "otpauth": "^9.5.0",
     "qrcode": "^1.5.4",
     "react": "19.2.3",
     "react-dom": "19.2.3",
-    "react-markdown": "^10.1.0"
+    "react-markdown": "^10.1.0",
+    "ipaddr.js": "2.5.0"
+  },
+  "overrides": {
+    "@simplewebauthn/browser": "$@simplewebauthn/browser",
+    "@simplewebauthn/server": "$@simplewebauthn/server"
   },
   "devDependencies": {
     "@jest/globals": "^29.7.0",
@@ -51,7 +57,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.4.3",
     "jest": "^29.7.0",
     "tailwindcss": "^4",
     "ts-jest": "^29.1.2",

@@ -8,7 +8,7 @@ This file is read by AI coding agents (GitHub Copilot, OpenAI Codex, Cursor, Cla
 - Store these artifacts in the chat's external artifact directory or a system temporary directory, and link to them from the chat.
 - Only add these kinds of notes to the repository when the user explicitly requests a repository file. Maintained project documentation, source code, tests, and required SQL belong in their appropriate repository locations.
 
-## Current version: 6.4.2
+## Current version: 6.5.0
 
 This is for the changelog version number. **Update this version number accordingly** to the Semver Guide below, then use it in your end-of-task SQL statement. (Make sure to update the version number in .github\copilot-instructions.md as well.) Remember, update the version number.
 
@@ -96,5 +96,5 @@ The workflow checks non-production branch pushes and pull requests to `main`. Th
 - **Styles:** Tailwind CSS 4 + CSS custom properties (`var(--accent)`, `var(--foreground)`, `var(--background)`, `var(--card)`, `var(--card-border)`)
 - **Auth:** NextAuth v5 JWT — `auth()` server-side, `/api/auth/session` client-side
 - **DB:** Supabase admin client at `apps/web/src/lib/supabase.ts`; always set `onConflict` on upserts
-- **Current enforcement:** Legacy Free 20 AI/day and 40 follow-ups/day; preview demo 200/400; Pro uses daily credits; dev unlimited. Approved V6 values live in `lib/entitlement-policy.ts`. Active branches are integrated but rollout stays disabled pending coordinated writer drain, revocation SQL approval, atomic access/finalization review and real-account acceptance. Local concurrency/controlled-clock tests pass; no current real Pro accounts need date backfill. Checkout stays disabled.
+- **Current enforcement:** Legacy Free 20 AI/day and 40 follow-ups/day; preview demo 200/400; Pro uses daily credits; dev unlimited. Monthly allowance policy values live in `lib/entitlement-policy.ts`. Active branches are integrated but rollout stays disabled pending coordinated writer drain, revocation SQL approval, atomic access/finalization review and real-account acceptance. Local concurrency/controlled-clock tests pass; no current real Pro accounts need date backfill. Checkout stays disabled.
 - **localStorage prefix:** all keys use `skystyle_` (e.g. `skystyle_last_seen_changelog`)

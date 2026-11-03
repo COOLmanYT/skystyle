@@ -61,3 +61,7 @@ curl "https://skystyle.app/api/v1/closet" \
 - If the user's closet is empty, `items` will be an empty array and `count` will be `0`.
 - Items are returned in the order they were added to the closet.
 - This endpoint reflects the closet of the user who owns the API key — there is no way to query another user's closet.
+
+## 6.3 development: latency diagnostics
+
+The public closet response keeps `items: string[]` and `count`. Structured wardrobe management uses signed-in app endpoints. The `Server-Timing` response header separates API-key verification (`auth`), accounting lookup (`accounting`), the closet database query (`closet_db`), handler execution (`handler`) and overall response (`total`). These timings are operational diagnostics; they add no retained behavioural tracking. Legacy credit deduction happens after the response and is outside that response timing.

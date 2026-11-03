@@ -1,3 +1,4 @@
+import { parseComfort } from "@/lib/comfort";
 export const dynamic = "force-dynamic";
 /**
  * GET  /api/settings      – get user settings
@@ -98,18 +99,22 @@ export async function PATCH(req: NextRequest) {
   for (const key of allowedKeys) {
     if (key in updates) filtered[key] = updates[key];
   }
+  if (updates.comfortPreferences !== undefined) {
+    try { filtered.comfort_preferences = updates.comfortPreferences === null ? null : parseComfort(updates.comfortPreferences); }
+    catch { return NextResponse.json({ error: "Invalid comfort preferences" }, { status: 400 }); }
+  }
   Object.assign(filtered, onboardingUpdates);
 
   if (Object.keys(filtered).length === 0) {
     return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
   }
 
-  // Free users: source picker limited to 1x/day (devs bypass)
+  // Legacy source-picker allowance (devs bypass).
   if (!account && !isPro && !isDev && ("custom_source_url" in filtered)) {
     const { allowed } = await canUseFeature(userId, "source_picks", isPro, isDev);
     if (!allowed) {
       return NextResponse.json(
-        { error: "Free users can only change weather source once per day. Upgrade to Pro for unlimited." },
+        { error: "Your daily weather-source allowance has been reached. Please try again after it resets." },
         { status: 429 }
       );
     }
@@ -124,5 +129,15 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Unable to save settings" }, { status: 500 });
   }
 
+  if ("comfort_preferences" in filtered) {
+    const check = await supabaseAdmin.from("settings").select("comfort_preferences").eq("user_id",userId).single();
+    if (check.error || JSON.stringify(check.data?.comfort_preferences) !== JSON.stringify(filtered.comfort_preferences)) {
+      // JSONB key ordering can differ; compare the normalized value instead.
+      try {
+        if (filtered.comfort_preferences === null ? check.data?.comfort_preferences !== null : JSON.stringify(parseComfort(check.data?.comfort_preferences)) !== JSON.stringify(parseComfort(filtered.comfort_preferences))) throw new Error();
+        if(check.error) throw check.error;
+      } catch { return NextResponse.json({ error: "Could not verify saved comfort preferences. Please retry." }, { status: 503 }); }
+    }
+  }
   return NextResponse.json({ success: true, updated: filtered });
 }

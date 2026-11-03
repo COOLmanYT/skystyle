@@ -24,7 +24,7 @@ export async function runIdleSchedulerScenarios({ sql, value, account, check }) 
   `);
   const invoke = () => value("SELECT json_build_object('request',public.invoke_automatic_recommendation_runner());");
   const calls = () => value('SELECT to_json(count(*)) FROM net.fixture_http_calls;');
-  for (const source of ['automatic-recommendations-cron.sql', 'review/idle-scheduler-invocation.sql']) {
+  for (const source of ['automatic-recommendations-cron.sql', 'review/idle-scheduler-invocation.sql', 'review/v63-scheduler-diagnostics.sql']) {
     const text = await readFile(new URL(`../${source}`, import.meta.url), 'utf8');
     const definition = text.match(/CREATE OR REPLACE FUNCTION public\.invoke_automatic_recommendation_runner\(\)[\s\S]*?END;\s*\$\$;/i)?.[0];
     assert(definition, `Missing scheduler definition in ${source}`);

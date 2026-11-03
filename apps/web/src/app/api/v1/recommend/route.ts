@@ -23,7 +23,7 @@ export const dynamic = "force-dynamic";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getWeather } from "@/lib/weather";
+import { getWeather, publicMeasurements } from "@/lib/weather";
 import { getStyleRecommendation } from "@/lib/ai";
 import { withApiAuth, ApiKeyContext, apiOptionsHandler } from "@/lib/api-middleware";
 
@@ -49,7 +49,7 @@ function kmhToMph(kmh: number): number {
 
 async function handleRecommend(
   req: NextRequest,
-  _ctx: ApiKeyContext  // eslint-disable-line @typescript-eslint/no-unused-vars
+  _ctx: ApiKeyContext
 ): Promise<NextResponse> {
   // 1. Parse and validate request body
   let body: RecommendBody;
@@ -104,6 +104,7 @@ async function handleRecommend(
       shareLocation: false,
       forceCloset: false,
       isDev: false,
+      isPro: _ctx.modelAccess === "pro",
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "AI request failed.";
@@ -119,13 +120,14 @@ async function handleRecommend(
       temp: isImperial ? celsiusToFahrenheit(weather.temp) : weather.temp,
       feels_like: isImperial ? celsiusToFahrenheit(weather.feelsLike) : weather.feelsLike,
       temp_unit: isImperial ? "°F" : "°C",
-      humidity_pct: weather.humidity,
-      wind_speed: isImperial ? kmhToMph(weather.windSpeed) : weather.windSpeed,
+      humidity_pct: weather.humidity ?? 0,
+      wind_speed: isImperial ? kmhToMph(weather.windSpeed ?? 0) : weather.windSpeed ?? 0,
       wind_speed_unit: isImperial ? "mph" : "km/h",
       wind_dir: weather.windDir,
       description: weather.description,
-      rain_chance_pct: weather.rainChance,
-      uv_index: weather.uvIndex,
+      rain_chance_pct: weather.rainChance ?? 0,
+      uv_index: weather.uvIndex ?? 0,
+      measurements: publicMeasurements(weather),
       is_day: weather.isDay,
       alerts: weather.alerts,
     },

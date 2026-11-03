@@ -1,3 +1,32 @@
+import { AsyncLocalStorage } from "node:async_hooks";
+import { measurement, roundedMeasurement, meanMeasurements, type RainPeriod } from "./weather-measurements";
+import { fetchPublicWeatherUrl } from './public-weather-fetch';
+const weatherDeadline = new AsyncLocalStorage<AbortSignal>();
+function weatherRequestSignal(): AbortSignal {
+  const signal = AbortSignal.any([AbortSignal.timeout(5000), ...(weatherDeadline.getStore() ? [weatherDeadline.getStore()!] : [])]);
+  signal.throwIfAborted();
+  return signal;
+}
+// Only built-in provider adapters use this transport. Custom URLs always use
+// fetchPublicWeatherUrl, which pins the connection to a validated public IP.
+export async function weatherFetch(url: string, options: RequestInit & { next?: { revalidate: number } } = {}) {
+  const target = new URL(url);
+  const providerHosts = ['www.bom.gov.au', 'api.openweathermap.org', 'api.weatherapi.com', 'weather.visualcrossing.com', 'api.pirateweather.net', 'api.open-meteo.com'];
+  if (target.username || target.password || target.port || !providerHosts.includes(target.hostname)
+    || (target.protocol !== 'https:' && !(target.protocol === 'http:' && target.hostname === 'www.bom.gov.au'))) {
+    throw new Error('Invalid built-in weather provider URL');
+  }
+  return fetch(url, { ...options, redirect: 'error', signal: weatherRequestSignal() });
+}
+function requiredTemperature(value: unknown): number {
+  const temp = roundedMeasurement(value, -100, 70);
+  if (temp === null) throw new Error("Weather temperature unavailable.");
+  return temp;
+}
+export function publicMeasurements(weather: WeatherData) {
+  return { humidity_pct: weather.humidity, wind_speed_kmh: weather.windSpeed,
+    rain_chance_pct: weather.rainChance, rain_period: weather.rainPeriod ?? "unknown", uv_index: weather.uvIndex };
+}
 /**
  * Weather data layer.
  *
@@ -9,26 +38,27 @@
  * classify as High (<10 km), Medium (10-50 km), or Low (>50 km).
  */
 
-import dns from "dns";
-import net from "net";
+
+
 
 export interface HourlyForecast {
   time: string;          // ISO string
   temp: number;          // Celsius
   description: string;
-  rainChance: number;    // 0-100
-  windSpeed: number;     // km/h
+  rainChance: number | null;    // 0-100
+  windSpeed: number | null;     // km/h
 }
 
 export interface SourceWeatherData {
   temp: number;
   feelsLike: number;
-  humidity: number;
-  windSpeed: number;
+  humidity: number | null;
+  windSpeed: number | null;
   windDir: string;
   description: string;
-  rainChance: number;
-  uvIndex: number;
+  rainChance: number | null;
+  uvIndex: number | null;
+  rainPeriod?: RainPeriod;
   source: string;
   hourly?: HourlyForecast[];
   /** IANA time zone for hourly entries, when supplied by the forecast provider. */
@@ -38,12 +68,13 @@ export interface SourceWeatherData {
 export interface WeatherData {
   temp: number;          // Celsius
   feelsLike: number;     // Celsius
-  humidity: number;      // %
-  windSpeed: number;     // km/h
+  humidity: number | null;      // %
+  windSpeed: number | null;     // km/h
   windDir: string;
   description: string;
-  rainChance: number;    // 0-100
-  uvIndex: number;
+  rainChance: number | null;    // 0-100
+  uvIndex: number | null;
+  rainPeriod?: RainPeriod;
   isDay: boolean;
   alerts: string[];
   stationName: string;
@@ -157,7 +188,7 @@ function nearestBomStation(lat: number, lon: number) {
 async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
   const { station, distanceKm } = nearestBomStation(lat, lon);
   const url = `http://www.bom.gov.au/fwo/${station.id}/${station.id}.json`;
-  const res = await fetch(url, {
+  const res = await weatherFetch(url, {
     headers: { "User-Agent": "SkyStyle/1.0 (weather-stylist app)" },
     next: { revalidate: 600 }, // cache 10 min
   });
@@ -166,14 +197,14 @@ async function fetchBom(lat: number, lon: number): Promise<WeatherData> {
   const obs = json.observations.data[0];
 
   return {
-    temp: obs.air_temp ?? 0,
-    feelsLike: obs.apparent_t ?? obs.air_temp ?? 0,
-    humidity: obs.rel_hum ?? 0,
-    windSpeed: obs.wind_spd_kmh ?? 0,
+    temp: requiredTemperature(obs.air_temp),
+    feelsLike: requiredTemperature(obs.apparent_t ?? obs.air_temp),
+    humidity: measurement(obs.rel_hum, 0, 100),
+    windSpeed: measurement(obs.wind_spd_kmh, 0),
     windDir: obs.wind_dir ?? "N",
     description: obs.weather ?? "Clear",
-    rainChance: 0, // BOM current obs doesn't include forecast rain%
-    uvIndex: 0,    // Not in current obs; would need separate BOM forecast call
+    rainChance: null, // Current observations have no rain forecast
+    uvIndex: null,
     isDay: isDaytime(lon),
     alerts: [],
     stationName: station.name,
@@ -203,11 +234,11 @@ async function fetchOpenWeather(lat: number, lon: number, apiKey?: string): Prom
   const coordParams = new URLSearchParams({ lat: lat.toFixed(6), lon: lon.toFixed(6), appid: key, units: "metric" });
   const forecastParams = new URLSearchParams({ lat: lat.toFixed(6), lon: lon.toFixed(6), cnt: "1", appid: key, units: "metric" });
   const [currentRes, forecastRes] = await Promise.all([
-    fetch(
+    weatherFetch(
       `https://api.openweathermap.org/data/2.5/weather?${coordParams}`,
       { next: { revalidate: 600 } }
     ),
-    fetch(
+    weatherFetch(
       `https://api.openweathermap.org/data/2.5/forecast?${forecastParams}`,
       { next: { revalidate: 600 } }
     ),
@@ -228,20 +259,21 @@ async function fetchOpenWeather(lat: number, lon: number, apiKey?: string): Prom
   const distanceKm = haversineKm(lat, lon, stationLat, stationLon);
 
   const rainChance =
-    (forecast.list?.[0]?.pop ?? 0) * 100;
+    measurement(forecast.list?.[0]?.pop, 0, 1) === null ? null : forecast.list[0].pop * 100;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const alerts: string[] = (current.alerts ?? []).map((a: any) => a.description as string);
 
   return {
-    temp: Math.round(current.main.temp),
-    feelsLike: Math.round(current.main.feels_like),
-    humidity: current.main.humidity,
-    windSpeed: Math.round((current.wind?.speed ?? 0) * 3.6), // m/s → km/h
+    temp: requiredTemperature(current.main?.temp),
+    feelsLike: requiredTemperature(current.main?.feels_like ?? current.main?.temp),
+    humidity: measurement(current.main?.humidity, 0, 100),
+    windSpeed: current.wind?.speed == null ? null : roundedMeasurement(current.wind.speed * 3.6, 0), // m/s → km/h
     windDir: degreesToCardinal(current.wind?.deg ?? 0),
     description: current.weather?.[0]?.description ?? "clear",
-    rainChance: Math.round(rainChance),
-    uvIndex: 0, // Requires separate One Call API
+    rainChance: roundedMeasurement(rainChance, 0, 100),
+    rainPeriod: "three-hours",
+    uvIndex: null,
     isDay: isDaytime(lon),
     alerts,
     stationName: current.name ?? "Unknown",
@@ -305,10 +337,10 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
   if (isPrivateHost(host)) {
     throw new Error("Custom source URL must point to a public host");
   }
-  // Verify DNS resolution targets only public IPs (prevent DNS-rebinding / TOCTOU attacks)
-  await assertHostnameResolvesToPublicIp(host);
+  // Pin the actual custom-source connection to a validated public IP.
 
-  const res = await fetch(parsed.toString(), { next: { revalidate: 300 } });
+
+  const res = await fetchPublicWeatherUrl(parsed.toString(), weatherRequestSignal(), 300);
   if (!res.ok) throw new Error(`Custom source fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
@@ -316,14 +348,14 @@ async function fetchCustomSource(url: string, lon: number): Promise<WeatherData>
   // Expect the custom JSON to follow our WeatherData shape (or a best-effort
   // mapping from common fields).
   return {
-    temp: Number(data.temp ?? data.temperature ?? 0),
-    feelsLike: Number(data.feelsLike ?? data.feels_like ?? data.temp ?? 0),
-    humidity: Number(data.humidity ?? 0),
-    windSpeed: Number(data.windSpeed ?? data.wind_speed ?? 0),
+    temp: requiredTemperature(data.temp ?? data.temperature),
+    feelsLike: requiredTemperature(data.feelsLike ?? data.feels_like ?? data.temp ?? data.temperature),
+    humidity: measurement(data.humidity, 0, 100),
+    windSpeed: measurement(data.windSpeed ?? data.wind_speed, 0),
     windDir: String(data.windDir ?? data.wind_dir ?? "N"),
     description: String(data.description ?? data.condition ?? "Unknown"),
-    rainChance: Number(data.rainChance ?? data.rain_chance ?? 0),
-    uvIndex: Number(data.uvIndex ?? data.uv_index ?? 0),
+    rainChance: measurement(data.rainChance ?? data.rain_chance, 0, 100),
+    uvIndex: measurement(data.uvIndex ?? data.uv_index, 0),
     isDay: Boolean(data.isDay ?? isDaytime(lon)),
     alerts: Array.isArray(data.alerts) ? data.alerts : [],
     stationName: String(data.stationName ?? data.station ?? "Custom"),
@@ -343,7 +375,7 @@ async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promi
 
   const params = new URLSearchParams({ key, q: `${lat.toFixed(6)},${lon.toFixed(6)}`, days: "2", aqi: "no", alerts: "no" });
   const url = `https://api.weatherapi.com/v1/forecast.json?${params}`;
-  const res = await fetch(url, { next: { revalidate: 600 } });
+  const res = await weatherFetch(url, { next: { revalidate: 600 } });
   if (!res.ok) throw new Error(`WeatherAPI fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
@@ -358,23 +390,24 @@ async function fetchWeatherApi(lat: number, lon: number, apiKey?: string): Promi
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (h: any) => ({
       time: Number.isFinite(h.time_epoch) ? new Date(h.time_epoch * 1000).toISOString() : h.time ?? "",
-      temp: Math.round(h.temp_c ?? 0),
+      temp: requiredTemperature(h.temp_c),
       description: h.condition?.text ?? "Unknown",
-      rainChance: h.chance_of_rain ?? 0,
-      windSpeed: Math.round(h.wind_kph ?? 0),
+      rainChance: measurement(h.chance_of_rain, 0, 100),
+      windSpeed: roundedMeasurement(h.wind_kph, 0),
     })
   );
 
   return {
-    temp: Math.round(current.temp_c ?? 0),
-    feelsLike: Math.round(current.feelslike_c ?? current.temp_c ?? 0),
-    humidity: current.humidity ?? 0,
-    windSpeed: Math.round(current.wind_kph ?? 0),
+    temp: requiredTemperature(current.temp_c),
+    feelsLike: requiredTemperature(current.feelslike_c ?? current.temp_c),
+    humidity: measurement(current.humidity, 0, 100),
+    windSpeed: roundedMeasurement(current.wind_kph, 0),
     windDir: current.wind_dir ?? "N",
     description: current.condition?.text ?? "Unknown",
-    rainChance: forecastDay.day?.daily_chance_of_rain ?? 0,
-    uvIndex: current.uv ?? 0,
+    rainChance: measurement(forecastDay.day?.daily_chance_of_rain, 0, 100),
+    uvIndex: measurement(current.uv, 0),
     source: "WeatherAPI",
+    rainPeriod: "day",
     hourly,
     timeZone: data.location?.tz_id,
   };
@@ -392,7 +425,7 @@ async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): P
   const safeLon = encodeURIComponent(lon.toFixed(6));
   const vcParams = new URLSearchParams({ unitGroup: "metric", key, include: "current,hours", contentType: "json" });
   const url = `https://weather.visualcrossing.com/VisualCrossingWebServices/rest/services/timeline/${safeLat},${safeLon}/next2days?${vcParams}`;
-  const res = await fetch(url, { next: { revalidate: 600 } });
+  const res = await weatherFetch(url, { next: { revalidate: 600 } });
   if (!res.ok) throw new Error(`Visual Crossing fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
@@ -407,23 +440,24 @@ async function fetchVisualCrossing(lat: number, lon: number, apiKey?: string): P
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (h: any) => ({
       time: Number.isFinite(h.datetimeEpoch) ? new Date(h.datetimeEpoch * 1000).toISOString() : h.datetime ?? "",
-      temp: Math.round(h.temp ?? 0),
+      temp: requiredTemperature(h.temp),
       description: h.conditions ?? "Unknown",
-      rainChance: Math.round(h.precipprob ?? 0),
-      windSpeed: Math.round(h.windspeed ?? 0),
+      rainChance: roundedMeasurement(h.precipprob, 0, 100),
+      windSpeed: roundedMeasurement(h.windspeed, 0),
     })
   );
 
   return {
-    temp: Math.round(current.temp ?? 0),
-    feelsLike: Math.round(current.feelslike ?? current.temp ?? 0),
-    humidity: Math.round(current.humidity ?? 0),
-    windSpeed: Math.round(current.windspeed ?? 0),
+    temp: requiredTemperature(current.temp),
+    feelsLike: requiredTemperature(current.feelslike ?? current.temp),
+    humidity: roundedMeasurement(current.humidity, 0, 100),
+    windSpeed: roundedMeasurement(current.windspeed, 0),
     windDir: degreesToCardinal(current.winddir ?? 0),
     description: current.conditions ?? "Unknown",
-    rainChance: Math.round(dayData.precipprob ?? 0),
-    uvIndex: current.uvindex ?? 0,
+    rainChance: roundedMeasurement(dayData.precipprob, 0, 100),
+    uvIndex: measurement(current.uvindex, 0),
     source: "VisualCrossing",
+    rainPeriod: "day",
     hourly,
     timeZone: data.timezone,
   };
@@ -440,8 +474,8 @@ async function fetchPirateWeather(lat: number, lon: number, apiKey?: string): Pr
 
   const safeLat = encodeURIComponent(lat.toFixed(6));
   const safeLon = encodeURIComponent(lon.toFixed(6));
-  const url = `https://api.pirateweather.net/forecast/${key}/${safeLat},${safeLon}?units=ca`;
-  const res = await fetch(url, { next: { revalidate: 600 } });
+  const url = `https://api.pirateweather.net/forecast/${encodeURIComponent(key)}/${safeLat},${safeLon}?units=ca`;
+  const res = await weatherFetch(url, { next: { revalidate: 600 } });
   if (!res.ok) throw new Error(`Pirate Weather fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
@@ -453,23 +487,24 @@ async function fetchPirateWeather(lat: number, lon: number, apiKey?: string): Pr
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (h: any) => ({
       time: new Date((h.time ?? 0) * 1000).toISOString(),
-      temp: Math.round(h.temperature ?? 0),
+      temp: requiredTemperature(h.temperature),
       description: h.summary ?? "Unknown",
-      rainChance: Math.round((h.precipProbability ?? 0) * 100),
-      windSpeed: Math.round(h.windSpeed ?? 0),
+      rainChance: h.precipProbability == null ? null : roundedMeasurement(h.precipProbability * 100, 0, 100),
+      windSpeed: roundedMeasurement(h.windSpeed, 0),
     })
   );
 
   return {
-    temp: Math.round(currently.temperature ?? 0),
-    feelsLike: Math.round(currently.apparentTemperature ?? currently.temperature ?? 0),
-    humidity: Math.round((currently.humidity ?? 0) * 100),
-    windSpeed: Math.round(currently.windSpeed ?? 0),
+    temp: requiredTemperature(currently.temperature),
+    feelsLike: requiredTemperature(currently.apparentTemperature ?? currently.temperature),
+    humidity: currently.humidity == null ? null : roundedMeasurement(currently.humidity * 100, 0, 100),
+    windSpeed: roundedMeasurement(currently.windSpeed, 0),
     windDir: degreesToCardinal(currently.windBearing ?? 0),
     description: currently.summary ?? "Unknown",
-    rainChance: Math.round((currently.precipProbability ?? 0) * 100),
-    uvIndex: Math.round(currently.uvIndex ?? 0),
+    rainChance: currently.precipProbability == null ? null : roundedMeasurement(currently.precipProbability * 100, 0, 100),
+    uvIndex: roundedMeasurement(currently.uvIndex, 0),
     source: "PirateWeather",
+    rainPeriod: "hour",
     hourly,
     timeZone: data.timezone,
   };
@@ -490,7 +525,7 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
     timezone: "auto",
   });
   const url = `https://api.open-meteo.com/v1/forecast?${omParams}`;
-  const res = await fetch(url, { next: { revalidate: 600 } });
+  const res = await weatherFetch(url, { next: { revalidate: 600 } });
   if (!res.ok) throw new Error(`Open-Meteo fetch failed: ${res.status}`);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const data: any = await res.json();
@@ -511,23 +546,24 @@ async function fetchOpenMeteo(lat: number, lon: number): Promise<SourceWeatherDa
 
     hourly.push({
       time: new Date(epochSeconds * 1000).toISOString(),
-      temp: Math.round(temps[i] ?? 0),
+      temp: requiredTemperature(temps[i]),
       description: wmoCodeToDescription(codes[i] ?? 0),
-      rainChance: Math.round(rainProbs[i] ?? 0),
-      windSpeed: Math.round(winds[i] ?? 0),
+      rainChance: roundedMeasurement(rainProbs[i], 0, 100),
+      windSpeed: roundedMeasurement(winds[i], 0),
     });
   }
 
   return {
-    temp: Math.round(current.temperature_2m ?? 0),
-    feelsLike: Math.round(current.apparent_temperature ?? current.temperature_2m ?? 0),
-    humidity: Math.round(current.relative_humidity_2m ?? 0),
-    windSpeed: Math.round(current.wind_speed_10m ?? 0),
+    temp: requiredTemperature(current.temperature_2m),
+    feelsLike: requiredTemperature(current.apparent_temperature ?? current.temperature_2m),
+    humidity: roundedMeasurement(current.relative_humidity_2m, 0, 100),
+    windSpeed: roundedMeasurement(current.wind_speed_10m, 0),
     windDir: degreesToCardinal(current.wind_direction_10m ?? 0),
     description: wmoCodeToDescription(current.weather_code ?? 0),
-    rainChance: Math.round(rainProbs[0] ?? 0),
-    uvIndex: 0,
+    rainChance: roundedMeasurement(rainProbs[0], 0, 100),
+    uvIndex: null,
     source: "Open-Meteo",
+    rainPeriod: "hour",
     hourly,
     timeZone: data.timezone,
   };
@@ -548,30 +584,19 @@ function wmoCodeToDescription(code: number): string {
 }
 
 /** Average multiple weather sources for display, keep all source data for AI */
-function averageSources(sources: SourceWeatherData[], primary: WeatherData): WeatherData {
-  if (sources.length === 0) return primary;
-
-  const avg = (field: keyof SourceWeatherData) => {
-    const nums = sources.map((s) => Number(s[field])).filter((n) => !isNaN(n));
-    return nums.length > 0 ? Math.round(nums.reduce((a, b) => a + b, 0) / nums.length) : 0;
-  };
-
-  // Merge hourly from first source that has it
-  const hourlySource = sources.find((s) => s.hourly && s.hourly.length > 0);
-
-  return {
-    ...primary,
-    temp: avg("temp"),
-    feelsLike: avg("feelsLike"),
-    humidity: avg("humidity"),
-    windSpeed: avg("windSpeed"),
-    rainChance: avg("rainChance"),
-    uvIndex: avg("uvIndex"),
-    source: sources.length > 1 ? "Multi" : primary.source,
-    hourly: hourlySource?.hourly,
-    timeZone: hourlySource?.timeZone,
-    sources,
-  };
+export function averageSources(sources: SourceWeatherData[], primary: WeatherData): WeatherData {
+  if (!sources.length) return primary;
+  const avg = (field: "temp" | "feelsLike" | "humidity" | "windSpeed" | "uvIndex") => meanMeasurements(sources.map(source => source[field]));
+  const hourlySource = sources.find(source => source.hourly?.length);
+  // A daily probability is not an hourly probability. Select one comparable period.
+  const rainSource = sources.find(source => typeof source.rainChance === "number");
+  const rainPeriod = rainSource?.rainPeriod ?? "unknown";
+  const rainChance = meanMeasurements(sources.filter(source => (source.rainPeriod ?? "unknown") === rainPeriod).map(source => source.rainChance));
+  const temp = avg("temp");
+  if (temp === null) throw new Error("Weather temperature unavailable.");
+  return { ...primary, temp, feelsLike: avg("feelsLike") ?? temp, humidity: avg("humidity"), windSpeed: avg("windSpeed"),
+    rainChance, rainPeriod, uvIndex: avg("uvIndex"), source: sources.length > 1 ? "Multi" : primary.source,
+    hourly: hourlySource?.hourly, timeZone: hourlySource?.timeZone, sources };
 }
 
 // ---------------------------------------------------------------------------
@@ -596,73 +621,6 @@ export const MAX_CUSTOM_SOURCES = 10;
  * Validate that a URL is safe to use as an outbound RSS fetch target.
  * Enforces HTTPS, public host, and disallows dangerous URL features.
  */
-function isPrivateOrReservedIp(ip: string): boolean {
-  // Only handle valid IPs; invalid ones are not considered here
-  if (!net.isIP(ip)) return false;
-
-  // IPv4 checks
-  const parts = ip.split(".").map((p) => parseInt(p, 10));
-  if (parts.length === 4 && parts.every((n) => !Number.isNaN(n))) {
-    const [a, b] = parts;
-    // 10.0.0.0/8
-    if (a === 10) return true;
-    // 172.16.0.0/12
-    if (a === 172 && b >= 16 && b <= 31) return true;
-    // 192.168.0.0/16
-    if (a === 192 && b === 168) return true;
-    // 127.0.0.0/8 loopback
-    if (a === 127) return true;
-    // 169.254.0.0/16 link-local
-    if (a === 169 && b === 254) return true;
-    // 100.64.0.0/10 carrier-grade NAT
-    if (a === 100 && b >= 64 && b <= 127) return true;
-    // 192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24 TEST-NET ranges
-    if (
-      (a === 192 && b === 0 && parts[2] === 2) ||
-      (a === 198 && b === 51 && parts[2] === 100) ||
-      (a === 203 && b === 0 && parts[2] === 113)
-    ) {
-      return true;
-    }
-    // 224.0.0.0/4 multicast and 240.0.0.0/4 reserved
-    if (a >= 224) return true;
-  }
-
-  // IPv6 checks (basic)
-  const normalized = ip.toLowerCase();
-  // Loopback ::1
-  if (normalized === "::1") return true;
-  // Link-local fe80::/10
-  if (normalized.startsWith("fe8") || normalized.startsWith("fe9") || normalized.startsWith("fea") || normalized.startsWith("feb")) {
-    return true;
-  }
-  // Unique local fc00::/7
-  if (normalized.startsWith("fc") || normalized.startsWith("fd")) return true;
-  // Multicast ff00::/8
-  if (normalized.startsWith("ff")) return true;
-
-  return false;
-}
-
-async function assertHostnameResolvesToPublicIp(hostname: string): Promise<void> {
-  try {
-    const addresses = await dns.promises.lookup(hostname, { all: true });
-    if (!addresses || addresses.length === 0) {
-      throw new Error("RSS feed host could not be resolved");
-    }
-    for (const addr of addresses) {
-      if (isPrivateOrReservedIp(addr.address)) {
-        throw new Error("RSS feed URL must not resolve to a private or internal IP address");
-      }
-    }
-  } catch (err) {
-    if (err instanceof Error && err.message.startsWith("RSS feed URL must not resolve")) {
-      throw err;
-    }
-    throw new Error("RSS feed host could not be resolved");
-  }
-}
-
 async function validatePublicHttpsUrlForRss(parsed: URL): Promise<void> {
   // Only allow HTTPS
   if (parsed.protocol !== "https:") {
@@ -691,8 +649,8 @@ async function validatePublicHttpsUrlForRss(parsed: URL): Promise<void> {
     throw new Error("RSS feed URL must point to a public host");
   }
 
-  // Additionally, ensure the hostname actually resolves to public IPs only
-  await assertHostnameResolvesToPublicIp(hostname);
+  // The shared weather transport validates and pins the actual DNS result.
+
 }
 
 /** Fetch and extract text content from an RSS feed URL (for weather context) */
@@ -707,10 +665,7 @@ async function fetchRssFeed(url: string): Promise<string> {
   // Enforce strict SSRF-safe validation of the target URL
   await validatePublicHttpsUrlForRss(parsed);
 
-  const res = await fetch(parsed.toString(), {
-    headers: { "User-Agent": "SkyStyle/1.0 (weather-stylist app)" },
-    next: { revalidate: 600 },
-  });
+  const res = await fetchPublicWeatherUrl(parsed.toString(), weatherRequestSignal(), 600);
   if (!res.ok) throw new Error(`RSS fetch failed: ${res.status}`);
   const xml = await res.text();
 
@@ -741,8 +696,10 @@ export async function processCustomSources(
 ): Promise<{ extraContext: string[]; extraWeatherSources: SourceWeatherData[] }> {
   const extraContext: string[] = [];
   const extraWeatherSources: SourceWeatherData[] = [];
+  const sourceOrder = new Map<string,number>();
 
-  for (const source of customSources.slice(0, MAX_CUSTOM_SOURCES)) {
+  await Promise.all(customSources.slice(0, MAX_CUSTOM_SOURCES).map(async (source,index) => {
+    sourceOrder.set(source.name,index);
     try {
       switch (source.type) {
         case "rss": {
@@ -781,6 +738,8 @@ export async function processCustomSources(
               description: data.description,
               rainChance: data.rainChance,
               uvIndex: data.uvIndex,
+              rainPeriod: data.rainPeriod,
+              hourly: data.hourly,
               source: `OpenWeather (${source.name})`,
             });
           }
@@ -790,8 +749,10 @@ export async function processCustomSources(
     } catch (err) {
       console.warn("[weather] Custom source %s failed:", source.name, err instanceof Error ? err.message : err);
     }
-  }
+  }));
 
+  const order = (name:string) => [...sourceOrder].find(([label])=>name.includes(`(${label})`) || name.startsWith(`[RSS: ${label}]`) || name.startsWith(`[URL Reference: ${label}]`))?.[1] ?? 0;
+  extraContext.sort((a,b)=>order(a)-order(b));extraWeatherSources.sort((a,b)=>order(a.source)-order(b.source));
   return { extraContext, extraWeatherSources };
 }
 
@@ -848,7 +809,7 @@ export function getCachedWeather(key: string): (WeatherData & { customContext?: 
   return null;
 }
 
-export async function getWeather(
+async function getWeatherInner(
   lat: number,
   lon: number,
   customSourceUrl?: string,
@@ -870,12 +831,19 @@ export async function getWeather(
     return fetchCustomSource(customSourceUrl, lon);
   }
 
-  // Process user's custom sources
-  const { extraContext, extraWeatherSources } =
-    customSources.length > 0
-      ? await processCustomSources(customSources, lat, lon)
-      : { extraContext: [] as string[], extraWeatherSources: [] as SourceWeatherData[] };
-
+  const customPromise = customSources.length > 0 ? processCustomSources(customSources, lat, lon)
+    : Promise.resolve({ extraContext: [] as string[], extraWeatherSources: [] as SourceWeatherData[] });
+  // Start built-in providers before awaiting custom sources.
+  const fetchBuiltins = () => Promise.all([
+    ...(process.env.OPENWEATHER_API_KEY ? [fetchOpenWeather(lat, lon).catch(() => null)] : []),
+    fetchOpenMeteo(lat, lon).catch(() => null),
+    ...(process.env.WEATHERAPI_KEY ? [fetchWeatherApi(lat, lon).catch(() => null)] : []),
+    ...(process.env.VISUALCROSSING_API_KEY ? [fetchVisualCrossing(lat, lon).catch(() => null)] : []),
+    ...(process.env.PIRATEWEATHER_API_KEY ? [fetchPirateWeather(lat, lon).catch(() => null)] : []),
+    ...(isAustralia(lat, lon) ? [fetchBom(lat, lon).catch(() => null)] : []),
+  ]);
+  let builtinPromise = sourceMode === "custom" ? undefined : fetchBuiltins();
+  const { extraContext, extraWeatherSources } = await customPromise;
   // Resolve effective source mode — fall back to built-in if custom has no data
   const effectiveMode: SourceMode =
     sourceMode === "custom" && extraWeatherSources.length === 0 && extraContext.length === 0
@@ -900,76 +868,9 @@ export async function getWeather(
     return cachedResult;
   }
 
-  // Fetch from multiple sources in parallel for better accuracy
-  const sourcePromises: Promise<SourceWeatherData | null>[] = [];
-
-  // Always try OpenWeather (primary)
-  if (process.env.OPENWEATHER_API_KEY) {
-    sourcePromises.push(
-      fetchOpenWeather(lat, lon)
-        .then((w) => ({
-          temp: w.temp,
-          feelsLike: w.feelsLike,
-          humidity: w.humidity,
-          windSpeed: w.windSpeed,
-          windDir: w.windDir,
-          description: w.description,
-          rainChance: w.rainChance,
-          uvIndex: w.uvIndex,
-          source: "OpenWeather",
-        }))
-        .catch(() => null)
-    );
-  }
-
-  // Always try Open-Meteo (free, no key needed)
-  sourcePromises.push(
-    fetchOpenMeteo(lat, lon).catch(() => null)
-  );
-
-  // Try WeatherAPI.com if key is available
-  if (process.env.WEATHERAPI_KEY) {
-    sourcePromises.push(
-      fetchWeatherApi(lat, lon).catch(() => null)
-    );
-  }
-
-  // Try Visual Crossing if key is available
-  if (process.env.VISUALCROSSING_API_KEY) {
-    sourcePromises.push(
-      fetchVisualCrossing(lat, lon).catch(() => null)
-    );
-  }
-
-  // Try Pirate Weather if key is available
-  if (process.env.PIRATEWEATHER_API_KEY) {
-    sourcePromises.push(
-      fetchPirateWeather(lat, lon).catch(() => null)
-    );
-  }
-
-  // Try BOM for Australia
-  if (isAustralia(lat, lon)) {
-    sourcePromises.push(
-      fetchBom(lat, lon)
-        .then((w) => ({
-          temp: w.temp,
-          feelsLike: w.feelsLike,
-          humidity: w.humidity,
-          windSpeed: w.windSpeed,
-          windDir: w.windDir,
-          description: w.description,
-          rainChance: w.rainChance,
-          uvIndex: w.uvIndex,
-          source: "BOM",
-        }))
-        .catch(() => null)
-    );
-  }
-
-  const results = await Promise.all(sourcePromises);
-  const validSources = results.filter((r): r is SourceWeatherData => r !== null);
-
+  builtinPromise ??= fetchBuiltins();
+  const results = await builtinPromise;
+  const validSources: SourceWeatherData[] = results.filter((r): r is NonNullable<typeof r> => r !== null);
   // In "both" mode, merge user's weather sources with built-in
   if (effectiveMode === "both" && extraWeatherSources.length > 0) {
     validSources.push(...extraWeatherSources);
@@ -980,24 +881,10 @@ export async function getWeather(
     throw new Error("All weather sources failed. Please try again later.");
   }
 
-  // Use the primary (first successful) source for metadata
-  let primary: WeatherData;
-  try {
-    primary = await fetchOpenWeather(lat, lon);
-  } catch {
-    // Fall back to a simple primary from first valid source
-    const s = validSources[0];
-    primary = {
-      ...s,
-      isDay: isDaytime(lon),
-      alerts: [],
-      stationName: s.source,
-      stationDistanceKm: 0,
-      accuracyScore: "Medium",
-      source: s.source as WeatherData["source"],
-    };
-  }
-
+  const fetchedPrimary = results.find((r): r is WeatherData => r !== null && "stationName" in r);
+  const first = validSources[0];
+  const primary: WeatherData = fetchedPrimary ?? { ...first, isDay: isDaytime(lon), alerts: [],
+    stationName: first.source, stationDistanceKm: 0, accuracyScore: "Medium", source: "Multi" };
   const averaged = averageSources(validSources, primary);
   const result = { ...averaged, customContext: extraContext.length > 0 ? extraContext : undefined };
   
@@ -1022,4 +909,18 @@ function isDaytime(lon: number): boolean {
 function degreesToCardinal(deg: number): string {
   const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
   return dirs[Math.round(deg / 45) % 8];
+}
+
+/** Bound the whole collection, including custom DNS/body processing. */
+export async function getWeather(lat: number, lon: number, customSourceUrl?: string, sourceMode: SourceMode = "builtin", customSources: CustomSource[] = []) {
+  const signal = AbortSignal.timeout(8000);
+  return weatherDeadline.run(signal, async () => {
+    let listener: () => void;
+    const deadline = new Promise<never>((_, reject) => {
+      listener = () => reject(new Error("Weather providers took too long. Please try again."));
+      signal.addEventListener("abort", listener, { once: true });
+    });
+    try { return await Promise.race([getWeatherInner(lat, lon, customSourceUrl, sourceMode, customSources), deadline]); }
+    finally { signal.removeEventListener("abort", listener!); }
+  });
 }

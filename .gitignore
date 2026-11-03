@@ -23,6 +23,13 @@
 # misc
 .DS_Store
 *.pem
+/.idea/
+
+# Local agent artifacts and personal planning
+/.local-artifacts/
+/qa-audit-*/
+/creator-research-*/
+/MARKETING_X_DRAFTS.md
 
 # debug
 npm-debug.log*

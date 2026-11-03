@@ -9,6 +9,7 @@ export interface ChangelogCta {
 export interface ChangelogEntry {
   date: string;
   version: string;
+  releaseStatus?: "development" | "released";
   title: string;
   description: string;
   /** e.g. "✨ Feature", "🐛 Fix", "📣 Promotion", "🎨 Design" */
@@ -35,7 +36,7 @@ export async function GET() {
   try {
     const { data: dbRows, error } = await supabaseAdmin
       .from("changelog_posts")
-      .select("version, title, body, image_url, published, created_at, category, type, content, image, cta, expanded, slug, large, show_on_next_login")
+      .select("*")
       .eq("published", true)
       .order("created_at", { ascending: false });
 
@@ -47,6 +48,7 @@ export async function GET() {
     const entries: ChangelogEntry[] = (dbRows ?? []).map((row) => ({
       date: row.created_at as string,
       version: row.version as string,
+      releaseStatus: row.release_status === "released" ? "released" : row.release_status === "development" || /development/i.test(String(row.category??"")+" "+String(row.title??"")) ? "development" : undefined,
       title: row.title as string,
       description: (row.body as string | null) ?? "",
       category: row.category as string | undefined,

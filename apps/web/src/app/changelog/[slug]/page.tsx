@@ -12,6 +12,7 @@ interface ChangelogCta {
 interface ChangelogEntry {
   date: string;
   version: string;
+  releaseStatus?: "development" | "released";
   title: string;
   description: string;
   category?: string;
@@ -27,7 +28,7 @@ async function getEntry(slug: string): Promise<ChangelogEntry | null> {
   try {
     const { data, error } = await supabaseAdmin
       .from("changelog_posts")
-      .select("version, title, body, image_url, published, created_at, category, type, content, image, cta, expanded, slug")
+      .select("*")
       .eq("slug", slug)
       .eq("published", true)
       .single();
@@ -36,6 +37,7 @@ async function getEntry(slug: string): Promise<ChangelogEntry | null> {
       return {
         date: data.created_at as string,
         version: data.version as string,
+      releaseStatus: data.release_status === "released" ? "released" : data.release_status === "development" || /development/i.test(String(data.category??"")+" "+String(data.title??"")) ? "development" : undefined,
         title: data.title as string,
         description: (data.body as string | null) ?? "",
         category: data.category as string | undefined,
@@ -97,7 +99,7 @@ export default async function ChangelogEntryPage({ params }: { params: Promise<{
             className="text-xs font-mono px-2 py-0.5 rounded-lg"
             style={{ background: "var(--card)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
           >
-            v{entry.version}
+            v{entry.version}{entry.releaseStatus && <span className="ml-2 text-xs font-normal">{entry.releaseStatus==="development"?"In development · not deployed":"Released"}</span>}
           </span>
           {entry.category && (
             <span

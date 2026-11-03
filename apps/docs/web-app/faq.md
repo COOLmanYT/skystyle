@@ -6,15 +6,11 @@ Common questions and fixes for Sky Style.
 
 ### My recommendation doesn't mention my closet items
 
-The AI uses your closet when the closet panel is engaged on the dashboard. Make sure:
-
-1. You've added items on the **Closet** page (`/closet`).
-2. The closet is active for the recommendation (open the closet panel on the dashboard before generating).
-3. You haven't hit your daily **closet usage** limit (4/day on Free).
+Recommendations can use your saved wardrobe without opening the Closet panel. To restrict advice to owned clothing, select **Owned clothes only** in Style. Check that the clothes are available to wear and that your [owned-clothes-only allowance](./how-it-works#usage-limits) remains available. In the development candidate, missing wardrobe requirements appear as gaps instead of invented owned items.
 
 ### The recommendation says the wrong temperature unit
 
-Units are controlled by your account's **unit preference** (metric or imperial), set in [Settings → Units](./settings#units). Changing it updates both the dashboard and the public API. If it hasn't updated, refresh the page after saving.
+Units are controlled by your account's **unit preference** (metric or imperial), set in [Settings → Units](./settings#units). The dashboard uses this preference. Public API requests use their explicit `unit` parameter, defaulting to metric when omitted. If it hasn't updated, refresh the page after saving.
 
 ### I got a 502 error
 
@@ -26,7 +22,7 @@ Sky Style picks the first **available** model in your plan's priority list (see 
 
 ## Usage & limits
 
-The [approved V6 caps and credit rules](../development/v6-entitlements) are staged, not yet active. Until cutover, the account/dashboard usage readouts reflect legacy limits. Checkout and credit purchases are unavailable.
+Your account and dashboard show current usage and available credits. Checkout and credit purchases are unavailable.
 
 ### I hit my daily limit — when does it reset?
 
@@ -56,7 +52,7 @@ Go to **Settings → Privacy Hub** (or the Account page) and request deletion. I
 
 ### Can I export my data?
 
-Yes — the Privacy Hub offers a **JSON export** of your profile, settings, closet, usage, feedback, and security logs. Non-Dev accounts are limited to one export every **12 hours**. See [Privacy Hub → Data export](./security-and-privacy#data-export).
+Yes — the Privacy Hub offers a **JSON export** of your profile, settings, closet, usage, feedback and security logs. The development candidate also exports structured wardrobe data, saved outfits and cloud comfort preferences; local-only data is excluded. Non-Dev accounts are limited to one export every **12 hours**. See [Privacy Hub → Data export](./security-and-privacy#data-export).
 
 ## API keys & credits
 
@@ -66,10 +62,10 @@ Each plan has a limit on **active** (non-revoked) keys: Free 3, Pro 20, Dev unli
 
 ### My API key has no credits
 
-Legacy key creation uses a configured per-key allowance (50 by default), and legacy middleware may fall back to one available App Credit. The approved V6 policy replaces this with account-level credits, zero new per-key grants and no silent fallback, but is not activated. Legacy money-wallet allocation is unavailable on the verified schema; do not assume a monthly money grant or a working top-up. See [API Dashboard](./api-dashboard#legacy-credits-v6-accounting-inactive).
+Check the key balance in the API Dashboard. If it is empty, a request may use one available App Credit and return a warning header. Credit purchases and money-wallet top-ups are unavailable. See [API credits](./api-dashboard#credits-and-usage).
 
 ::: tip Credit purchases
-API credit purchases are not live yet. The "Get credits" button opens an informational donation prompt — it doesn't process a purchase.
+Checkout and credit purchases are unavailable. A voluntary donation does not grant access or credits.
 :::
 
 ## Weather
@@ -84,7 +80,7 @@ Yes — Pro users can add custom HTTPS weather sources. See [Custom Weather Sour
 
 ### The weather looks wrong
 
-Sky Style aggregates multiple sources and averages them. If a source returns bad data, it can skew the average. Pro users can use the **source picker** to choose a specific built-in source, or add a [custom source](./custom-weather-sources) they trust.
+Sky Style aggregates comparable, valid provider measurements. Missing values are excluded in the development candidate, and forecast coverage is reported separately. If a source returns bad data, it can skew the average. Pro users can use the **source picker** to choose a specific built-in source, or add a [custom source](./custom-weather-sources) they trust.
 
 ## App behaviour
 
@@ -98,7 +94,7 @@ Most preferences are stored in your browser's `localStorage` (keys prefixed with
 
 ### The dashboard tour keeps appearing
 
-The tour shows once per browser (tracked by `skystyle_tutorial_seen_<id>`). If it keeps reappearing, your browser may be clearing `localStorage` on exit. You can dismiss it with **Skip**, or replay it anytime from [Settings → Tutorials](./settings#tutorials).
+Onboarding completion and guided mode are saved to your account. Workspace and tutorial preferences also use browser storage. If a tour keeps reappearing, check whether account settings failed to save or this browser is clearing local preferences. You can dismiss it with **Skip**, or replay it anytime from [Settings → Tutorials](./settings#tutorials).
 
 ### Dark mode isn't working
 
@@ -106,6 +102,6 @@ Theme is controlled in [Settings → Appearance](./settings#appearance): system,
 
 ## Still stuck?
 
-- Browse the full [Web App Guide](./web-app) for detailed references.
+- Browse the full [Web App Guide](/web-app) for detailed references.
 - Send a message from the [Feedback](./account-and-support#feedback) page — every message is read personally.
 - Check the [COOLman service status page](https://status.coolmanyt.com/) for outages.

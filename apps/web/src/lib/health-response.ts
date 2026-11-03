@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { aggregateHealth, getCategoryHealth, HEALTH_PROVIDERS, type HealthCategory } from "./health-checks";
+import { aggregateHealth, aggregateServiceHealth, getCategoryHealth, HEALTH_PROVIDERS, type HealthCategory } from "./health-checks";
 const headers = { "Cache-Control": "public, max-age=30, s-maxage=300", "X-Content-Type-Options": "nosniff" };
 export async function categoryHealthResponse(category: HealthCategory, request?: NextRequest) {
   const start = Date.now();
@@ -15,8 +15,11 @@ export async function overallHealthResponse() {
   const categories = ["database", "ai", "weather"] as const;
   const results = await Promise.all(categories.map(async (category) => {
     const result = await getCategoryHealth(category);
-    return [category, { status: aggregateHealth(result.providers), checkedAt: result.checkedAt,
+    return [category, { status: aggregateHealth(result.providers), checkedAt: result.checkedAt, cached: result.cached,
       responseTime: Math.max(0, ...result.providers.map((provider) => provider.latencyMs ?? 0)) }] as const;
   }));
-  return NextResponse.json({ status: results.some(([, result]) => result.status === "degraded") ? "degraded" : "ok", responseTime: Date.now() - start, services: Object.fromEntries(results) }, { headers });
+  const status = aggregateServiceHealth(results.map(([, result]) => result.status));
+  return NextResponse.json({ status, healthy: status === "ok", responseTime: Date.now() - start,
+    checkedAt: results.map(([, result]) => result.checkedAt).sort()[0], cached: results.every(([, result]) => result.cached),
+    services: Object.fromEntries(results) }, { headers });
 }

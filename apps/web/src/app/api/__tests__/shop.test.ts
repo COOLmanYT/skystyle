@@ -23,9 +23,11 @@ describe("Shop authorization and validation", () => {
   });
   it("does not charge for unconfigured or empty product data", async () => {
     expect((await POST(request({ query: "shirt" }))).status).toBe(200); expect(incrementUsage).not.toHaveBeenCalled();
+    (searchShop as jest.Mock).mockResolvedValue({ status: "ok", products: [], model: "gemini" });
+    expect((await POST(request({ query: "shirt" }))).status).toBe(200); expect(incrementUsage).not.toHaveBeenCalled();
   });
   it("meters successful ranked recommendations using the current allowance", async () => {
-    (searchShop as jest.Mock).mockResolvedValue({ status: "ok", products: [], model: "gemini" });
+    (searchShop as jest.Mock).mockResolvedValue({ status: "ok", products: [{ id: "shirt" }], model: "gemini" });
     expect((await POST(request({ query: "shirt" }))).status).toBe(200); expect(incrementUsage).toHaveBeenCalledWith("demo", "ai_uses", false, false, true);
   });
 });

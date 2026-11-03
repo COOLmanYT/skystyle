@@ -1,6 +1,17 @@
 "use client";
+import { displayMeasurement } from "@/lib/weather-measurements";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import OutfitActions from "./OutfitActions";
+import ClosetManager from "./ClosetManager";
+import ExampleOutfit from "./ExampleOutfit";
+import useClothingInventory from "./useClothingInventory";
+import { DEMO_USER_ID } from "@/lib/demo";
+import { decodeGenderPreference, decodePreferenceText, encodePreferenceText } from "@/lib/browser-preferences";
+import type { OutfitDetails, OutfitPayload } from "@/lib/outfits";
+import DailyAdviceControls from "./DailyAdviceControls";
+import useByokCredentials from "./useByokCredentials";
+import ByokCredentialControls from "./ByokCredentialControls";
 import LocationPicker, { ResolvedLocation } from "./LocationPicker";
 import WeatherPlanningPanel from "./WeatherPlanningPanel";
 import WeatherEffectCard, { getWeatherCondition, formatHourlyDay, formatHourlyTime, HOURLY_FORECAST_LIMIT } from "./WeatherEffectCard";
@@ -18,7 +29,8 @@ import { visibleDashboardSections } from "@/lib/dashboard-sections";
 import ShopPanel from "@/components/ShopPanel";
 import StyleFeedbackPanel from "@/components/StyleFeedbackPanel";
 import { selectLatestLoginPopup } from "@/lib/changelog-popup";
-import { getAllModels, isModelAvailable, ModelID, type PlanningData, type ByokProvider } from "@/lib/ai";
+import { getAllModels, isModelAvailable, type ModelID } from "@/lib/ai-models";
+import type { PlanningData } from "@/lib/ai";
 import type { DailyLimitsInfo } from "@/lib/daily-usage";
 import AccountingUsage from "./AccountingUsage";
 import {
@@ -51,20 +63,20 @@ interface HourlyForecast {
   time: string;
   temp: number;
   description: string;
-  rainChance: number;
-  windSpeed: number;
+  rainChance: number | null;
+  windSpeed: number | null;
 }
 
 interface StyleResponse {
   weather: {
     temp: number;
     feelsLike: number;
-    humidity: number;
-    windSpeed: number;
+    humidity: number | null;
+    windSpeed: number | null;
     windDir: string;
     description: string;
-    rainChance: number;
-    uvIndex: number;
+    rainChance: number | null;
+    uvIndex: number | null;
     isDay: boolean;
     alerts: string[];
     stationName: string;
@@ -77,15 +89,17 @@ interface StyleResponse {
       source: string;
       temp: number;
       feelsLike: number;
-      humidity: number;
-      windSpeed: number;
+      humidity: number | null;
+      windSpeed: number | null;
       windDir: string;
       description: string;
-      rainChance: number;
-      uvIndex: number;
+      rainChance: number | null;
+      uvIndex: number | null;
     }[];
   };
   recommendation: {
+    details?: OutfitDetails;
+    chargeable?: boolean;
     outfit: string;
     reasoning: string;
     closetWarning?: string;
@@ -99,6 +113,7 @@ interface StyleResponse {
     modelUsed?: string;
     recommendationContext?: RecommendationContext;
     eventForecastStatus?: EventForecastStatus;
+    windowForecastStatus?: "not-requested"|"full"|"partial"|"unavailable";
   };
 }
 
@@ -156,6 +171,7 @@ interface DashboardProps {
   startTour?: boolean;
   onboardingPersistenceAvailable?: boolean;
   initialSection?: DashboardSection;
+  initialShopItem?: string | null;
 }
 
 export default function Dashboard({
@@ -169,6 +185,7 @@ export default function Dashboard({
   startTour = false,
   onboardingPersistenceAvailable = true,
   initialSection = "style",
+  initialShopItem = null,
 }: DashboardProps) {
   const [location, setLocation] = useState<ResolvedLocation | null>(null);
   const [loading, setLoading] = useState(false);
@@ -183,14 +200,16 @@ export default function Dashboard({
   const [dailyLimits, setDailyLimits] = useState<DailyLimitsInfo | null>(initialDailyLimits);
   const [gender, setGender] = useState<string>("N/A");
   const [customGender, setCustomGender] = useState("");
-  const [userApiKey, setUserApiKey] = useState<string>("");
+  const byok = useByokCredentials(userId);
+  const { key: userApiKey, setKey: setUserApiKey, provider: byokProvider, setProvider: setByokProvider } = byok;
   const [shareLocation, setShareLocation] = useState(false);
-  const [closetItems, setClosetItems] = useState<string[]>([]);
-  const [newClosetItem, setNewClosetItem] = useState("");
-  const [closetLoading, setClosetLoading] = useState(false);
+  const [dayAdviceError, setDayAdviceError] = useState("");
+  const inventory = useClothingInventory(userId === DEMO_USER_ID);
+  const { items: closetItems, wardrobeItems } = inventory;
   const [forceCloset, setForceCloset] = useState(false);
   const [weatherOnly, setWeatherOnly] = useState(false);
   const [userUnitPreference, setUserUnitPreference] = useState<"metric" | "imperial">("metric");
+  const [unitMessage, setUnitMessage] = useState("");
   const [devChatMessage, setDevChatMessage] = useState("");
   const [devChatLoading, setDevChatLoading] = useState(false);
   const [devChatError, setDevChatError] = useState<string | null>(null);
@@ -208,29 +227,36 @@ export default function Dashboard({
   const [feedbackCategory, setFeedbackCategory] = useState<string | undefined>(undefined);
   const [simpleMode, setSimpleMode] = useState(initialExperienceMode !== "advanced");
   const [selectedSection, setActiveSection] = useState<DashboardSection>(initialSection);
+  const [shopContext, setShopContext] = useState<{ item: string; sequence: number } | null>(initialShopItem ? { item: initialShopItem, sequence: 0 } : null);
   const { mode: sectionMode } = useDashboardSections(userId);
-  const activeSection = sectionMode === "both" ? selectedSection : sectionMode;
+  // A deliberate clothing action can open Shop even in a Style-only workspace.
+  const displayedSectionMode = shopContext ? "both" : sectionMode;
+  const activeSection = displayedSectionMode === "both" ? selectedSection : displayedSectionMode;
+  function openShopItem(item: string) {
+    setShopContext((previous) => ({ item, sequence: (previous?.sequence ?? 0) + 1 }));
+    setActiveSection("shop");
+    requestAnimationFrame(() => document.getElementById("shop-query")?.focus());
+  }
   const [feedbackSummary, setFeedbackSummary] = useState("");
   const [occasion, setOccasion] = useState<Occasion>("everyday");
   const [customOccasion, setCustomOccasion] = useState("");
   const [eventDateTime, setEventDateTime] = useState("");
+  const [dailyContext, setDailyContext] = useState<Pick<RecommendationContext,"window" | "comfort">>({});
   const [fragranceMode, setFragranceMode] = useState<"none" | "pair" | "suggest">("none");
   const [ownedFragrance, setOwnedFragrance] = useState("");
   const [fragranceFamily, setFragranceFamily] = useState<FragranceFamily>("any");
   const [fragranceTier, setFragranceTier] = useState<FragranceTier>("any");
   // BYOK enhancements — provider selector + client-side custom prompt (Pro/Dev)
-  const [byokProvider, setByokProvider] = useState<ByokProvider>("openai");
+
   const [clientCustomPrompt, setClientCustomPrompt] = useState("");
-  const [modelSwitchesRemaining, setModelSwitchesRemaining] = useState<number | null>(null);
-  
-  // Update model switches remaining when daily limits change
+  const modelSwitchesRemaining = dailyLimits?.model_switches
+    ? (dailyLimits.model_switches.limit ?? Infinity) - dailyLimits.model_switches.used
+    : null;
+  const [forecastNow, setForecastNow] = useState(() => Date.now());
   useEffect(() => {
-    if (dailyLimits?.model_switches) {
-      setModelSwitchesRemaining(
-        (dailyLimits.model_switches.limit ?? Infinity) - dailyLimits.model_switches.used
-      );
-    }
-  }, [dailyLimits]);
+    const timer = setInterval(() => setForecastNow(Date.now()), 60_000);
+    return () => clearInterval(timer);
+  }, []);
   
   // Model selection and regeneration
   const [showModelSelector, setShowModelSelector] = useState(false);
@@ -250,7 +276,7 @@ export default function Dashboard({
   const [byokOpen, setByokOpen] = useState(false);
 
   const buildRecommendationContext = useCallback((): RecommendationContext | undefined => {
-    const context: RecommendationContext = {};
+    const context: RecommendationContext = { ...dailyContext };
     if (feedbackSummary.trim()) context.feedbackSummary = feedbackSummary.trim().slice(0, 600);
     context.occasion = {
       kind: occasion,
@@ -275,7 +301,7 @@ export default function Dashboard({
       context.fragrance = { mode: "none" };
     }
     return context;
-  }, [customOccasion, eventDateTime, feedbackSummary, fragranceFamily, fragranceMode, fragranceTier, occasion, ownedFragrance]);
+  }, [dailyContext, customOccasion, eventDateTime, feedbackSummary, fragranceFamily, fragranceMode, fragranceTier, occasion, ownedFragrance]);
 
   // Returns the gradient/background CSS class for plan-based primary buttons
   const planBtnClass = isDev ? "btn-plan-dev" : isPro ? "btn-plan-pro" : "btn-plan-free";
@@ -313,26 +339,14 @@ export default function Dashboard({
     try {
       const savedGender = localStorage.getItem("skystyle_gender");
       if (savedGender) {
-        try {
-          // Decode stored gender; fall back to raw value if decoding fails
-          const decodedGender = atob(savedGender);
-          setGender(decodedGender);
-        } catch {
-          setGender(savedGender);
-        }
+        setGender(decodeGenderPreference(savedGender));
       }
       const savedCustomGender = localStorage.getItem("skystyle_custom_gender");
       if (savedCustomGender) {
-        try {
-          // Decode stored custom gender; fall back to raw value if decoding fails
-          const decodedCustomGender = atob(savedCustomGender);
-          setCustomGender(decodedCustomGender);
-        } catch {
-          setCustomGender(savedCustomGender);
-        }
+        setCustomGender(decodePreferenceText(savedCustomGender).slice(0, 30));
       }
-      const savedApiKey = localStorage.getItem("skystyle_byok_key");
-      if (savedApiKey) setUserApiKey(savedApiKey);
+      if (userId === DEMO_USER_ID) setUserUnitPreference(localStorage.getItem("skystyle_demo_units") === "imperial" ? "imperial" : "metric");
+
       const savedLocationConsent = localStorage.getItem("skystyle_location_consent");
       if (savedLocationConsent !== null) setShareLocation(savedLocationConsent === "true");
       const savedWeatherOnly = localStorage.getItem("skystyle_weather_only");
@@ -361,10 +375,6 @@ export default function Dashboard({
         setSimpleMode(savedSimpleMode === "true");
       }
 
-      const savedByokProvider = localStorage.getItem("skystyle_byok_provider");
-      if (savedByokProvider === "gemini" || savedByokProvider === "mistral" || savedByokProvider === "anthropic") setByokProvider(savedByokProvider);
-      else setByokProvider("openai");
-
       const savedClientCustomPrompt = localStorage.getItem("skystyle_byok_custom_prompt");
       if (savedClientCustomPrompt !== null) setClientCustomPrompt(savedClientCustomPrompt);
 
@@ -378,25 +388,29 @@ export default function Dashboard({
     } catch {
       /* ignore */
     }
-  }, [initialExperienceMode]);
+  }, [initialExperienceMode, userId]);
 
   // Load custom sources from localStorage on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("skystyle_custom_sources");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed.customSources)) setCustomSources(parsed.customSources);
-        if (parsed.sourceMode) setSourceMode(parsed.sourceMode);
-      }
-    } catch { /* ignore */ }
+    let current = true;
+    queueMicrotask(() => {
+      if (!current) return;
+      try {
+        const saved = localStorage.getItem("skystyle_custom_sources");
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed.customSources)) setCustomSources(parsed.customSources);
+          if (parsed.sourceMode) setSourceMode(parsed.sourceMode);
+        }
+      } catch { /* ignore */ }
+    });
+    return () => { current = false; };
   }, []);
 
   // Persist gender preference to localStorage when changed
   useEffect(() => {
     try {
-      // Encode gender before storing to avoid clear text storage
-      localStorage.setItem("skystyle_gender", btoa(gender));
+      localStorage.setItem("skystyle_gender", encodePreferenceText(gender));
     } catch {
       /* ignore */
     }
@@ -404,8 +418,7 @@ export default function Dashboard({
 
   useEffect(() => {
     try {
-      // Encode custom gender before storing
-      localStorage.setItem("skystyle_custom_gender", btoa(customGender));
+      localStorage.setItem("skystyle_custom_gender", encodePreferenceText(customGender));
     } catch {
       /* ignore */
     }
@@ -462,7 +475,8 @@ export default function Dashboard({
       const id = setTimeout(() => setAiRevealed(true), 50);
       return () => clearTimeout(id);
     } else {
-      setAiRevealed(false);
+      const id = setTimeout(() => setAiRevealed(false), 0);
+      return () => clearTimeout(id);
     }
   }, [result]);
 
@@ -505,14 +519,7 @@ export default function Dashboard({
   useEffect(() => {
     (async () => {
       try {
-        const [closetRes, settingsRes] = await Promise.all([
-          fetch("/api/closet"),
-          fetch("/api/settings"),
-        ]);
-        if (closetRes.ok) {
-          const data = await closetRes.json();
-          setClosetItems(data.items ?? []);
-        }
+        const settingsRes = await fetch("/api/settings");
         if (settingsRes.ok) {
           const data = await settingsRes.json();
           if (data.unit_preference === "imperial") {
@@ -523,57 +530,17 @@ export default function Dashboard({
         /* ignore */
       }
     })();
-    syncStoredPreferences();
+    let current = true;
+    queueMicrotask(() => { if (current) syncStoredPreferences(); });
     window.addEventListener("storage", syncStoredPreferences);
     window.addEventListener("skystyle-preferences-updated", syncStoredPreferences);
 
     return () => {
+      current = false;
       window.removeEventListener("storage", syncStoredPreferences);
       window.removeEventListener("skystyle-preferences-updated", syncStoredPreferences);
     };
   }, [syncStoredPreferences]);
-
-  async function addClosetItem(e: React.FormEvent) {
-    e.preventDefault();
-    const item = newClosetItem.trim();
-    if (!item) return;
-    setClosetLoading(true);
-    try {
-      const res = await fetch("/api/closet", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClosetItems(data.items ?? []);
-        setNewClosetItem("");
-      }
-    } catch {
-      /* ignore */
-    } finally {
-      setClosetLoading(false);
-    }
-  }
-
-  async function removeClosetItem(item: string) {
-    setClosetLoading(true);
-    try {
-      const res = await fetch("/api/closet", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ item }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setClosetItems(data.items ?? []);
-      }
-    } catch {
-      /* ignore */
-    } finally {
-      setClosetLoading(false);
-    }
-  }
 
   const creditsRemaining = result?.meta?.creditsRemaining ?? initialCredits;
 
@@ -598,6 +565,7 @@ export default function Dashboard({
   /** Triggered by the "Fetch Weather & Style" button and the Refresh button. */
   const handleFetch = useCallback(async () => {
     if (!location) return;
+    if (dayAdviceError && !weatherOnly) { setError(dayAdviceError); return; }
     setError(null);
     setResult(null);
     setWeatherData(null);
@@ -646,7 +614,7 @@ export default function Dashboard({
     const stylePromise = fetch("/api/style", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
+      body: JSON.stringify({ structuredOutfit: true,
         lat: location.lat, lon: location.lon, gender: effectiveGender, shareLocation, forceCloset,
         unitPreference: userUnitPreference, sourceMode, customSources,
         ...(userApiKey ? { userApiKey, byokProvider } : {}),
@@ -709,7 +677,7 @@ export default function Dashboard({
     } finally {
       setAiLoading(false);
     }
-  }, [location, weatherOnly, gender, customGender, shareLocation, forceCloset, isPro, isDev, showDiagnostics, userUnitPreference, sourceMode, customSources, userApiKey, byokProvider, clientCustomPrompt, buildRecommendationContext]);
+  }, [location, weatherOnly, dayAdviceError, gender, customGender, shareLocation, forceCloset, isPro, isDev, showDiagnostics, userUnitPreference, sourceMode, customSources, userApiKey, byokProvider, clientCustomPrompt, buildRecommendationContext]);
 
   async function handleFollowUp(e: React.FormEvent) {
     e.preventDefault();
@@ -729,14 +697,15 @@ export default function Dashboard({
     const baseReasoning = followUpMode === "chat" && followUpHistory.length > 0
       ? followUpHistory[followUpHistory.length - 1].reasoning
       : result.recommendation.reasoning;
-    const followUpContext = withCurrentFeedback(result.meta.recommendationContext, feedbackSummary);
+    const followUpContext = withCurrentFeedback({...result.meta.recommendationContext,...(dailyContext.comfort?{comfort:dailyContext.comfort}:{})}, feedbackSummary);
     try {
       const res = await fetch("/api/followup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify({ structuredOutfit: true,
           message: questionText,
-          previousOutfit: baseOutfit,
+          forceCloset,
+        previousOutfit: baseOutfit,
           previousReasoning: baseReasoning,
           weather: result.weather,
           ...(followUpContext ? { recommendationContext: followUpContext } : {}),
@@ -797,7 +766,7 @@ export default function Dashboard({
       const res = await fetch("/api/style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lat: 0, lon: 0, devMessage: devChatMessage.trim() }),
+        body: JSON.stringify({ structuredOutfit: true, lat: 0, lon: 0, devMessage: devChatMessage.trim() }),
       });
       if (!res.ok) {
         let errorMessage = "Dev chat failed.";
@@ -823,6 +792,7 @@ export default function Dashboard({
   /** Regenerate recommendation with the same model (Try Again) */
   async function handleRegenerate() {
     if (!result || !location || regenerating) return;
+    if (dayAdviceError) { setRegenerationError(dayAdviceError); return; }
     
     setRegenerating(true);
     setRegenerationError(null);
@@ -833,7 +803,7 @@ export default function Dashboard({
       const res = await fetch("/api/style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify({ structuredOutfit: true,
           lat: location.lat,
           lon: location.lon,
           gender: gender === "N/A" ? undefined : gender,
@@ -863,13 +833,6 @@ export default function Dashboard({
       setResult(data);
       if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
       
-      // Update model switches remaining
-      if (data.meta?.dailyLimits?.model_switches !== undefined) {
-        setModelSwitchesRemaining(
-          (data.meta.dailyLimits.model_switches.limit ?? Infinity) - 
-          data.meta.dailyLimits.model_switches.used
-        );
-      }
     } catch {
       setRegenerationError("Network error — please try again.");
     } finally {
@@ -880,6 +843,7 @@ export default function Dashboard({
   /** Regenerate recommendation with a different model */
   async function handleRegenerateWithModel(modelId: ModelID) {
     if (!result || !location || regenerating) return;
+    if (dayAdviceError) { setRegenerationError(dayAdviceError); return; }
     
     setRegenerating(true);
     setRegenerationError(null);
@@ -891,7 +855,7 @@ export default function Dashboard({
       const res = await fetch("/api/style", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+        body: JSON.stringify({ structuredOutfit: true,
           lat: location.lat,
           lon: location.lon,
           gender: gender === "N/A" ? undefined : gender,
@@ -923,13 +887,6 @@ export default function Dashboard({
       setSelectedModel(modelId);
       if (data.meta?.dailyLimits) setDailyLimits(data.meta.dailyLimits);
       
-      // Update model switches remaining
-      if (data.meta?.dailyLimits?.model_switches !== undefined) {
-        setModelSwitchesRemaining(
-          (data.meta.dailyLimits.model_switches.limit ?? Infinity) - 
-          data.meta.dailyLimits.model_switches.used
-        );
-      }
     } catch {
       setRegenerationError("Network error — please try again.");
     } finally {
@@ -1049,7 +1006,7 @@ export default function Dashboard({
       {/* ── Main Content ── */}
       <nav aria-label="Dashboard sections" data-tour="sections" className="w-full border-b p-2 sm:px-6" style={{ background: "var(--card)", borderColor: "var(--card-border)" }}>
         <div className="flex w-full gap-2">
-          {visibleDashboardSections(sectionMode).map((section) => <button key={section} id={`dashboard-${section}-tab`} type="button"
+          {visibleDashboardSections(displayedSectionMode).map((section) => <button key={section} id={`dashboard-${section}-tab`} type="button"
             aria-pressed={activeSection === section} aria-controls={`dashboard-${section}-panel`} onClick={() => setActiveSection(section)}
             className="flex-1 rounded-xl px-5 py-3 text-sm font-semibold transition-colors btn-interact"
             style={{ background: activeSection === section ? "var(--accent)" : "transparent", color: activeSection === section ? "#fff" : "var(--foreground)" }}>
@@ -1128,7 +1085,7 @@ export default function Dashboard({
               >
                 <div>
                   <h2 id="recommendation-context-heading" className="text-sm font-semibold">Plan this recommendation</h2>
-                  <p className="mt-1 text-xs opacity-55">Optional details stay with your follow-up questions.</p>
+                  <p className="mt-1 text-xs opacity-70">Optional details stay with your follow-up questions.</p>
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2">
@@ -1171,9 +1128,10 @@ export default function Dashboard({
                       className="w-full rounded-xl px-3 py-2 text-sm"
                       style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}
                     />
-                    <p className="mt-1 text-[11px] opacity-50">Uses your device time zone. Later dates get general advice until a forecast is available.</p>
+                    <p className="mt-1 text-[11px] opacity-70">Uses your device time zone. Later dates get general advice until a forecast is available.</p>
                   </div>
 
+                  <DailyAdviceControls onValidationChange={setDayAdviceError} userId={userId} onChange={setDailyContext} />
                   <div>
                     <label htmlFor="fragrance-mode" className="mb-1 block text-xs font-medium">Fragrance</label>
                     <select
@@ -1251,6 +1209,7 @@ export default function Dashboard({
             )}
 
             {/* ── Loading ── */}
+            {!weatherOnly && !loading && !aiLoading && !result && !weatherData && <ExampleOutfit closetItems={closetItems} wardrobeItems={wardrobeItems} links={!inventory.loading && !inventory.error} onShopItem={openShopItem} />}
             {(loading || aiLoading) && (
               <div
                 role="status"
@@ -1291,7 +1250,7 @@ export default function Dashboard({
               <>
                 <WeatherEffectCard
                   condition={getWeatherCondition(w?.description ?? "")}
-                  windSpeed={w!.windSpeed}
+                  windSpeed={w!.windSpeed ?? 0}
                   className="rounded-2xl p-5 space-y-3"
                   style={{
                     background: "var(--card)",
@@ -1310,7 +1269,7 @@ export default function Dashboard({
                       </p>
                       <p
                         className="text-sm capitalize mt-0.5"
-                        style={{ color: "var(--foreground)", opacity: 0.55 }}
+                        style={{ color: "var(--foreground)", opacity: 0.45 }}
                       >
                         {w!.description} · feels like{" "}
                         {userUnitPreference === "imperial"
@@ -1325,18 +1284,18 @@ export default function Dashboard({
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                     {[
-                      { label: "Humidity", value: `${w!.humidity}%`, icon: "💧" },
-                      { label: "Rain chance", value: `${w!.rainChance}%`, icon: "🌧" },
+                      { label: "Humidity", value: w!.humidity === null ? "Unavailable" : `${w!.humidity}%`, icon: "💧" },
+                      { label: "Rain chance", value: w!.rainChance === null ? "Unavailable" : `${w!.rainChance}%`, icon: "🌧" },
                       {
                         label: "Wind",
-                        value: `${
+                        value: w!.windSpeed === null ? "Unavailable" : `${
                           userUnitPreference === "imperial"
-                            ? `${Math.round(w!.windSpeed * 0.621)}mph`
+                            ? `${Math.round((w!.windSpeed ?? 0) * 0.621)}mph`
                             : `${w!.windSpeed}km/h`
                         } ${w!.windDir}`,
                         icon: "💨",
                       },
-                      { label: "UV Index", value: `${w!.uvIndex}`, icon: "☀️" },
+                      { label: "UV Index", value: w!.uvIndex === null ? "Unavailable" : `${w!.uvIndex}`, icon: "☀️" },
                       {
                         label: "Feels like",
                         value: userUnitPreference === "imperial"
@@ -1392,7 +1351,7 @@ export default function Dashboard({
                     <div className="pt-2">
                       <p
                         className="text-xs font-semibold uppercase tracking-widest mb-2"
-                        style={{ color: "var(--foreground)", opacity: 0.4 }}
+                        style={{ color: "var(--foreground)", opacity: 0.65 }}
                       >
                         Per-Source Breakdown
                       </p>
@@ -1400,7 +1359,7 @@ export default function Dashboard({
                         <table className="w-full text-xs" style={{ color: "var(--foreground)" }}>
                           <caption className="sr-only">Per-source weather data breakdown</caption>
                           <thead>
-                            <tr style={{ opacity: 0.5 }}>
+                            <tr style={{ opacity: 0.65 }}>
                               <th scope="col" className="text-left py-1 pr-2">Source</th>
                               <th scope="col" className="text-right py-1 px-1">Temp</th>
                               <th scope="col" className="text-right py-1 px-1">Feels</th>
@@ -1430,24 +1389,24 @@ export default function Dashboard({
                                   )}
                                 </td>
                                 <td className="text-right py-1 px-1">
-                                  {userUnitPreference === "imperial"
+                                  {s.windSpeed === null ? "Unavailable" : userUnitPreference === "imperial"
                                     ? `${Math.round((s.temp * 9) / 5 + 32)}°F`
                                     : `${s.temp}°C`}
                                 </td>
                                 <td className="text-right py-1 px-1">
-                                  {userUnitPreference === "imperial"
+                                  {s.windSpeed === null ? "Unavailable" : userUnitPreference === "imperial"
                                     ? `${Math.round((s.feelsLike * 9) / 5 + 32)}°F`
                                     : `${s.feelsLike}°C`}
                                 </td>
-                                <td className="text-right py-1 px-1">{s.humidity}%</td>
+                                <td className="text-right py-1 px-1">{displayMeasurement(s.humidity,"%")}</td>
                                 <td className="text-right py-1 px-1">
-                                  {userUnitPreference === "imperial"
-                                    ? `${Math.round(s.windSpeed * 0.621)}mph`
+                                  {s.windSpeed === null ? "Unavailable" : userUnitPreference === "imperial"
+                                    ? `${Math.round((s.windSpeed ?? 0) * 0.621)}mph`
                                     : `${s.windSpeed}km/h`}{" "}
-                                  {s.windDir}
+                                  {s.windSpeed === null ? "" : s.windDir}
                                 </td>
-                                <td className="text-right py-1 px-1">{s.rainChance}%</td>
-                                <td className="text-right py-1 px-1">{s.uvIndex}</td>
+                                <td className="text-right py-1 px-1">{displayMeasurement(s.rainChance,"%")}</td>
+                                <td className="text-right py-1 px-1">{displayMeasurement(s.uvIndex)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -1467,7 +1426,7 @@ export default function Dashboard({
                     />
                     <span
                       className="text-xs"
-                      style={{ color: "var(--foreground)", opacity: 0.5 }}
+                      style={{ color: "var(--foreground)", opacity: 0.65 }}
                     >
                       {w!.accuracyScore} accuracy · {w!.stationName} (
                       {w!.stationDistanceKm} km) · {w!.source}
@@ -1484,13 +1443,13 @@ export default function Dashboard({
                   >
                     <p
                       className="text-xs font-semibold uppercase tracking-widest mb-1.5"
-                      style={{ color: "var(--foreground)", opacity: 0.4 }}
+                      style={{ color: "var(--foreground)", opacity: 0.65 }}
                     >
                       Data Sources &amp; Credits
                     </p>
                     <p
                       className="text-xs leading-relaxed"
-                      style={{ color: "var(--foreground)", opacity: 0.5 }}
+                      style={{ color: "var(--foreground)", opacity: 0.65 }}
                     >
                       Weather data from{" "}
                       {[...new Set([
@@ -1535,12 +1494,12 @@ export default function Dashboard({
                     <div className="pt-2">
                       <p
                         className="text-xs font-semibold uppercase tracking-widest mb-2"
-                        style={{ color: "var(--foreground)", opacity: 0.4 }}
+                        style={{ color: "var(--foreground)", opacity: 0.65 }}
                       >
                         Hourly Forecast
                       </p>
                       <div className="flex gap-2 overflow-x-auto pb-1" tabIndex={0} role="region" aria-label="Hourly forecast — scroll horizontally">
-                        {selectFutureHourlyForecast(w!.hourly, Date.now(), HOURLY_FORECAST_LIMIT).map((h, i) => (
+                        {selectFutureHourlyForecast(w!.hourly, forecastNow, HOURLY_FORECAST_LIMIT).map((h, i) => (
                           <div
                             key={i}
                             className="flex-shrink-0 rounded-xl p-2 text-center min-w-[80px]"
@@ -1550,7 +1509,7 @@ export default function Dashboard({
                               className="text-xs"
                               style={{
                                 color: "var(--foreground)",
-                                opacity: 0.5,
+                                opacity: 0.65,
                               }}
                             >
                               {formatHourlyDay(h.time, w!.timeZone)} {formatHourlyTime(h.time, w!.timeZone)}
@@ -1559,7 +1518,7 @@ export default function Dashboard({
                               className="text-sm font-medium"
                               style={{ color: "var(--foreground)" }}
                             >
-                              {userUnitPreference === "imperial"
+                              {h.windSpeed === null ? "Unavailable" : userUnitPreference === "imperial"
                                 ? `${Math.round((h.temp * 9) / 5 + 32)}°`
                                 : `${h.temp}°`}
                             </p>
@@ -1567,10 +1526,10 @@ export default function Dashboard({
                               className="text-xs"
                               style={{
                                 color: "var(--foreground)",
-                                opacity: 0.4,
+                                opacity: 0.65,
                               }}
                             >
-                              <span aria-hidden="true">🌧</span>{h.rainChance}%
+                              <span aria-hidden="true">🌧</span>{displayMeasurement(h.rainChance,"%")}
                             </p>
                             <p
                               className="text-xs"
@@ -1579,8 +1538,8 @@ export default function Dashboard({
                                 opacity: 0.35,
                               }}
                             >
-                              <span aria-hidden="true">💨</span>{userUnitPreference === "imperial"
-                                ? `${Math.round(h.windSpeed * 0.621)}`
+                              <span aria-hidden="true">💨</span>{h.windSpeed === null ? "Unavailable" : userUnitPreference === "imperial"
+                                ? `${Math.round((h.windSpeed ?? 0) * 0.621)}`
                                 : h.windSpeed}
                             </p>
                           </div>
@@ -1590,6 +1549,7 @@ export default function Dashboard({
                   )}
                 </WeatherEffectCard>
 
+                {result?.meta?.windowForecastStatus && result.meta.windowForecastStatus!=="not-requested" && <p role="status" className="text-sm">Window forecast coverage: {result.meta.windowForecastStatus}. {result.meta.windowForecastStatus!=="full" && "Some hours have no forecast. Refresh nearer your outing; current conditions do not predict those hours."}</p>}
                 {result?.meta?.eventForecastStatus === "unavailable" && (
                   <div
                     role="status"
@@ -1641,7 +1601,7 @@ export default function Dashboard({
                   )}
                   <WeatherEffectCard
                     condition={getWeatherCondition(w?.description ?? "")}
-                    windSpeed={w!.windSpeed}
+                    windSpeed={w!.windSpeed ?? 0}
                     className="rounded-2xl p-5 space-y-3"
                     style={{
                       background: "var(--card)",
@@ -1656,12 +1616,15 @@ export default function Dashboard({
                     </h2>
                     <MarkdownRenderer
                       content={rec!.outfit}
-                      closetItems={closetItems}
+                      closetItems={closetItems} wardrobeItems={wardrobeItems}
+                      recommendationLinks={!inventory.loading && !inventory.error} onShopItem={openShopItem}
                       className="text-base leading-relaxed"
                       style={{ color: "var(--foreground)" }}
                     />
+                    {rec.details && <OutfitActions wardrobeItems={inventory.structured ? wardrobeItems : undefined} payload={{outfit:rec.outfit,reasoning:rec.reasoning,...rec.details}} temporary={userId === DEMO_USER_ID} apiKey={userApiKey} provider={byokProvider}
+                      onChange={(payload: OutfitPayload) => setResult(previous => previous ? {...previous,recommendation:{...previous.recommendation,outfit:payload.outfit,reasoning:payload.reasoning,details:payload}} : previous)} />}
                     {result?.meta.recommendationContext?.budget && (
-                      <p className="text-xs opacity-60">
+                      <p className="text-xs opacity-70">
                         Budget guide: {result.meta.recommendationContext.budget.currency}{" "}
                         {result.meta.recommendationContext.budget.minAmount !== undefined
                           ? `${result.meta.recommendationContext.budget.minAmount.toFixed(2)}–${result.meta.recommendationContext.budget.maxAmount.toFixed(2)}`
@@ -1673,19 +1636,20 @@ export default function Dashboard({
                       <>
                         <h3
                           className="text-xs font-semibold uppercase tracking-widest pt-1"
-                          style={{ color: "var(--foreground)", opacity: 0.4 }}
+                          style={{ color: "var(--foreground)", opacity: 0.65 }}
                         >
                           Reasoning
                         </h3>
                         <MarkdownRenderer
                           content={rec!.reasoning}
+                          closetItems={closetItems} wardrobeItems={wardrobeItems} recommendationLinks={!inventory.loading && !inventory.error} onShopItem={openShopItem}
                           className="text-sm leading-relaxed"
                           style={{ color: "var(--foreground)", opacity: 0.7 }}
                         />
                         <div className="flex items-center gap-2 pt-1">
                           <span
                             className="text-xs"
-                            style={{ color: "var(--foreground)", opacity: 0.5 }}
+                            style={{ color: "var(--foreground)", opacity: 0.65 }}
                           >
                             🤖 {result?.meta?.modelUsed ?? rec!.modelUsed ?? "unknown"}
                           </span>
@@ -1700,7 +1664,7 @@ export default function Dashboard({
                                 opacity: 0.7,
                               }}
                             >
-                              ⭐ Upgrade to Pro for GPT-4o
+                              View Pro options
                             </button>
                           )}
                         </div>
@@ -1783,7 +1747,7 @@ export default function Dashboard({
                           <p className="text-sm mb-4" style={{ color: "var(--foreground)", opacity: 0.7 }}>
                             {isPro || isDev 
                               ? "Choose a different AI model for your recommendation." 
-                              : `Free users can switch models ${modelSwitchesRemaining !== null ? modelSwitchesRemaining : 2} more times this week.`
+                              : `Free users can switch models ${modelSwitchesRemaining !== null ? modelSwitchesRemaining : 2} more times today.`
                             }
                           </p>
                           
@@ -1816,7 +1780,7 @@ export default function Dashboard({
                                   }}
                                   disabled={regenerating}
                                   className={`w-full text-left rounded-xl px-4 py-3 text-sm btn-interact flex items-center justify-between ${
-                                    isAvailable ? "opacity-100" : "opacity-50 cursor-not-allowed"
+                                    isAvailable ? "opacity-100" : "opacity-70 cursor-not-allowed"
                                   }`}
                                   style={{
                                     background: isSelected 
@@ -1832,9 +1796,9 @@ export default function Dashboard({
                                   {isAvailable ? (
                                     <span>✓</span>
                                   ) : isByok ? (
-                                    <span style={{ opacity: 0.5 }}>🔑</span>
+                                    <span style={{ opacity: 0.65 }}>🔑</span>
                                   ) : (
-                                    <span style={{ opacity: 0.5 }}>🔒</span>
+                                    <span style={{ opacity: 0.65 }}>🔒</span>
                                   )}
                                 </button>
                               );
@@ -1867,7 +1831,7 @@ export default function Dashboard({
                   {/* ── Follow-Up Input ── */}
                   <WeatherEffectCard
                     condition={getWeatherCondition(w?.description ?? "")}
-                    windSpeed={w!.windSpeed}
+                    windSpeed={w!.windSpeed ?? 0}
                     className="rounded-2xl p-4"
                     style={{
                       background: "var(--card)",
@@ -1876,7 +1840,7 @@ export default function Dashboard({
                   >
                     <p
                       className="text-xs font-semibold uppercase tracking-widest mb-2"
-                      style={{ color: "var(--foreground)", opacity: 0.4 }}
+                      style={{ color: "var(--foreground)", opacity: 0.65 }}
                     >
                       {followUpMode === "chat" ? "💬 Chat" : "Follow Up"}
                       {dailyLimits && (
@@ -1906,7 +1870,7 @@ export default function Dashboard({
                               className="rounded-xl px-3 py-2 text-xs leading-relaxed"
                               style={{ background: "var(--background)", color: "var(--foreground)", border: "1px solid var(--card-border)" }}
                             >
-                              {item.outfit}
+                              <MarkdownRenderer content={item.outfit} closetItems={closetItems} wardrobeItems={wardrobeItems} recommendationLinks={!inventory.loading && !inventory.error} onShopItem={openShopItem} />
                             </div>
                           </div>
                         ))}
@@ -2045,35 +2009,35 @@ export default function Dashboard({
                   style={{ color: isDev ? "#ff9500" : "var(--foreground)" }}
                 >
                   🔬 Session Diagnostics
-                  {!isDev && <span className="ml-1 normal-case font-normal" style={{ opacity: 0.5 }}>(enabled in settings)</span>}
+                  {!isDev && <span className="ml-1 normal-case font-normal" style={{ opacity: 0.65 }}>(enabled in settings)</span>}
                 </h2>
                 <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: "var(--foreground)" }}>
                   <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
-                    <span style={{ opacity: 0.5 }}>Last AI</span>
+                    <span style={{ opacity: 0.65 }}>Last AI</span>
                     <p className="font-semibold mt-0.5" style={{ color: diagLastAiStatus === "success" ? "#30d158" : diagLastAiStatus === "error" ? "#ff3b30" : "var(--foreground)", opacity: diagLastAiStatus ? 1 : 0.4 }}>
                       {diagLastAiStatus ?? "—"}
                     </p>
                   </div>
                   <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
-                    <span style={{ opacity: 0.5 }}>AI Model</span>
+                    <span style={{ opacity: 0.65 }}>AI Model</span>
                     <p className="font-semibold mt-0.5" style={{ opacity: diagLastAiProvider ? 1 : 0.4 }}>
                       {diagLastAiProvider ?? "—"}
                     </p>
                   </div>
                   <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
-                    <span style={{ opacity: 0.5 }}>Last Weather</span>
+                    <span style={{ opacity: 0.65 }}>Last Weather</span>
                     <p className="font-semibold mt-0.5" style={{ color: diagLastWeatherStatus === "success" ? "#30d158" : diagLastWeatherStatus === "error" ? "#ff3b30" : "var(--foreground)", opacity: diagLastWeatherStatus ? 1 : 0.4 }}>
                       {diagLastWeatherStatus ?? "—"}
                     </p>
                   </div>
                   <div className="rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
-                    <span style={{ opacity: 0.5 }}>Session Errors</span>
+                    <span style={{ opacity: 0.65 }}>Session Errors</span>
                     <p className="font-semibold mt-0.5" style={{ color: diagSessionErrors > 0 ? "#ff3b30" : "#30d158" }}>
                       {diagSessionErrors}
                     </p>
                   </div>
                   <div className="col-span-2 rounded-xl p-2" style={{ background: "var(--background)", border: "1px solid var(--card-border)" }}>
-                    <span style={{ opacity: 0.5 }}>Last Fetch</span>
+                    <span style={{ opacity: 0.65 }}>Last Fetch</span>
                     <p className="font-semibold mt-0.5" style={{ opacity: diagLastFetchAt ? 1 : 0.4, fontFamily: "monospace" }}>
                       {diagLastFetchAt ? new Date(diagLastFetchAt).toLocaleTimeString() : "—"}
                     </p>
@@ -2160,7 +2124,7 @@ export default function Dashboard({
                 <p
                   id="gender-label"
                   className="text-xs font-semibold uppercase tracking-widest mb-2"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
+                  style={{ color: "var(--foreground)", opacity: 0.65 }}
                 >
                   Gender (for outfit recommendations)
                 </p>
@@ -2209,7 +2173,7 @@ export default function Dashboard({
                 <p
                   id="units-label"
                   className="text-xs font-semibold uppercase tracking-widest mb-2"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
+                  style={{ color: "var(--foreground)", opacity: 0.65 }}
                 >
                   Units
                 </p>
@@ -2220,14 +2184,22 @@ export default function Dashboard({
                       aria-pressed={userUnitPreference === unit}
                       onClick={async () => {
                         setUserUnitPreference(unit);
+                        setUnitMessage("");
                         try {
-                          await fetch("/api/settings", {
+                          if (userId === DEMO_USER_ID) {
+                            localStorage.setItem("skystyle_demo_units", unit);
+                            setUnitMessage("Units saved on this device for the demo.");
+                            return;
+                          }
+                          const response = await fetch("/api/settings", {
                             method: "PATCH",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ unit_preference: unit }),
+                            signal: AbortSignal.timeout(8000),
                           });
+                          if (!response.ok) throw new Error();
                         } catch {
-                          /* ignore */
+                          setUnitMessage("Units apply to this visit. They could not be saved; choose them again to retry.");
                         }
                       }}
                       className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact capitalize"
@@ -2241,6 +2213,7 @@ export default function Dashboard({
                     </button>
                   ))}
                 </div>
+                {unitMessage && <p role="status" className="mt-2 text-xs">{unitMessage}</p>}
               </div>
               <Checkbox
                 checked={shareLocation}
@@ -2263,81 +2236,20 @@ export default function Dashboard({
                 border: "1px solid var(--card-border)",
               }}
             >
-              <p
-                className="text-xs font-semibold uppercase tracking-widest"
-                style={{ color: "var(--foreground)", opacity: 0.4 }}
-              >
-                👕 My Closet
-              </p>
-              <form onSubmit={addClosetItem} className="flex gap-2">
-                <label htmlFor="closet-input" className="sr-only">Add a closet item</label>
-                <input
-                  id="closet-input"
-                  type="text"
-                  value={newClosetItem}
-                  onChange={(e) => setNewClosetItem(e.target.value)}
-                  placeholder="Add an item (e.g. Blue denim jacket)"
-                  className="flex-1 rounded-xl px-4 py-2.5 text-sm outline-none"
-                  style={{
-                    background: "var(--background)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--card-border)",
-                  }}
-                />
-                <button
-                  type="submit"
-                  disabled={closetLoading || !newClosetItem.trim()}
-                  className={`rounded-xl px-4 py-2.5 text-sm font-medium btn-interact disabled:opacity-40 ${planBtnClass}`}
-                >
-                  {closetLoading ? "…" : "Add"}
-                </button>
-              </form>
-              {closetItems.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {closetItems.map((item) => (
-                    <span
-                      key={item}
-                      className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs"
-                      style={{
-                        background: "var(--background)",
-                        color: "var(--foreground)",
-                        border: "1px solid var(--card-border)",
-                      }}
-                    >
-                      {item}
-                      <button
-                        onClick={() => removeClosetItem(item)}
-                        disabled={closetLoading}
-                        className="hover:opacity-70 disabled:opacity-30"
-                        style={{ color: "#ff3b30" }}
-                        aria-label={`Remove ${item}`}
-                      >
-                        ✕
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-              {closetItems.length === 0 && (
-                <p
-                  className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
-                >
-                  No items in your closet yet. Add some to get personalized recommendations!
-                </p>
-              )}
+              <ClosetManager embedded temporary={userId === DEMO_USER_ID} initialItems={closetItems} initialSnapshot={inventory.structured ? inventory.snapshot : undefined} onChange={inventory.update} />
               <Checkbox
                 checked={forceCloset}
                 onChange={setForceCloset}
-                label="Force recommendation to use closet"
-                description={closetItems.length === 0 ? "Add items to your closet for more accurate recommendations" : undefined}
+                label="Owned clothes only"
+                disabled={userId === DEMO_USER_ID}
+                description={userId === DEMO_USER_ID ? "Sign in with a real account to use your saved wardrobe in AI advice." : closetItems.length === 0 ? "Add items to your closet to use this option." : undefined}
               />
               <Link
                 href="/closet"
                 className="block w-full text-center rounded-xl py-2 text-xs btn-interact"
                 style={{
                   color: "var(--foreground)",
-                  opacity: 0.55,
+                  opacity: 0.45,
                   border: "1px solid var(--card-border)",
                 }}
               >
@@ -2361,13 +2273,13 @@ export default function Dashboard({
               >
                 <p
                   className="text-xs font-semibold uppercase tracking-widest"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
+                  style={{ color: "var(--foreground)", opacity: 0.65 }}
                 >
                   🌐 Weather Sources
                 </p>
                 <span
                   className="text-xs"
-                  style={{ color: "var(--foreground)", opacity: 0.4 }}
+                  style={{ color: "var(--foreground)", opacity: 0.65 }}
                 >
                   {sourcesExpanded ? "▲" : "▼"}
                 </span>
@@ -2379,7 +2291,7 @@ export default function Dashboard({
                   <div>
                     <p
                       className="text-xs mb-2"
-                      style={{ color: "var(--foreground)", opacity: 0.5 }}
+                      style={{ color: "var(--foreground)", opacity: 0.65 }}
                     >
                       Source mode
                     </p>
@@ -2410,7 +2322,7 @@ export default function Dashboard({
                     <div className="space-y-2">
                       <p
                         className="text-xs"
-                        style={{ color: "var(--foreground)", opacity: 0.5 }}
+                        style={{ color: "var(--foreground)", opacity: 0.65 }}
                       >
                         Your sources ({customSources.length})
                       </p>
@@ -2435,7 +2347,7 @@ export default function Dashboard({
                             </p>
                             <p
                               className="text-xs truncate"
-                              style={{ color: "var(--foreground)", opacity: 0.4 }}
+                              style={{ color: "var(--foreground)", opacity: 0.65 }}
                             >
                               {source.type === "api_key"
                                 ? `${source.service} · ••••${source.value.slice(-4)}`
@@ -2447,7 +2359,7 @@ export default function Dashboard({
                             style={{
                               background: "var(--card)",
                               color: "var(--foreground)",
-                              opacity: 0.5,
+                              opacity: 0.65,
                             }}
                           >
                             {source.type === "rss" ? "RSS" : source.type === "api_key" ? "API Key" : "URL"}
@@ -2469,7 +2381,7 @@ export default function Dashboard({
                   <form onSubmit={addCustomSource} className="space-y-2">
                     <p
                       className="text-xs"
-                      style={{ color: "var(--foreground)", opacity: 0.5 }}
+                      style={{ color: "var(--foreground)", opacity: 0.65 }}
                     >
                       Add a source
                     </p>
@@ -2583,13 +2495,13 @@ export default function Dashboard({
                     className="text-sm font-semibold"
                     style={{ color: "var(--foreground)" }}
                   >
-                    {isDev ? "🛠️ Dev Plan" : isPro ? "⭐ Pro Plan" : "Free Plan"}
+                    {isDev ? "🛠️ Dev Plan" : userId === DEMO_USER_ID ? "Demo preview" : isPro ? "⭐ Pro Plan" : "Free Plan"}
                   </h2>
                   <p
                     className="text-xs mt-0.5"
-                    style={{ color: "var(--foreground)", opacity: 0.5 }}
+                    style={{ color: "var(--foreground)", opacity: 0.65 }}
                   >
-                    {isDev ? "Special Access" : isPro ? (dailyLimits?.accountingActive ? "Admin-managed Pro · A$6.99/month approved price · checkout unavailable" : "Legacy Pro allowance · V6 price approved, not active") : "A$0 — free forever"}
+                    {isDev ? "Special Access" : userId === DEMO_USER_ID ? "Temporary preview · no cloud wardrobe saves" : isPro ? (dailyLimits?.accountingActive ? "Pro access · purchases unavailable" : "Pro access · managed for your account") : "A$0"}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -2607,7 +2519,7 @@ export default function Dashboard({
                       className="rounded-full px-3 py-1 text-xs font-medium btn-interact"
                       style={{ background: "var(--accent)", color: "#fff" }}
                     >
-                      ☕ Upgrade to Pro
+                      Compare plans
                     </button>
                   )}
                 </div>
@@ -2619,7 +2531,7 @@ export default function Dashboard({
                 <div className="grid grid-cols-2 gap-2 pt-1">
                   {[
                     {
-                      label: "AI uses",
+                      label: "Recommendations",
                       used: dailyLimits.ai.used,
                       limit: dailyLimits.ai.limit,
                     },
@@ -2629,7 +2541,7 @@ export default function Dashboard({
                       limit: dailyLimits.followUps.limit,
                     },
                     {
-                      label: "Closet uses",
+                      label: "Owned-only advice",
                       used: dailyLimits.closet.used,
                       limit: dailyLimits.closet.limit,
                     },
@@ -2686,89 +2598,26 @@ export default function Dashboard({
                   style={{ color: "var(--foreground)" }}
                   aria-expanded={byokOpen}
                 >
-                  <span className="font-semibold uppercase tracking-widest" style={{ opacity: 0.4 }}>
+                  <span className="font-semibold uppercase tracking-widest" style={{ opacity: 0.65 }}>
                     🔑 Bring Your Own Key
                   </span>
-                  <span style={{ opacity: 0.4, fontSize: 10 }}>{byokOpen ? "▲" : "▼"}</span>
+                  <span style={{ opacity: 0.65, fontSize: 10 }}>{byokOpen ? "▲" : "▼"}</span>
                 </button>
                 {byokOpen && (
                 <div className="px-4 pb-4 space-y-3">
 
-                {/* AI provider selector */}
-                <div>
-                  <p className="text-xs mb-1.5" style={{ color: "var(--foreground)", opacity: 0.55 }}>
-                    AI provider for your key
-                  </p>
-                  <div className="flex gap-2">
-                    {(["openai", "gemini", "mistral", "anthropic"] as const).map((prov) => (
-                      <button
-                        key={prov}
-                        type="button"
-                        onClick={() => {
-                          setByokProvider(prov);
-                          if (prov !== byokProvider) setUserApiKey("");
-                          try { localStorage.setItem("skystyle_byok_provider", prov); if (prov !== byokProvider) localStorage.removeItem("skystyle_byok_key"); } catch { /* optional browser storage */ }
-                        }}
-                        className="rounded-xl px-3 py-1.5 text-xs font-medium btn-interact"
-                        style={{
-                          background: byokProvider === prov ? "var(--accent)" : "var(--background)",
-                          color: byokProvider === prov ? "#fff" : "var(--foreground)",
-                          border: "1px solid var(--card-border)",
-                        }}
-                      >
-                        {prov === "openai" ? "OpenAI" : prov === "gemini" ? "Gemini" : prov === "anthropic" ? "Anthropic" : "Mistral"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.55 }}>
-                  {byokProvider === "openai"
-                    ? "Provide your OpenAI API key (sk-…)."
-                    : byokProvider === "gemini"
-                      ? "Provide your Google Gemini API key."
-                      : byokProvider === "anthropic" ? "Provide your Anthropic key for Claude Haiku 4.5." : "Provide your Mistral AI API key."}{" "}
-                  Stored in this browser, sent securely through Sky Style to your selected provider only when you request AI advice. Not saved in the Sky Style database.
-                </p>
-                <input
-                  type="password"
-                  value={userApiKey}
-                  onChange={(e) => {
-                    const val = e.target.value.slice(0, 200);
-                    setUserApiKey(val);
-                    try { localStorage.setItem("skystyle_byok_key", val); } catch { /* ignore */ }
-                  }}
-                  placeholder={byokProvider === "openai" ? "sk-… (optional)" : byokProvider === "gemini" ? "AI… (optional)" : byokProvider === "anthropic" ? "sk-ant-… (optional)" : "mx-… (optional)"}
-                  autoComplete="off"
-                  className="w-full rounded-xl px-3 py-2 text-xs outline-none"
-                  style={{
-                    background: "var(--background)",
-                    color: "var(--foreground)",
-                    border: "1px solid var(--card-border)",
-                  }}
-                />
-                {userApiKey && (
-                  <button
-                    onClick={() => {
-                      setUserApiKey("");
-                      try { localStorage.removeItem("skystyle_byok_key"); } catch { /* ignore */ }
-                    }}
-                    className="text-xs btn-interact rounded-lg px-2 py-1"
-                    style={{ color: "#ff3b30" }}
-                  >
-                    Clear key
-                  </button>
-                )}
+                <ByokCredentialControls provider={byokProvider} apiKey={userApiKey} remember={byok.remember} storageAvailable={byok.storageAvailable}
+                  onProvider={setByokProvider} onKey={setUserApiKey} onRemember={byok.setRemember} onClear={byok.clear} />
 
                 {/* Custom AI prompt (Pro/Dev) */}
                 <div className="space-y-1.5 pt-1">
                   <p
                     className="text-xs font-semibold uppercase tracking-widest"
-                    style={{ color: "var(--foreground)", opacity: 0.4 }}
+                    style={{ color: "var(--foreground)", opacity: 0.65 }}
                   >
                     ✏️ Custom AI Prompt
                   </p>
-                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.5 }}>
+                  <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.65 }}>
                     Replaces the default Sky Style prompt. Must include JSON output instructions. Stored locally only.
                   </p>
                   <textarea
@@ -2812,12 +2661,13 @@ export default function Dashboard({
           </div>
         </section>
         <ShopPanel
+          contextItem={shopContext}
           outfitIdea={rec?.outfit}
-          userId={userId} isPro={isPro} isDev={isDev} userApiKey={userApiKey} byokProvider={byokProvider}
+          userId={userId} isPro={isPro} isDev={isDev} userApiKey={userApiKey} byokProvider={byokProvider} byokRemember={byok.remember} byokStorageAvailable={byok.storageAvailable} onByokRemember={byok.setRemember} onByokClear={byok.clear}
           onApiKeyChange={setUserApiKey} onProviderChange={setByokProvider}
           feedbackSummary={feedbackSummary}
           onSwitchToStyle={() => setActiveSection("style")}
-          canSwitchToStyle={sectionMode !== "shop"}
+          canSwitchToStyle={displayedSectionMode !== "shop"}
           hidden={activeSection !== "shop"}
         />
       </main>

@@ -57,10 +57,11 @@ jest.mock('@/lib/ai', () => {
   getDefaultModel: jest.fn((isPro: boolean, isDev: boolean) => ({
     id: isPro || isDev ? 'gpt-4o' : 'gemini-2.5-flash',
   })),
+  isModelAvailable: jest.requireActual('@/lib/ai-models').isModelAvailable,
   PlanningData: jest.fn(),
   ModelID: jest.fn(),
   getModelById: jest.fn((modelId: string) => {
-    const validModels = ['gpt-4o', 'gemini-2.5-flash', 'mistral-large-latest'];
+    const validModels = ['gpt-4o', 'gemini-2.5-flash', 'mistral-large-latest', 'mistral-small-latest'];
     return validModels.includes(modelId) ? { id: modelId, provider: 'openai', name: modelId } : null;
   }),
   };
@@ -233,7 +234,7 @@ describe('Style API Route - Model Switch Rate Limiting', () => {
     const req = createMockNextRequest({ 
       lat: 40.7128, 
       lon: -74.0060,
-      modelId: 'mistral-large-latest' // Different from default
+      modelId: 'mistral-small-latest' // Available Free model, different from default
     });
     
     // Mock user as free
@@ -263,7 +264,7 @@ describe('Style API Route - Model Switch Rate Limiting', () => {
     const req = createMockNextRequest({ 
       lat: 40.7128, 
       lon: -74.0060,
-      modelId: 'mistral-large-latest' // Different from default
+      modelId: 'mistral-small-latest' // Available Free model, different from default
     });
     
     // Mock user as free
@@ -325,6 +326,7 @@ describe('Style API Route - Model Switch Rate Limiting', () => {
 });
 
 describe('Style API Route - BYOK Provider Validation', () => {
+  beforeEach(() => setMockProfile(mockProUser));
   it('should accept openai as byokProvider', async () => {
     const req = createMockNextRequest({ 
       lat: 40.7128, 
@@ -335,7 +337,7 @@ describe('Style API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
   });
 
   it('should accept gemini as byokProvider', async () => {
@@ -348,7 +350,7 @@ describe('Style API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
   });
 
   it('should accept mistral as byokProvider', async () => {
@@ -361,7 +363,7 @@ describe('Style API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
   });
 
   it('should default to openai when byokProvider is not specified', async () => {
@@ -373,7 +375,7 @@ describe('Style API Route - BYOK Provider Validation', () => {
     
     const res = await POST(req);
     
-    expect(res.status).not.toBe(400);
+    expect(res.status).toBe(200);
   });
 });
 
@@ -603,5 +605,43 @@ describe('Style API Route - Dev Mode', () => {
     
     // Restore original
     authModule.auth = originalAuth;
+  });
+});
+
+describe("6.3 usable-output charging",()=>{
+ it("does not charge unusable AI output",async()=>{
+  jest.requireMock('@/lib/ai').getStyleRecommendation.mockResolvedValueOnce({outfit:"",reasoning:"incomplete"});
+  expect((await POST(createMockNextRequest({lat:51.5,lon:-0.1}))).status).toBe(502);
+  expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
+  expect(jest.requireMock('@/lib/credits').deductCredit).not.toHaveBeenCalled(); });
+ it("returns an incomplete outfit without consuming allowance",async()=>{
+  jest.requireMock('@/lib/ai').getStyleRecommendation.mockResolvedValueOnce({...mockStyleRecommendation,chargeable:false});
+  expect((await POST(createMockNextRequest({lat:51.5,lon:-0.1}))).status).toBe(200);
+  expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
+  expect(jest.requireMock('@/lib/credits').deductCredit).not.toHaveBeenCalled(); });
+});
+
+describe('legacy account model and credential access', () => {
+  it('a Free default request carries server-owned Free access', async () => {
+    setMockProfile(mockUser);
+    const ai = jest.requireMock('@/lib/ai');
+    const response = await POST(createMockNextRequest({ lat: -37.8, lon: 145 }));
+    expect(response.status).toBe(200);
+    expect(ai.getStyleRecommendation).toHaveBeenCalledWith(expect.objectContaining({ modelId: undefined, isDev: false, isPro: false }));
+  });
+  it.each([[mockUser, true, false], [mockProUser, false, true]] as const)('request-body plan claims do not override the profile', async (profile, claimed, expected) => {
+    setMockProfile(profile);
+    const response = await POST(createMockNextRequest({ lat: -37.8, lon: 145, isPro: claimed }));
+    expect(response.status).toBe(200);
+    expect(jest.requireMock('@/lib/ai').getStyleRecommendation).toHaveBeenCalledWith(expect.objectContaining({ isPro: expected }));
+  });
+  it.each([{ modelId: 'gpt-4o' }, { userApiKey: 'synthetic-key' }])('rejects unavailable options before generation: %j', async options => {
+    setMockProfile(mockUser);
+    const ai = jest.requireMock('@/lib/ai');
+    ai.getStyleRecommendation.mockClear();
+    const response = await POST(createMockNextRequest({ ...{ lat: -37.8, lon: 145 }, ...options }));
+    expect(response.status).toBe(403);
+    expect(ai.getStyleRecommendation).not.toHaveBeenCalled();
+    expect(jest.requireMock('@/lib/daily-usage').incrementUsage).not.toHaveBeenCalled();
   });
 });

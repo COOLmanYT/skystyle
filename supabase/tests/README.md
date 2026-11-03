@@ -2,7 +2,9 @@
 
 `npm run test:scheduler` checks the idle scheduler gate in an in-memory PostgreSQL engine (PGlite). It uses synthetic schedules and a stubbed HTTP queue, covering idle ticks, due times, lock recovery, delivery retries, legacy schema compatibility, secret validation and role denial. It never connects to Supabase or sends HTTP requests. It does not establish production delivery or concurrent claim acceptance.
 
-## V6 accounting
+`npm run test:daily-outfits` rehearses the exact 6.3 SQL candidates and the 6.5 legacy-writer guard in disposable, single-connection PostgreSQL (PGlite). It verifies SQL compatibility and synthetic behavior; it does not establish concurrent or real-account acceptance.
+
+## V6 accounting and everyday outfits
 
 `v6-entitlements-regression.sql` is the existing sequential rollback fixture. It is not a migration or concurrency proof.
 

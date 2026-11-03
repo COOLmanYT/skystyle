@@ -33,27 +33,33 @@ export default function PrivacyHubClient({ isPendingDeletion: initialPending, is
   const [loading, setLoading] = useState(false);
   // Export cooldown: timestamp (ms) when cooldown expires, or null if not active
   const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
-  // Tick to force re-render of cooldown display every minute
-  const [, setTick] = useState(0);
+  // Keep the clock in state so renders remain pure.
+  const [now, setNow] = useState(() => Date.now());
   // Hydration guard — avoid reading localStorage before client mount
   const [mounted, setMounted] = useState(false);
 
   // Load cooldown from localStorage on mount
   useEffect(() => {
-    setMounted(true);
-    if (isDev) return; // dev users have no cooldown
-    try {
-      const stored = localStorage.getItem(EXPORT_COOLDOWN_KEY);
-      if (stored) {
-        const until = parseInt(stored, 10);
-        if (!isNaN(until) && until > Date.now()) {
-          setCooldownUntil(until);
-        } else {
-          // Expired — clean up
-          localStorage.removeItem(EXPORT_COOLDOWN_KEY);
+    let current = true;
+    queueMicrotask(() => {
+      if (!current) return;
+      setNow(Date.now());
+      setMounted(true);
+      if (isDev) return; // dev users have no cooldown
+      try {
+        const stored = localStorage.getItem(EXPORT_COOLDOWN_KEY);
+        if (stored) {
+          const until = parseInt(stored, 10);
+          if (!isNaN(until) && until > Date.now()) {
+            setCooldownUntil(until);
+          } else {
+            // Expired — clean up
+            localStorage.removeItem(EXPORT_COOLDOWN_KEY);
+          }
         }
-      }
-    } catch { /* ignore */ }
+      } catch { /* ignore */ }
+    });
+    return () => { current = false; };
   }, [isDev]);
 
   // Refresh the displayed countdown every 60 s; clear interval when cooldown expires
@@ -64,12 +70,12 @@ export default function PrivacyHubClient({ isPendingDeletion: initialPending, is
         setCooldownUntil(null);
         try { localStorage.removeItem(EXPORT_COOLDOWN_KEY); } catch { /* ignore */ }
       }
-      setTick((t) => t + 1);
+      setNow(Date.now());
     }, 60_000);
     return () => clearInterval(id);
   }, [cooldownUntil]);
 
-  const cooldownRemaining = cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0;
+  const cooldownRemaining = cooldownUntil ? Math.max(0, cooldownUntil - now) : 0;
   const isCoolingDown = mounted && !isDev && cooldownRemaining > 0;
 
   const showToast = (msg: string) => {
@@ -94,7 +100,9 @@ export default function PrivacyHubClient({ isPendingDeletion: initialPending, is
       showToast("✅ Your data has been downloaded.");
       // Start cooldown for non-dev users
       if (!isDev) {
-        const until = Date.now() + EXPORT_COOLDOWN_MS;
+        const exportedAt = Date.now();
+        const until = exportedAt + EXPORT_COOLDOWN_MS;
+        setNow(exportedAt);
         setCooldownUntil(until);
         try { localStorage.setItem(EXPORT_COOLDOWN_KEY, String(until)); } catch { /* ignore */ }
       }

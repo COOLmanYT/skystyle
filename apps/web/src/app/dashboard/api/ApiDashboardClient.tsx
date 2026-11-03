@@ -166,7 +166,9 @@ export default function ApiDashboardClient() {
   }, [fetchApiKeys, fetchUsage]);
 
   useEffect(() => {
-    void refreshAll();
+    let current = true;
+    queueMicrotask(() => { if (current) void refreshAll(); });
+    return () => { current = false; };
   }, [refreshAll]);
 
   /** Endpoints sorted by call count descending for the bar chart. */

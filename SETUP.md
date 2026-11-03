@@ -1,102 +1,124 @@
-# Setup Guide
+# Setup guide
 
-Full instructions for deploying and developing Sky Style locally.
+Run commands from the repository root. The web app and docs share npm workspaces and the root lockfile.
 
-## Repository layout
+## Before you start
 
-This repository uses a monorepo-style layout:
+Use Node.js 20.9 or later and npm. Check with `node --version` and `npm --version`. The web app needs a Supabase database, an Auth.js secret, and credentials for the sign-in and AI providers you test. The docs site needs no web-app credentials.
 
-- `apps/web` - Sky Style Next.js app
-- `apps/docs` - VitePress docs site
-- `apps/api` - future standalone API placeholder
+## Run the web app locally
 
-The intended production deployment is `https://skystyle.app`; preview deployments use their own Vercel URL.
+1. Install the locked dependencies with `npm ci`.
+2. Copy the environment template into the web workspace.
 
-## Deploying to Vercel
+   PowerShell:
 
-### 1. Set up external services
+   ```powershell
+   Copy-Item .env.example apps/web/.env.local
+   ```
 
-Before deploying, create accounts and obtain credentials for:
+   macOS/Linux:
 
-| Service | Purpose | Link |
-|---|---|---|
-| [Supabase](https://supabase.com) | Database & auth adapter | [Dashboard](https://supabase.com/dashboard) |
-| [GitHub OAuth App](https://github.com/settings/developers) | Sign-in with GitHub | New OAuth App |
-| [Google OAuth App](https://console.cloud.google.com/) | Sign-in with Google | APIs & Services → Credentials |
-| [OpenAI](https://platform.openai.com) | AI outfit recommendations | API Keys |
-| [OpenWeatherMap](https://openweathermap.org/api) | Weather data | Free tier |
+   ```bash
+   cp .env.example apps/web/.env.local
+   ```
 
-> **Note:** [Open-Meteo](https://open-meteo.com/) is also used as a weather source and requires no API key.
+3. Edit `apps/web/.env.local`. Replace the production defaults for `AUTH_URL` and `NEXT_PUBLIC_SITE_URL` with `http://localhost:3000`. Generate a random `AUTH_SECRET`:
 
-**Optional extra weather sources** (improve accuracy via multi-source aggregation):
+   ```bash
+   node -e "console.log(require('node:crypto').randomBytes(32).toString('base64'))"
+   ```
 
-| Service | Purpose | Link |
-|---|---|---|
-| [WeatherAPI.com](https://www.weatherapi.com/) | Additional weather source | Free tier |
-| [Visual Crossing](https://www.visualcrossing.com/) | Additional weather source | Free tier |
-| [Pirate Weather](https://pirateweather.net/) | Additional weather source | Free tier |
+4. Fill in the server credentials below and register the matching OAuth callbacks.
+5. Run `npm run dev` and open `http://localhost:3000`.
 
-### 2. Create the Supabase database
+If you use another port, update both URL variables and your OAuth registrations to match. Restart the server after editing environment variables.
 
-1. Create a new Supabase project.
-2. In the Supabase **SQL Editor**, run the contents of [`supabase/schema.sql`](supabase/schema.sql) to create all required tables.
+## Environment configuration
 
-### 3. Configure OAuth redirect URIs
+[`.env.example`](.env.example) is the full template. Keep secrets in `apps/web/.env.local` or your deployment environment; never commit them or give server secrets a `NEXT_PUBLIC_` prefix.
 
-- **GitHub** — set *Homepage URL* to `https://<your-domain>` and *Authorization callback URL* to `https://<your-domain>/api/auth/callback/github`
-- **Google** — add `https://<your-domain>/api/auth/callback/google` as an *Authorised redirect URI*
+| Variables | Purpose |
+| --- | --- |
+| `AUTH_SECRET` | Signs Auth.js JWT sessions; required for the web app |
+| `AUTH_URL`, `NEXT_PUBLIC_SITE_URL` | Local or production origin, including the correct port |
+| `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` | Server database access; the service-role key must stay server-side |
+| `AUTH_GITHUB_ID`, `AUTH_GITHUB_SECRET` | GitHub OAuth credentials |
+| `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET` | Google OAuth credentials |
+| `OPENAI_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY` | Hosted AI providers; configure the providers needed by the models you test |
+| `OPENWEATHER_API_KEY` | OpenWeatherMap weather source |
+| `WEATHERAPI_KEY`, `VISUALCROSSING_API_KEY`, `PIRATEWEATHER_API_KEY` | Optional additional weather sources; Open-Meteo needs no API key |
+| `DEV_EMAILS` | Optional developer accounts; grants privileged access and bypasses usage limits |
+| `CRON_SECRET` | Authenticates the automatic-recommendation worker when its scheduler is configured |
+| `EBAY_CLIENT_ID`, `EBAY_CLIENT_SECRET`, `SHOP_SOURCE_APPROVED` | Official Shop source; leave approval disabled until production access and source rights are approved |
 
-### 4. Deploy to Vercel
+The Free model list uses Gemini or Mistral. An OpenAI key alone does not configure those Free models.
 
-For the main web app, configure the Vercel project **Root Directory** as `apps/web`.
+## Database setup
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/COOLmanYT/skystyle)
+[`supabase/schema.sql`](supabase/schema.sql) contains baseline tables. It is not a complete replay of the deployed database. Review the SQL assets required by your environment before executing them.
 
-Or manually:
+Read the [migration notes](supabase/migrations/README.md), and [database regression guide](supabase/tests/README.md). The migration folder does not reconstruct all older remote history. Do not blindly reapply recorded migrations or push the partial chain to an existing project.
 
-```bash
-npm i -g vercel
-vercel
+Checkout is unavailable. Local setup does not activate purchases or change the deployed account policy.
+
+## OAuth callbacks
+
+Register the exact callback for each environment. For local GitHub and Google sign-in:
+
+```text
+http://localhost:3000/api/auth/callback/github
+http://localhost:3000/api/auth/callback/google
 ```
 
-### 5. Add environment variables
+For production, replace the origin with `https://skystyle.app`. Use a separately registered preview callback when testing those providers on previews.
 
-In your Vercel project go to **Settings → Environment Variables** and add every variable listed in [`.env.example`](.env.example):
+## Run the documentation site
 
-| Variable | Where to find it |
-|---|---|
-| `AUTH_SECRET` | Run `npx auth secret` locally and copy the output |
-| `AUTH_URL` | Your deployment URL, e.g. `https://your-domain.vercel.app` |
-| `AUTH_GITHUB_ID` | GitHub OAuth App → Client ID |
-| `AUTH_GITHUB_SECRET` | GitHub OAuth App → Client Secret |
-| `AUTH_GOOGLE_ID` | Google OAuth App → Client ID |
-| `AUTH_GOOGLE_SECRET` | Google OAuth App → Client Secret |
-| `SUPABASE_URL` | Supabase → Project Settings → API → Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Project Settings → API → `service_role` secret |
-| `OPENAI_API_KEY` | OpenAI → API Keys |
-| `OPENWEATHER_API_KEY` | OpenWeatherMap → My API Keys |
-| `WEATHERAPI_KEY` | *(optional)* WeatherAPI.com → Dashboard → API Key |
-| `VISUALCROSSING_API_KEY` | *(optional)* Visual Crossing → Account → API Key |
-| `PIRATEWEATHER_API_KEY` | *(optional)* Pirate Weather → [Request API Key](https://pirateweather.net/) |
-| `DEV_EMAILS` | *(optional)* Comma-separated emails granted dev mode (bypasses all limits) |
-
-### 6. Redeploy
-
-After saving the environment variables, trigger a redeployment from the Vercel dashboard so the new values take effect.
-
----
-
-## Local development
-
-```bash
-cp .env.example apps/web/.env.local
-# fill in values in apps/web/.env.local
-npm install
-npm run dev
-```
-
-## Docs local development
+After `npm ci`, run:
 
 ```bash
 npm run docs:dev
 ```
+
+Open the local URL printed by VitePress. To verify and preview the static output:
+
+```bash
+npm run docs:build
+npm run docs:preview
+```
+
+## Verify a change
+
+```bash
+npm test -- --runInBand
+npm run lint
+npm run build
+npm run docs:build
+```
+
+See the [testing guide](apps/docs/development/testing.md) for focused checks and the distinction between mocked tests and live acceptance.
+
+## Deployment configuration
+
+| Project | Vercel root directory | Intended domain |
+| --- | --- | --- |
+| Web | `apps/web` | `https://skystyle.app` |
+| Docs | `apps/docs` | `https://docs.skystyle.app` |
+
+The public API runs in the web app at `/api/v1` and requires no separate API deployment.
+
+Configure variables for the intended Vercel environment and register its OAuth callbacks before deploying. Production uses the production origin; previews use their own origin. Redeploy after changing deployment variables.
+
+Automatic recommendations use Supabase Cron and Vault. Follow the [scheduler guide](apps/docs/development/index.md#hosting-and-background-jobs); starting the app alone does not install a recurring job.
+
+## Troubleshooting
+
+| Symptom | Check |
+| --- | --- |
+| Missing environment variable | Put the value in `apps/web/.env.local` and restart the server |
+| Sign-in redirects to production or fails callback validation | Local URL variables, port, and registered callback must agree |
+| Missing table or column | Check baseline SQL and migration history against the feature being tested |
+| AI model unavailable | Confirm its provider is configured and allowed for the account tier |
+| Shop offers a retailer-search fallback | Expected while the approved source is unconfigured; see the [Shop guide](apps/docs/web-app/shop.md) |
+| Tests pass but a provider fails | Tests mock provider calls; verify real credentials and callbacks separately |

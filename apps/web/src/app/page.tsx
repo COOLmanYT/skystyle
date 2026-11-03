@@ -1,10 +1,11 @@
 "use client";
+import { displayMeasurement } from "@/lib/weather-measurements";
 
 import { useState, useEffect } from "react";
 import DemoLocationPicker, { ResolvedLocation } from "@/components/DemoLocationPicker";
 import WeatherEffectCard, { getWeatherCondition, formatHourlyTime, isHourlyCurrentOrFuture, HOURLY_FORECAST_LIMIT } from "@/components/WeatherEffectCard";
 import Link from "next/link";
-import V6PlanOverview from "@/components/V6PlanOverview";
+import PlanOverview from "@/components/PlanOverview";
 
 /** Returns true if semver string `a` is strictly greater than `b`. */
 function isVersionGreater(a: string, b: string): boolean {
@@ -41,19 +42,19 @@ interface HourlyForecast {
   time: string;
   temp: number;
   description: string;
-  rainChance: number;
-  windSpeed: number;
+  rainChance: number | null;
+  windSpeed: number | null;
 }
 
 interface WeatherData {
   temp: number;
   feelsLike: number;
-  humidity: number;
-  windSpeed: number;
+  humidity: number | null;
+  windSpeed: number | null;
   windDir: string;
   description: string;
-  rainChance: number;
-  uvIndex: number;
+  rainChance: number | null;
+  uvIndex: number | null;
   isDay: boolean;
   alerts: string[];
   stationName: string;
@@ -65,12 +66,12 @@ interface WeatherData {
     source: string;
     temp: number;
     feelsLike: number;
-    humidity: number;
-    windSpeed: number;
+    humidity: number | null;
+    windSpeed: number | null;
     windDir: string;
     description: string;
-    rainChance: number;
-    uvIndex: number;
+    rainChance: number | null;
+    uvIndex: number | null;
   }[];
 }
 
@@ -272,12 +273,12 @@ export default function Home() {
             {
               emoji: "📍",
               title: "Share your location",
-              desc: "Use GPS or enter any city. We find the nearest weather station for accurate data.",
+              desc: "Use GPS or enter any city. We fetch available weather for your chosen location.",
             },
             {
               emoji: "🌡️",
               title: "Real-time weather",
-              desc: "We pull hyper-local weather from the Bureau of Meteorology (Australia) or OpenWeatherMap.",
+              desc: "We pull weather from available providers, including BOM in Australia, OpenWeather and Open-Meteo.",
             },
             {
               emoji: "✨",
@@ -386,7 +387,7 @@ export default function Home() {
               {/* Weather card */}
               <WeatherEffectCard
                 condition={getWeatherCondition(weather.description)}
-                windSpeed={weather.windSpeed}
+                windSpeed={weather.windSpeed ?? 0}
                 className="rounded-2xl p-5 space-y-3"
                 style={{
                   background: "var(--card)",
@@ -415,10 +416,10 @@ export default function Home() {
 
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
                   {[
-                    { label: "Humidity", value: `${weather.humidity}%`, icon: "💧" },
-                    { label: "Rain chance", value: `${weather.rainChance}%`, icon: "🌧" },
-                    { label: "Wind", value: `${weather.windSpeed}km/h ${weather.windDir}`, icon: "💨" },
-                    { label: "UV Index", value: `${weather.uvIndex}`, icon: "☀️" },
+                    { label: "Humidity", value: weather.humidity === null ? "Unavailable" : `${weather.humidity}%`, icon: "💧" },
+                    { label: "Rain chance", value: weather.rainChance === null ? "Unavailable" : `${weather.rainChance}%`, icon: "🌧" },
+                    { label: "Wind", value: weather.windSpeed === null ? "Unavailable" : `${weather.windSpeed}km/h ${weather.windDir}`, icon: "💨" },
+                    { label: "UV Index", value: weather.uvIndex === null ? "Unavailable" : `${weather.uvIndex}`, icon: "☀️" },
                     { label: "Feels like", value: `${weather.feelsLike}°C`, icon: "🌡️" },
                     { label: "Time", value: weather.isDay ? "Daytime" : "Night-time", icon: weather.isDay ? "🌞" : "🌙" },
                   ].map(({ label, value, icon }) => (
@@ -505,10 +506,10 @@ export default function Home() {
                                 )}
                               </td>
                               <td className="text-right py-1 px-1">{s.temp}°C</td>
-                              <td className="text-right py-1 px-1">{s.humidity}%</td>
-                              <td className="text-right py-1 px-1">{s.windSpeed}km/h {s.windDir}</td>
-                              <td className="text-right py-1 px-1">{s.rainChance}%</td>
-                              <td className="text-right py-1 px-1">{s.uvIndex}</td>
+                              <td className="text-right py-1 px-1">{displayMeasurement(s.humidity,"%")}</td>
+                              <td className="text-right py-1 px-1">{displayMeasurement(s.windSpeed,"km/h")} {s.windSpeed === null ? "" : s.windDir}</td>
+                              <td className="text-right py-1 px-1">{displayMeasurement(s.rainChance,"%")}</td>
+                              <td className="text-right py-1 px-1">{displayMeasurement(s.uvIndex)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -540,10 +541,10 @@ export default function Home() {
                             {h.temp}°
                           </p>
                           <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.4 }}>
-                            <span aria-hidden="true">🌧</span>{h.rainChance}%
+                            <span aria-hidden="true">🌧</span>{displayMeasurement(h.rainChance,"%")}
                           </p>
                           <p className="text-xs" style={{ color: "var(--foreground)", opacity: 0.35 }}>
-                            <span aria-hidden="true">💨</span>{h.windSpeed}
+                            <span aria-hidden="true">💨</span>{displayMeasurement(h.windSpeed)}
                           </p>
                         </div>
                       ))}
@@ -613,7 +614,7 @@ export default function Home() {
               {/* AI recommendation — demo placeholder */}
               <WeatherEffectCard
                 condition={getWeatherCondition(weather.description)}
-                windSpeed={weather.windSpeed}
+                windSpeed={weather.windSpeed ?? 0}
                 className="rounded-2xl p-5 space-y-3"
                 style={{
                   background: "var(--card)",
@@ -652,9 +653,9 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Approved V6 policy; current account allowances remain unchanged. */}
-      <section id="pricing" className="px-6 py-16 max-w-6xl mx-auto" aria-label="Approved V6 plans">
-        <V6PlanOverview />
+      {/* Display verified current plan availability. */}
+      <section id="pricing" className="px-6 py-16 max-w-6xl mx-auto" aria-label="Plans and allowances">
+        <PlanOverview />
       </section>
 
       {/* Changelog Section */}

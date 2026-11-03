@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getWeather } from "@/lib/weather";
+import { getWeather, publicMeasurements } from "@/lib/weather";
 import { withApiAuth, ApiKeyContext, apiOptionsHandler } from "@/lib/api-middleware";
 
 const LAT_MIN = -90;
@@ -99,13 +99,14 @@ async function handleWeather(
     temp: isImperial ? celsiusToFahrenheit(weather.temp) : weather.temp,
     feels_like: isImperial ? celsiusToFahrenheit(weather.feelsLike) : weather.feelsLike,
     temp_unit: isImperial ? "°F" : "°C",
-    humidity_pct: weather.humidity,
-    wind_speed: isImperial ? kmhToMph(weather.windSpeed) : weather.windSpeed,
+    humidity_pct: weather.humidity ?? 0,
+    wind_speed: isImperial ? kmhToMph(weather.windSpeed ?? 0) : weather.windSpeed ?? 0,
     wind_speed_unit: isImperial ? "mph" : "km/h",
     wind_dir: weather.windDir,
     description: weather.description,
-    rain_chance_pct: weather.rainChance,
-    uv_index: weather.uvIndex,
+    rain_chance_pct: weather.rainChance ?? 0,
+    uv_index: weather.uvIndex ?? 0,
+      measurements: publicMeasurements(weather),
     is_day: weather.isDay,
     alerts: weather.alerts,
     source: weather.source,

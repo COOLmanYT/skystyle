@@ -33,7 +33,7 @@ export default function Checkbox({
   return (
     <label
       htmlFor={id}
-      className="sky-checkbox-label flex items-start gap-3 cursor-pointer select-none"
+      className="sky-checkbox-label flex min-h-11 items-start gap-3 py-1 cursor-pointer select-none"
       style={{ opacity: disabled ? 0.45 : 1 }}
     >
       <span className="sky-checkbox-wrapper flex-shrink-0 mt-0.5">

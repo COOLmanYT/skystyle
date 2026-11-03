@@ -5,6 +5,7 @@
  */
 export function sanitizeUrl(url: string): string | null {
   const trimmed = url.trim();
+  if (/^[\/\\]{2}/.test(trimmed) || /[\\\u0000-\u001f\u007f]/.test(trimmed)) return null;
   if (/^https?:\/\//i.test(trimmed)) return trimmed;
   if (trimmed.startsWith("/") || trimmed.startsWith("./") || trimmed.startsWith("../")) return trimmed;
   if (/^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed)) return null; // unsafe scheme

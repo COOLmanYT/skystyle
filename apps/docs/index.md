@@ -5,19 +5,21 @@ layout: home
 hero:
   name: "Sky Style Docs"
   text: "Weather-aware outfit intelligence"
-  tagline: Platform guides, deployment references, and the official API documentation
+  tagline: Get started, explore the app, and build with the public API
   image:
     src: /images/dashboard-2.png
     alt: Sky Style dashboard preview
   actions:
     - theme: brand
-      text: API Reference
-      link: /api/
+      text: Get Started
+      link: /web-app/getting-started
     - theme: alt
       text: Open Sky Style
       link: https://skystyle.app
 
 features:
+  - title: Dress for your day
+    details: Use local weather and your own closet to build an outfit, then refine it with follow-up questions.
   - title: AI Outfit API
     details: Access AI-powered outfit recommendations via REST. Authenticate with an API key and POST coordinates to get an instant outfit suggestion.
   - title: Weather Data API
@@ -25,13 +27,6 @@ features:
   - title: Closet API
     details: Read the closet of the key owner to build personalised integrations on top of the user's saved wardrobe.
 ---
-
-## Monorepo Layout
-
-- `apps/web` — Next.js production app (skystyle.app)
-- `apps/docs` — This VitePress documentation site
-- `apps/api` — Future standalone API scaffold
-- `supabase` — Schema and SQL assets
 
 ## Quick links
 
@@ -45,7 +40,6 @@ features:
 
 ## Development
 
-- [Development guide](/development)
+- [Contributor guide](/development/)
 - [Testing](/development/testing)
 - [Architecture](/development/architecture)
-

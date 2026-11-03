@@ -1,33 +1,39 @@
-# Public health endpoints
+# Health checks
 
-`GET /api/v1/health` returns aggregate read-only connectivity status, response time, and the database/AI/weather categories. No API key is required. Category endpoints:
+Health endpoints provide read-only connectivity diagnostics. They require no API key, return no account data and do not consume API credits.
 
-| Endpoint | Probe scope |
+| Endpoint | Checks |
 | --- | --- |
-| `/api/v1/health/db` | A bounded read-only database request; no row data returned |
-| `/api/v1/health/ai?provider=openai` | Hosted model-list reachability for OpenAI, Gemini or Mistral; no generation tokens or user BYOK keys |
-| `/api/v1/health/weather?provider=open-meteo` | Open-Meteo reachability only; no paid weather-source probes |
+| `GET /api/v1/health` | Combined database, hosted AI and weather status |
+| `GET /api/v1/health/db` | Database reachability without returning records |
+| `GET /api/v1/health/ai` | Hosted AI model-list connectivity, without generating text |
+| `GET /api/v1/health/weather` | Open-Meteo connectivity |
 
-Provider requests have a four-second timeout. Per-category results are cached for five minutes, concurrent refreshes share one request in each server process, and CDN responses may be cached for five minutes. `checkedAt` describes the cached measurement, not the request time. Status is `ok`, `degraded`, or `unconfigured`; connectivity is not a guarantee of generation, data accuracy or BYOK availability. Unsupported provider filters return 400. Raw errors, credentials and database records are never included.
+## Request
 
-This follows the intent of [PR #56](https://github.com/COOLmanYT/skystyle/pull/56) without merging it or copying its unrestricted paid weather probes.
-
-## Authenticated Shop endpoint
-
-`POST /api/shop` requires the normal authenticated web-app session. It is not an API-key endpoint and is not a new public entitlement.
-
-```json
-{
-  "query": "linen shirt for a lunch",
-  "region": "AU",
-  "size": "M relaxed fit",
-  "recommendationContext": {
-    "occasion": { "kind": "everyday" },
-    "budget": { "minAmount": 30, "maxAmount": 100, "currency": "AUD" }
-  }
-}
+```bash
+curl https://skystyle.app/api/v1/health
 ```
 
-Optional `modelId` must be available to the account. Pro/Dev may supply `userApiKey`, `byokProvider` and `clientCustomPrompt`. The request limit is 16,000 characters. Product fields are grounded in the source, not AI output; see [Shop](../web-app/shop).
+The AI endpoint optionally accepts `?provider=openai`, `?provider=gemini` or `?provider=mistral`. Weather accepts `?provider=open-meteo`. An unsupported filter returns HTTP 400.
 
-Responses include `status` (`ok`, `empty`, `unconfigured`), `products`, `model`, source timing, and a clear message. No AI call/charge occurs for empty or unconfigured sourcing. Errors use 400 for invalid inputs, 401 for no session, 403 for disabled/unavailable access, 402 for insufficient credits, 429 for usage/concurrent requests, and 502/503 for generation/source failures. Existing account allowances remain unchanged.
+## Reading the response
+
+The combined response includes:
+
+| Field | Meaning |
+| --- | --- |
+| `status` | `ok`, `degraded` or `unconfigured` |
+| `healthy` | True only when all required categories are healthy |
+| `responseTime` | Time to serve the diagnostic, in milliseconds |
+| `checkedAt` | Oldest category measurement time |
+| `cached` | Whether all category measurements came from the probe cache |
+| `services` | Per-category status, measurement time, response time and cache state |
+
+HTTP 200 means the diagnostic was returned successfully. Monitor the JSON `status` or `healthy` field to decide whether services are reachable. One unavailable category gives `degraded`; all categories missing configuration gives `unconfigured`.
+
+## Cache and scope
+
+Provider checks have a four-second timeout. Measurements and CDN responses may be cached for up to five minutes. `checkedAt` is the measurement time, not necessarily the time you sent the request.
+
+AI probes list models rather than generate recommendations. Weather probes check Open-Meteo and do not verify paid weather providers. Results do not establish BYOK availability, data accuracy or an uptime guarantee. Credentials and raw provider errors are excluded.

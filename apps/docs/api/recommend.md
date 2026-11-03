@@ -27,8 +27,8 @@ Returns an AI-generated outfit recommendation based on current weather at the gi
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `outfit` | `string` | Concise outfit recommendation (up to 120 words). |
-| `reasoning` | `string` | Explanation linking weather conditions to the outfit choices. |
+| `outfit` | `string` | Outfit advice as Markdown; may include [clothing references](./clothing-references). |
+| `reasoning` | `string` | Markdown explanation linking weather conditions to clothing choices. |
 | `weather` | `object` | Key weather conditions used (see [/weather](./weather) for field definitions). |
 | `model` | `string` | AI model that generated the recommendation. |
 | `generated_at` | `string` | ISO-8601 UTC timestamp. |
@@ -93,3 +93,7 @@ curl -X POST "https://skystyle.app/api/v1/recommend" \
   "generated_at": "2026-04-17T12:00:00.000Z"
 }
 ```
+
+## Development response additions
+
+The 6.3 candidate retains legacy weather fields and adds nullable [`measurements`](./weather#unavailable-measurements) to distinguish missing observations from real zeroes. Outfit and reasoning text can contain [clothing references](./clothing-references). These additions describe the development candidate, pending deployment.

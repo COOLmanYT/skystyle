@@ -1,6 +1,8 @@
 "use client";
+import { clearDemoWardrobe } from "@/lib/demo-wardrobe";
 
 import { useState, useRef, useEffect } from "react";
+import { clearByokSessions } from "@/lib/byok-storage";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useDashboardSections from "./useDashboardSections";
@@ -234,6 +236,7 @@ export default function HamburgerNav({
                     >
                       👕 Closet
                     </Link>
+                    <Link href="/outfits" onClick={()=>setMenuOpen(false)} className="block rounded-xl px-3 py-2 text-sm btn-interact" style={{color:"var(--foreground)"}}>Saved outfits</Link>
                   </div>
                 )}
               </div>
@@ -312,7 +315,7 @@ export default function HamburgerNav({
 
               {/* Sign Out (only when a sign-out action is provided) */}
               {signOutAction && (
-                <form action={signOutAction}>
+                <form action={signOutAction} onSubmit={() => { clearByokSessions(); clearDemoWardrobe(); }}>
                   <button
                     type="submit"
                     className="w-full text-left rounded-xl px-3 py-2.5 text-sm btn-interact"
